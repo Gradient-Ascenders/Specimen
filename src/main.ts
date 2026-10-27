@@ -38,6 +38,8 @@ import '@fontsource-variable/space-grotesk';
 import './style.css';
 import './cinematics/boss-defeat.css';
 import './ui/ui-theme.css';
+import './ui/liquid-loading.css';
+import './ui/interface-polish.css';
 
 const trailerShot = new URLSearchParams(window.location.search).get('trailer');
 if (trailerShot === 'opening' || trailerShot === 'goop') {
@@ -395,6 +397,7 @@ function startGame(): void {
         } finally { autoDetecting = false; }
       },
       applySettings: (nextSettings) => {
+        app.dataset.reducedMenuMotion = String(nextSettings.reduceMenuMotion);
         audio.setVolumes(nextSettings.masterVolume, nextSettings.soundEffectsVolume);
         music.setMasterVolume(nextSettings.masterVolume);
         music.setMusicVolume(nextSettings.musicVolume);
@@ -479,6 +482,8 @@ function startGame(): void {
     'objectiveChanged',
     ({ objective }) => gameFlow.setObjective(objective),
   );
+  const unsubscribeCheckpointReached = gameSession.events.on('checkpointReached',
+    (event) => gameFlow.notifyCheckpointReached(event));
   const unsubscribeTransitionStarted = gameSession.events.on(
     'transitionStarted',
     ({ levelId, message }) => {
@@ -626,6 +631,7 @@ function startGame(): void {
     window.removeEventListener('focus', focusAudio);
     document.removeEventListener('visibilitychange', focusAudio);
     unsubscribeObjectiveChanged();
+    unsubscribeCheckpointReached();
     unsubscribeGraphicsPreparation(); graphicsPreparationOverlay.dispose();
     goopSpeedOverlay.dispose();
     unsubscribeTransitionStarted();

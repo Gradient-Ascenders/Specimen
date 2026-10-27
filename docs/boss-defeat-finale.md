@@ -52,7 +52,27 @@ effects are omitted from the ending while combat and collapse cues remain.
 
 All five requested dialogue lines are preserved verbatim. Character dialogue
 uses the game’s existing subtitle/typewriter audio convention; there are no new
-recorded voice assets or third-party models, music or textures.
+recorded voice assets or third-party models or textures.
+
+## First Sunlight soundtrack
+
+`public/assets/audio/music/10-blackout-first-sunlight-ending.ogg` is copied
+unchanged from the approved `first-sunlight-complete-ending.ogg` (SHA-256
+`60212b64ba1f8fcb101ce5d51cd7df89ca8f785b9f4e105c99b00da2660ae175`).
+It is one 179-second stereo Vorbis stream: Claimed by the Void at 0–105s,
+six seconds of silence, then Exploration Theme at 111–179s, including the
+credits beginning at 133s. Both works are separately credited in `CREDITS.md`;
+the existing menu ledger and rolling credits read that same source.
+
+Real `begin()` creates one `CinematicMusic('ending', ENDING_TIMING.duration)`
+token at time zero. Fixed updates advance its clock through daylight and the
+credits without a restart. Rehearsal creates no token. The shared
+`BackgroundMusic` players cancel outgoing boss ownership/fades before starting
+the nonlooping score at normal speed and zero source offset, with the existing
+0.28 music gain and master/music controls. The supplied file owns its fades;
+the ending bypasses the usual runtime end envelope and stops immediately on
+completion, skip, reset or disposal. Other cinematic and boss mixes are unchanged.
+Pause, focus and slow-frame synchronization use the existing music owner.
 
 ## Preview and ownership
 

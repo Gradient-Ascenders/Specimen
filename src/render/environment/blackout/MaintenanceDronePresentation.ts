@@ -2,13 +2,12 @@ import { DEFAULT_USER_KEY_BINDINGS, keyLabel, type UserKeyBindings } from '../..
 import * as THREE from 'three';
 import { markDecorativeEffect } from '../../GraphicsResourcePolicy.ts';
 import { disposeShadowLight, setShadowMapUpdatesActive } from '../../ShadowLightResources.ts';
-import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 import type { MaintenanceDroneReadModel } from '../../../vehicles/MaintenanceDroneTypes.ts';
 import type { CollisionWorld } from '../../../physics/CollisionWorld.ts';
 import { BeamOcclusion } from '../../hazards/BeamOcclusion.ts';
 import type { BlackoutMaintenanceMaterials } from './BlackoutMaintenanceMaterials.ts';
-import { mapBlackoutPropUVs } from './BlackoutMaintenanceUVs.ts';
+import { MaintenanceDroneModel, type MaintenanceDroneModelLoader } from './MaintenanceDroneModel.ts';
 
 /** Worn, purely visual maintenance craft; gameplay/collision remain runtime-owned. */
 export class MaintenanceDronePresentation {
@@ -19,9 +18,8 @@ export class MaintenanceDronePresentation {
   private readonly status: HTMLDivElement;
   private readonly geometries = new Set<THREE.BufferGeometry>();
   private readonly materials = new Set<THREE.Material>();
-  private readonly fans: THREE.Group[] = [];
+  private readonly model: MaintenanceDroneModel;
   private readonly cones: { mesh: THREE.Mesh; baseOpacity: number }[] = [];
-  private readonly lamps: THREE.MeshStandardMaterial[] = [];
   private readonly dustPositions: Float32Array;
   private readonly dustGeometry: THREE.BufferGeometry;
   private readonly dust: THREE.Points;
@@ -48,77 +46,8 @@ export class MaintenanceDronePresentation {
     this.root.userData.presentationOnly = true;
     authoringRoot.add(this.root);
 
-    const mat = (color: number, roughness: number, metalness: number) => {
-      const m = new THREE.MeshStandardMaterial({ color, roughness, metalness });
-      this.materials.add(m);
-      return m;
-    };
-    const yellow = kit?.get('dronePaint') ?? mat(0xc79b27, .78, .35);
-    const edgeYellow = kit?.detail('droneTrim') ?? mat(0x84651c, .88, .28);
-    const darkMetal = kit?.get('machineryMetal') ?? mat(0x252a27, .52, .78);
-    const steel = kit?.detail('steel') ?? mat(0x66706b, .44, .82);
-    const rubber = kit?.detail('rubber') ?? mat(0x171a18, .96, .05);
-    const glass = mat(0x182522, .24, .35);
-    const shellGeo = this.own(new RoundedBoxGeometry(1.45, .38, 1.34, 4, .13));
-    const shell = new THREE.Mesh(shellGeo, yellow);
-    shell.name = 'maintenance-drone-worn-yellow-shell';
-    shell.position.y = .02;
-    this.root.add(shell);
-
-    // Raised service hatch, bumper rails and unmistakable hazard paint.
-    const hatch = new THREE.Mesh(this.own(new RoundedBoxGeometry(.69, .1, .65, 3, .045)), edgeYellow);
-    hatch.position.set(0, .245, -.04); this.root.add(hatch);
-    const window = new THREE.Mesh(this.own(new RoundedBoxGeometry(.37, .055, .2, 3, .025)), glass);
-    window.position.set(0, .31, -.1); this.root.add(window);
-    shell.castShadow = hatch.castShadow = true;
-    shell.receiveShadow = hatch.receiveShadow = window.receiveShadow = true;
-    for (const side of [-1, 1]) {
-      const rail = new THREE.Mesh(this.own(new THREE.CylinderGeometry(.035, .035, 1.13, 8)), darkMetal);
-      rail.rotation.z = Math.PI / 2; rail.position.set(0, -.07, side * .62); this.root.add(rail);
-      const stripe = new THREE.Mesh(this.own(new THREE.BoxGeometry(.28, .012, .018)), edgeYellow);
-      stripe.position.set(side * .39, .218, .655); stripe.rotation.y = -.28; this.root.add(stripe);
-    }
-    // Four guarded ducted fans with simple rotating three-blade rotors.
-    for (const x of [-.52, .52]) for (const z of [-.49, .49]) {
-      const fan = new THREE.Group(); fan.position.set(x, .25, z); fan.name = 'guarded-lift-fan'; this.root.add(fan);
-      const ring = new THREE.Mesh(this.own(new THREE.TorusGeometry(.195, .035, 7, 18)), darkMetal);
-      ring.rotation.x = Math.PI / 2; fan.add(ring);
-      const hub = new THREE.Mesh(this.own(new THREE.CylinderGeometry(.055, .07, .09, 10)), steel);
-      hub.position.y = .01; fan.add(hub);
-      for (let i = 0; i < 3; i++) {
-        const blade = new THREE.Mesh(this.own(new THREE.BoxGeometry(.13, .018, .07)), steel);
-        blade.position.set(Math.cos(i * Math.PI * 2 / 3) * .095, .012, Math.sin(i * Math.PI * 2 / 3) * .095);
-        blade.rotation.y = i * Math.PI * 2 / 3 + .3; fan.add(blade);
-      }
-      this.fans.push(fan);
-    }
-    // Functional-looking service fittings and bundled exposed cable, no weaponry.
-    const hoseMat = kit?.detail('rubber') ?? mat(0x332b1b, .92, .08);
-    for (let i = 0; i < 3; i++) {
-      const cable = new THREE.Mesh(this.own(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-.37 + i * .16, .02, .66), new THREE.Vector3(-.3 + i * .16, -.1, .72),
-        new THREE.Vector3(-.12 + i * .16, -.12, .69), new THREE.Vector3(-.07 + i * .16, -.015, .65),
-      ]), 12, .014, 5, false)), hoseMat);
-      this.root.add(cable);
-    }
-    for (const x of [-.49, .49]) {
-      const foot = new THREE.Mesh(this.own(new THREE.CylinderGeometry(.065, .085, .19, 8)), rubber);
-      foot.position.set(x, -.19, .43); this.root.add(foot);
-    }
-
-    // Bake once in object coordinates. Fan motion and flight never rewrite UVs.
-    if (kit) this.root.traverse(object => {
-      if (object instanceof THREE.Mesh && kit.owns(object.material as THREE.Material)) {
-        mapBlackoutPropUVs(object.geometry, (object.material as THREE.Material).userData.tileSizeMetres);
-      }
-    });
-
-    for (const [x, z] of [[-.47, -.684], [.47, -.684], [-.47, .684], [.47, .684]]) {
-      const lampMat = mat(0x44351a, .35, .18); lampMat.emissive.setHex(0xffc42e); lampMat.emissiveIntensity = .3;
-      this.lamps.push(lampMat);
-      const lamp = new THREE.Mesh(this.own(new THREE.SphereGeometry(.045, 8, 6)), lampMat);
-      lamp.position.set(x, .03, z); this.root.add(lamp);
-    }
+    this.model = new MaintenanceDroneModel(kit);
+    this.root.add(this.model.root);
 
     // At normal hover height, cover a 5 x 7 m landing deck with a soft local pool.
     // Keep one shadowed source; the beam geometry and occlusion use its angle.
@@ -166,6 +95,9 @@ export class MaintenanceDronePresentation {
     host.append(this.hud);
   }
 
+  /** Resolve authored geometry before the runtime compiles its material forms. */
+  prepare(loader?: MaintenanceDroneModelLoader): Promise<void> { return this.model.prepare(loader); }
+
   update(dt: number, state: MaintenanceDroneReadModel, activeVolt = true): void {
     if (this.disposed) return;
     const step = Math.max(0, Math.min(dt, .1)); this.elapsed += step;
@@ -186,14 +118,15 @@ export class MaintenanceDronePresentation {
       cone.mesh.position.y=-.13-beamLength/2;
     }
     for (const cone of this.cones) (cone.mesh.material as THREE.MeshBasicMaterial).opacity = cone.baseOpacity * ramp;
-    for (const fan of this.fans) {
+    for (let i = 0; i < this.model.rotors.length; i++) {
+      const fan = this.model.rotors[i]!;
       const spinning = state.powered || started;
-      fan.rotation.y += step * (spinning ? 21 : 0.35) * (this.fans.indexOf(fan) % 2 ? -1 : 1);
+      fan.rotation.y += step * (spinning ? 21 : 0.35) * (i % 2 ? -1 : 1);
     }
-    for (let i = 0; i < this.lamps.length; i++) {
-      this.lamps[i]!.emissiveIntensity = lit ? .8 + Math.sin(this.elapsed * 5 + i) * .16 : .16;
-      if (state.state === 'shorted') this.lamps[i]!.emissive.setHex(i % 2 ? 0xff421e : 0xffc42e);
-      else this.lamps[i]!.emissive.setHex(0xffc42e);
+    for (let i = 0; i < this.model.lamps.length; i++) {
+      this.model.lamps[i]!.emissiveIntensity = lit ? .8 + Math.sin(this.elapsed * 5 + i) * .16 : .16;
+      if (state.state === 'shorted') this.model.lamps[i]!.emissive.setHex(i % 2 ? 0xff421e : 0xffc42e);
+      else this.model.lamps[i]!.emissive.setHex(0xffc42e);
     }
     const positions = this.dustPositions;
     for (let i = 0; i < positions.length / 3; i++) {
@@ -245,6 +178,7 @@ export class MaintenanceDronePresentation {
     if (this.disposed) return;
     this.disposed = true;
     disposeShadowLight(this.spot);
+    this.model.dispose();
     this.root.removeFromParent(); this.root.clear(); this.hud.remove();
     for (const geometry of this.geometries) geometry.dispose();
     for (const material of this.materials) material.dispose();

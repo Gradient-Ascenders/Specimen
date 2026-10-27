@@ -6,7 +6,7 @@ import { ColliderTransformMode, CollisionLayer, DEFAULT_SOLID_COLLISION_LAYERS, 
 import type { SurfaceRegistry } from '../physics/SurfaceRegistry.ts';
 import { LiftDroneFlightPresentation } from '../render/hazards/LiftDroneFlightPresentation.ts';
 import { DroneBreakupPresentation } from '../render/hazards/DroneBreakupPresentation.ts';
-import { SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
+import { SecurityDronePresentationResources, type SecurityDroneGeometrySource } from '../render/hazards/SecurityDronePresentation.ts';
 import { SlimeDamageSystem } from '../systems/SlimeDamageSystem.ts';
 import { DroneProjectileSystem, type DroneProjectileTarget } from './DroneProjectileSystem.ts';
 import { SecurityDrone, type SecurityDroneTarget } from './SecurityDrone.ts';
@@ -45,8 +45,9 @@ export class ElevatorDroneEncounter {
     world: CollisionWorld, surfaces: SurfaceRegistry,
     bob: KinematicBody, goop: KinematicBody, targets: readonly DissolveTarget[],
     dissolve: DissolveSystem, requestDeath: (id: 'bob' | 'goop') => void,
-    surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture }) {
-    this.resources = new SecurityDronePresentationResources(surfaceMaps, true);
+    surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture },
+    presentationModels?: SecurityDroneGeometrySource) {
+    this.resources = new SecurityDronePresentationResources(surfaceMaps, true, true, presentationModels);
     this.room = room; this.world = world;
     this.breakup = new DroneBreakupPresentation(room.droneRoots.length);
     room.root.add(this.breakup.root);
@@ -115,7 +116,10 @@ export class ElevatorDroneEncounter {
     for (const s of this.slots) if (s.phase === 'approaching' || s.phase === 'firing') living++;
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i];
-      if (!this.ended && slot.phase === 'pending' && ROOM_FOUR_SPAWNS[i].time <= controller.readModel.elapsed + 1e-9 && living < 8) {
+      // Later waves reuse anchors. Wait for the previous hull (including its
+      // falling wreck) to clear before admitting another drone on that path.
+      if (!this.ended && slot.phase === 'pending' && ROOM_FOUR_SPAWNS[i].time <= controller.readModel.elapsed + 1e-9 && living < 8 &&
+          !this.slots.some((other, j) => other !== slot && other.root.visible && ROOM_FOUR_SPAWNS[j].anchor === ROOM_FOUR_SPAWNS[i].anchor)) {
         slot.phase = 'approaching'; slot.root.visible = true; living++;
         slot.target.mesh.visible = true; slot.drone.collider.visible = true;
         this.world.setTransformMode(slot.target.mesh, ColliderTransformMode.Dynamic);
@@ -193,6 +197,10 @@ export class ElevatorDroneEncounter {
       body.teleport(this.room.root.localToWorld(this.ejection)); body.applyKnockback(this.impulse);
       slot.ejected |= 1 << i;
     }
+  }
+
+  updateDetail(camera: THREE.Camera): void {
+    for (const slot of this.slots) if (slot.root.visible) slot.drone.presentation.updateDetail(camera);
   }
 
   diagnostics(): string {

@@ -9,8 +9,9 @@ export interface SurfaceRepairStep {
 }
 
 /** CPU inputs are borrowed; every returned GPU resource belongs to its caller. */
+export type CultivationTexture = THREE.DataTexture | THREE.CompressedTexture;
 export interface CultivationAssetSource {
-  textures(key: string): Record<string, THREE.DataTexture>;
+  textures(key: string): Record<string, CultivationTexture>;
   geometry(key: string, generate: () => THREE.BufferGeometry): THREE.BufferGeometry;
   geometries(key: string, generate: () => Record<string, THREE.BufferGeometry>): Record<string, THREE.BufferGeometry>;
   bounds(key: string, generate: () => Record<string, readonly number[]>): Readonly<Record<string, readonly number[]>>;
@@ -26,7 +27,9 @@ export class CultivationAssetOwner {
 export interface BakedArray {
   readonly offset: number;
   readonly length: number;
-  readonly type: 'Float32Array' | 'Uint32Array' | 'Uint16Array' | 'Uint8Array';
+  readonly type: 'Float32Array' | 'Int16Array' | 'Uint32Array' | 'Uint16Array' | 'Uint8Array';
+  /** Lossless word-delta stride. Decoded directly into the caller's own copy. */
+  readonly delta?: number;
 }
 export interface BakedGeometry {
   readonly attributes: Readonly<Record<string, BakedArray & { itemSize: number; normalized: boolean }>>;
@@ -37,6 +40,7 @@ export interface BakedGeometry {
 }
 export interface BakedTexture {
   readonly pixels: BakedArray;
+  readonly bc7?: readonly { readonly pixels: BakedArray; readonly width: number; readonly height: number }[];
   readonly width: number;
   readonly height: number;
   readonly name: string;
@@ -60,9 +64,9 @@ export interface CultivationAssetManifest {
 }
 
 const MAGIC = 'SPCCUL01';
-const arrayTypes = { Float32Array, Uint32Array, Uint16Array, Uint8Array };
+const arrayTypes = { Float32Array, Int16Array, Uint32Array, Uint16Array, Uint8Array };
 
-/** Validated lossless buffers; no generation, triangle search, or global cache. */
+/** Validated offline buffers; no generation, triangle search, or global cache. */
 export class CultivationBakedAssets implements CultivationAssetSource {
   readonly manifest: CultivationAssetManifest;
   private readonly bytes: ArrayBuffer;
@@ -78,10 +82,21 @@ export class CultivationBakedAssets implements CultivationAssetSource {
     }
     for (const maps of Object.values(manifest.textures)) for (const map of Object.values(maps)) {
       if (!Number.isSafeInteger(map.width) || !Number.isSafeInteger(map.height) || map.width < 1 || map.height < 1 ||
-          map.pixels.type !== 'Uint8Array' || map.pixels.length !== map.width * map.height * 4) {
+          map.pixels.type !== 'Uint8Array' || map.pixels.delta !== undefined || (!map.bc7 && map.pixels.length !== map.width * map.height * 4)) {
         throw new Error(`Invalid Cultivation texture: ${map.name}`);
       }
       this.array(map.pixels);
+      if (map.bc7) {
+        if (map.width !== map.height || (map.width & (map.width - 1)) ||
+            map.bc7.length !== Math.log2(map.width) + 1 ||
+            JSON.stringify(map.pixels) !== JSON.stringify(map.bc7[0]?.pixels)) throw new Error('Invalid Cultivation BC7 chain.');
+        for (const [level, mip] of map.bc7.entries()) {
+          const size = Math.max(1, map.width >> level);
+          if (mip.width !== size || mip.height !== size || mip.pixels.type !== 'Uint8Array' || mip.pixels.delta !== undefined ||
+              mip.pixels.length !== Math.ceil(size / 4) ** 2 * 16) throw new Error('Invalid Cultivation BC7 mip.');
+          this.array(mip.pixels);
+        }
+      }
     }
     for (const geometry of Object.values(manifest.geometries)) {
       if (!geometry.attributes.position || !Array.isArray(geometry.groups)) throw new Error('Invalid Cultivation geometry.');
@@ -120,6 +135,7 @@ export class CultivationBakedAssets implements CultivationAssetSource {
       : undefined;
     if (!Type || !Number.isSafeInteger(spec.offset) || !Number.isSafeInteger(spec.length) || spec.offset < 0 ||
         spec.length < 0 || spec.offset % Type.BYTES_PER_ELEMENT ||
+        (spec.delta !== undefined && (!Number.isInteger(spec.delta) || spec.delta < 1 || spec.delta > 16 || Type.BYTES_PER_ELEMENT < 2)) ||
         spec.offset + spec.length * Type.BYTES_PER_ELEMENT > this.bytes.byteLength - this.byteOffset) {
       throw new Error('Invalid or truncated Cultivation asset buffer.');
     }
@@ -127,11 +143,26 @@ export class CultivationBakedAssets implements CultivationAssetSource {
     return new Type(this.bytes, this.byteOffset + spec.offset, spec.length);
   }
 
-  textures(key: string): Record<string, THREE.DataTexture> {
+  private geometryArray(spec:BakedArray):THREE.TypedArray{
+    const source=this.array(spec);
+    // Copy bytes rather than float values: encoded float words may contain
+    // NaN bit patterns, whose payload must survive until lossless decoding.
+    const bytes=new Uint8Array(source.buffer,source.byteOffset,source.byteLength).slice();
+    if(spec.delta){
+      const Words=source.BYTES_PER_ELEMENT===4?Uint32Array:Uint16Array;
+      const words=new Words(bytes.buffer);
+      for(let i=spec.delta;i<words.length;i++)words[i]+=words[i-spec.delta];
+    }
+    return new arrayTypes[spec.type](bytes.buffer);
+  }
+
+  textures(key: string): Record<string, CultivationTexture> {
     const maps = this.manifest.textures[key];
     if (!maps) throw new Error(`Missing baked Cultivation textures: ${key}`);
     return Object.fromEntries(Object.entries(maps).map(([role, spec]) => {
-      const texture = new THREE.DataTexture(this.array(spec.pixels) as Uint8Array, spec.width, spec.height);
+      const texture = spec.bc7
+        ? new THREE.CompressedTexture(spec.bc7.map(mip => ({data:this.array(mip.pixels) as Uint8Array, width:mip.width, height:mip.height})), spec.width, spec.height, THREE.RGBA_BPTC_Format)
+        : new THREE.DataTexture(this.array(spec.pixels) as Uint8Array, spec.width, spec.height);
       texture.name = spec.name; texture.colorSpace = spec.colorSpace;
       texture.wrapS = spec.wrapS; texture.wrapT = spec.wrapT;
       texture.magFilter = spec.magFilter; texture.minFilter = spec.minFilter;
@@ -148,9 +179,9 @@ export class CultivationBakedAssets implements CultivationAssetSource {
     const geometry = new THREE.BufferGeometry();
     for (const [name, attribute] of Object.entries(spec.attributes)) {
       // Presentation code may edit UVs; never lend mutable geometry arrays.
-      geometry.setAttribute(name, new THREE.BufferAttribute(this.array(attribute).slice(), attribute.itemSize, attribute.normalized));
+      geometry.setAttribute(name, new THREE.BufferAttribute(this.geometryArray(attribute), attribute.itemSize, attribute.normalized));
     }
-    if (spec.index) geometry.setIndex(new THREE.BufferAttribute(this.array(spec.index).slice(), 1));
+    if (spec.index) geometry.setIndex(new THREE.BufferAttribute(this.geometryArray(spec.index), 1));
     for (const group of spec.groups) geometry.addGroup(group.start, group.count, group.materialIndex);
     geometry.boundingBox = spec.box
       ? new THREE.Box3(new THREE.Vector3().fromArray(spec.box), new THREE.Vector3().fromArray(spec.box, 3))

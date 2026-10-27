@@ -10,13 +10,15 @@ import { requiresTransmissionPreparation } from './TransmissionPreparation.ts';
 type Drawable = THREE.Mesh | THREE.Points | THREE.Line | THREE.Sprite;
 interface Configuration { key: string; visible: boolean[]; dark: boolean; z: number; ready: boolean; lightingKey?: string; }
 interface Step { label?: string; run: () => void | Promise<unknown>; }
-const ROOT_ROOMS: readonly LevelTwoAuthoredRoomId[] = [1, 1, 2, 2, 2, 3, 4, 5];
+const ROOT_ROOMS: readonly LevelTwoAuthoredRoomId[] = [1, 1, 2, 2, 2, 3, 4, 5, 4];
 const DIAGNOSTIC_HISTORY_LIMIT = 128;
+const FOREGROUND_COMPILE_BATCH_SIZE = 128;
+const MAX_STARTUP_COMPILER_JOBS = 4;
 
 /** A single bounded GPU preparation queue. It never changes the live room hierarchy. */
 export class CultivationPreparationQueue {
   readonly diagnostics = { constructionMs: 0, initialMs: 0, startupMs: 0, workMs: 0, textureMs: 0, compileWaitMs: 0, compileSubmissionMs: 0, compileAsyncWaitMs: 0, compileSubmissions: 0, skippedTransmissionObjects: 0, primeMs: 0, collectionMs: 0, maxStepMs: 0,
-    intent: 'idle' as 'idle' | 'current' | 'handoff' | 'speculative', deferredTicks: 0, outstandingBatches: 0,
+    intent: 'idle' as 'idle' | 'current' | 'handoff' | 'speculative', deferredTicks: 0, outstandingBatches: 0, compilerJobs: 0, maxCompilerJobs: 0,
     batches: [] as {label: string; objects: number; submissionMs: number; elapsedMs: number}[],
     reusedProgramObjects: 0, retainedMaterialCopies: 0,
     slowSteps: [] as {label: string; ms: number; z: number; dark: boolean}[], completed: 0, reused: 0, total: 0, pending: false, configurations: [] as {z: number; dark: boolean; elapsedMs: number}[] };
@@ -46,6 +48,7 @@ export class CultivationPreparationQueue {
   private upcoming: Configuration | undefined;
   private startupComplete = false;
   private startupCoverage: Configuration | undefined;
+  private startupConfiguration: Configuration | undefined;
   private configStarted = 0;
   private lastTick = -1;
   private readonly overlay: HTMLDivElement | undefined;
@@ -57,10 +60,11 @@ export class CultivationPreparationQueue {
     this.backgroundSupported = layer.renderer.extensions.has('KHR_parallel_shader_compile');
     this.roots = [preview.roomOne.root, preview.roomOneToTwoPassage.root, preview.roomTwo.root,
       preview.roomTwoToThreeGoopPassage.root, preview.roomTwoToThreeBobAirDuct.root,
-      preview.roomThree.root, preview.roomFour.root, preview.roomFive.root];
+      preview.roomThree.root, preview.roomFour.root, preview.roomFive.root, preview.roomFourLighting];
     this.camera = layer.cameraRig.camera.clone();
     const saved = this.roots.map(root => root.visible);
     const savedLiftGeometry = preview.roomFourGeometry.visible;
+    const savedLiftEntrance = preview.roomFourEntranceGeometry.visible;
     const add = (z: number, dark: boolean) => {
       const visible = this.roots.map(root => root.visible), key = this.key(visible, dark);
       if (!this.configurations.some(c => c.key === key)) this.configurations.push({key, visible, dark, z, ready: false});
@@ -76,6 +80,7 @@ export class CultivationPreparationQueue {
     }
     this.roots.forEach((root, i) => root.visible = saved[i]);
     preview.roomFourGeometry.visible = savedLiftGeometry;
+    preview.roomFourEntranceGeometry.visible = savedLiftEntrance;
     this.diagnostics.total = this.configurations.length;
     preview.root.userData.preparation = this.diagnostics;
     if (host && typeof document !== 'undefined') {
@@ -114,12 +119,12 @@ export class CultivationPreparationQueue {
     // Room 5's searchlights enter its render scope. Prepare that smaller layout
     // first rather than leaving it behind unrelated earlier-room work.
     this.upcoming = this.configurations.find(config => !config.ready && !config.dark &&
-      config.visible.every((visible, i) => visible === (i === 6))) ?? this.liftExitConfiguration();
+      config.visible[8] && config.visible.slice(0, 8).every((visible, i) => visible === (i === 6))) ?? this.liftExitConfiguration();
   }
 
   private liftExitConfiguration(): Configuration | undefined {
     return this.configurations.find(config => config.dark &&
-      config.visible.every((visible, i) => visible === (i === 6 || i === 7)));
+      config.visible[8] && config.visible.slice(0, 8).every((visible, i) => visible === (i === 6 || i === 7)));
   }
 
   /** Called after visibility selection, before any unprepared scene can be rendered. */
@@ -188,7 +193,10 @@ export class CultivationPreparationQueue {
       shared = {key, visible, dark: false, z: 0, ready: false};
       this.configurations.push(shared); this.diagnostics.total++;
     }
-    await this.prepareConfiguration(shared);
+    this.startupConfiguration = shared;
+    try { await this.prepareConfiguration(shared); }
+    finally { this.startupConfiguration = undefined; }
+    if (this.disposed) return;
     this.startupCoverage = shared;
     this.diagnostics.initialMs = performance.now() - started;
     this.priority = undefined;
@@ -305,7 +313,7 @@ export class CultivationPreparationQueue {
       if (++visited % 32 === 0) yield {label:'collect-scene', run: () => {}};
     }
     const padding = new CultivationLightLayout(scene);
-    // Only the bounded layout needs comparison samplers, including dormant
+    // Only the bounded layout needs shadow samplers, including dormant
     // filler slots. Do not allocate nine unused searchlight maps for a primer.
     scene.traverseVisible(light => {
       if (!(light instanceof THREE.SpotLight || light instanceof THREE.PointLight || light instanceof THREE.DirectionalLight) ||
@@ -313,8 +321,9 @@ export class CultivationPreparationQueue {
       const depth = light instanceof THREE.PointLight
         ? new THREE.CubeDepthTexture(1, THREE.UnsignedIntType)
         : new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
-      depth.compareFunction = THREE.LessEqualCompare;
-      depth.minFilter = depth.magFilter = THREE.LinearFilter;
+      const compare = this.layer.renderer.shadowMap.type === THREE.PCFShadowMap;
+      depth.compareFunction = compare ? THREE.LessEqualCompare : null;
+      depth.minFilter = depth.magFilter = compare ? THREE.LinearFilter : THREE.NearestFilter;
       const target = light instanceof THREE.PointLight
         ? new THREE.WebGLCubeRenderTarget(1)
         : new THREE.WebGLRenderTarget(1, 1);
@@ -345,7 +354,9 @@ export class CultivationPreparationQueue {
       // the hidden originals only lengthens startup and background slices.
       if (!materials.some(material => material.visible)) continue;
       const geometry = source.geometry;
-      const feature = source.type + ':' + source.receiveShadow + ':' + (source instanceof THREE.InstancedMesh ? 'instanced:' + !!source.instanceColor : 'ordinary') + ':' +
+      // receiveShadow is a uniform in Three r185, not a shader variant. The
+      // same live material/geometry features can share a preparation copy.
+      const feature = source.type + ':' + (source instanceof THREE.InstancedMesh ? 'instanced:' + !!source.instanceColor : 'ordinary') + ':' +
         Object.entries(geometry.attributes).map(([name, a]) => name + a.itemSize + ':' + a.normalized).sort().join(',') + ':' +
         Object.entries(geometry.morphAttributes).map(([name, entries]) => name + ':' + entries.length).sort().join(',');
       const proxy = clonePrewarmDrawable(source, this.instanceDisposers) as Drawable; proxy.visible = true; proxy.frustumCulled = false; proxy.castShadow = false;
@@ -462,28 +473,25 @@ export class CultivationPreparationQueue {
     if (!transmissionRequired) this.diagnostics.skippedTransmissionObjects += opaquePrograms.length;
     const passes = [[programs, false, scene], [transmissionPrograms, true, scene], [shadows, true, shadowScene]] as const;
     for (const [objects, shadowTarget, targetScene] of passes) {
+      const label = targetScene === shadowScene ? 'shadow' : shadowTarget ? 'linear' : 'screen';
+      if (config === this.startupConfiguration && this.backgroundSupported && objects.length > FOREGROUND_COMPILE_BATCH_SIZE) {
+        // Startup owns the loading screen. Feed several independent compiler
+        // batches, yielding to paint between submissions, then await the whole
+        // pass before any linear/screen material copy can be reused.
+        yield {label:'startup-'+label+'-compile', run: () => this.compileStartupPass(objects, shadowTarget, targetScene, label, config)};
+        continue;
+      }
       for (let i = 0; i < objects.length;) {
         // A requested room can submit a larger compiler batch while the loading
         // screen is already up. Introduce one background object at a time:
         // parallel driver compilation still competes with live draws AFTER a
         // submission returns, beyond the synchronous slice budget. Keep the
         // remaining work resumable and promote it on demand at the doorway.
-        const batch = objects.slice(i, i + (this.priority === config ? 128 : 1));
+        const batch = objects.slice(i, i + (this.priority === config ? FOREGROUND_COMPILE_BATCH_SIZE : 1));
         i += batch.length;
         const group = new THREE.Group(); group.add(...batch);
         yield {label: targetScene === shadowScene ? 'shadow-compile' : shadowTarget ? 'transmission-compile' : 'compile', run: () => {
-          const start = performance.now();
-          const result = this.withState(true, shadowTarget, () => this.layer.renderer.compileAsync(group, this.camera, targetScene));
-          const submissionMs = performance.now() - start;
-          this.diagnostics.compileSubmissionMs += submissionMs; this.diagnostics.compileSubmissions++;
-          return result.then(() => {
-            const elapsedMs = performance.now()-start;
-            this.diagnostics.compileWaitMs += elapsedMs;
-            this.diagnostics.compileAsyncWaitMs += Math.max(0, elapsedMs - submissionMs);
-            this.diagnostics.batches.push({label:targetScene === shadowScene ? 'shadow' : shadowTarget ? 'linear' : 'screen', objects:batch.length, submissionMs, elapsedMs});
-            if (this.diagnostics.batches.length > DIAGNOSTIC_HISTORY_LIMIT) this.diagnostics.batches.shift();
-            group.clear();
-          });
+          return this.compileBatch(group, shadowTarget, targetScene, label, true);
         }};
       }
     }
@@ -536,6 +544,62 @@ export class CultivationPreparationQueue {
       }
       padding.dispose(); scene.clear(); shadowScene.clear();
     }
+  }
+
+  private compileBatch(group: THREE.Group, shadowTarget: boolean, scene: THREE.Scene, label: string, countWait: boolean): Promise<void> {
+    const start = performance.now(), objects = group.children.length;
+    let result: Promise<unknown>;
+    try { result = this.withState(true, shadowTarget, () => this.layer.renderer.compileAsync(group, this.camera, scene)); }
+    catch (error) { group.clear(); throw error; }
+    const submissionMs = performance.now()-start;
+    this.diagnostics.compileSubmissionMs += submissionMs; this.diagnostics.compileSubmissions++;
+    return result.then(() => {
+      const elapsedMs = performance.now()-start;
+      if (countWait) {
+        this.diagnostics.compileWaitMs += elapsedMs;
+        this.diagnostics.compileAsyncWaitMs += Math.max(0, elapsedMs-submissionMs);
+      }
+      this.diagnostics.batches.push({label, objects, submissionMs, elapsedMs});
+      if (this.diagnostics.batches.length > DIAGNOSTIC_HISTORY_LIMIT) this.diagnostics.batches.shift();
+    }).finally(() => group.clear());
+  }
+
+  private async compileStartupPass(objects: readonly Drawable[], shadowTarget: boolean, scene: THREE.Scene, label: string, config: Configuration): Promise<void> {
+    const started = performance.now(), beforeSubmission = this.diagnostics.compileSubmissionMs;
+    const pending = new Set<Promise<void>>();
+    let failed = false, failure: unknown;
+    try {
+      for (let i = 0; i < objects.length; i += FOREGROUND_COMPILE_BATCH_SIZE) {
+        // Yield before even the first batch: the queue owns one compound wait,
+        // and records each actual synchronous submission separately below.
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        if (this.disposed || failed) break;
+        const group = new THREE.Group(); group.add(...objects.slice(i, i+FOREGROUND_COMPILE_BATCH_SIZE));
+        const start = performance.now();
+        const job = this.compileBatch(group, shadowTarget, scene, label, false).catch(error => {
+          if (!failed) { failed = true; failure = error; }
+        }).finally(() => { pending.delete(job); this.diagnostics.compilerJobs--; });
+        pending.add(job); this.diagnostics.compilerJobs++;
+        this.diagnostics.maxCompilerJobs = Math.max(this.diagnostics.maxCompilerJobs, this.diagnostics.compilerJobs);
+        const ms = performance.now()-start;
+        this.diagnostics.workMs += ms; this.diagnostics.maxStepMs = Math.max(this.diagnostics.maxStepMs, ms);
+        if (ms > 20) {
+          this.diagnostics.slowSteps.push({label:'startup-'+label+'-compile', ms, z:config.z, dark:config.dark});
+          if (this.diagnostics.slowSteps.length > DIAGNOSTIC_HISTORY_LIMIT) this.diagnostics.slowSteps.shift();
+        }
+        if (pending.size >= MAX_STARTUP_COMPILER_JOBS) await Promise.race(pending);
+      }
+    } catch (error) { if (!failed) { failed = true; failure = error; } }
+    finally {
+      // Polls retain material.currentProgram, even after cancellation/failure.
+      // Finish submitted work before the queue may release its material copies.
+      await Promise.all(pending);
+      const elapsed = performance.now()-started;
+      // Count wall time once, rather than adding overlapping batch durations.
+      this.diagnostics.compileWaitMs += elapsed;
+      this.diagnostics.compileAsyncWaitMs += Math.max(0, elapsed-(this.diagnostics.compileSubmissionMs-beforeSubmission));
+    }
+    if (failed) throw failure;
   }
 
   /** State is restored synchronously, before compileAsync yields to gameplay. */

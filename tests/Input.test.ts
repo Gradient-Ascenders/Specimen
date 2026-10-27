@@ -69,26 +69,6 @@ test('restart-key orphan repeat cannot retrigger after input reset', () => {
   assertOrphanRepeatIsIgnored('KeyR', 'debugReset');
 });
 
-test('room debug teleports use top-row number keys without repeat retriggers', () => {
-  for (const [code, action] of [
-    ['Digit1', 'debugTeleportRoomOne'],
-    ['Digit2', 'debugTeleportRoomTwo'],
-    ['Digit3', 'debugTeleportRoomThree'],
-    ['Digit4', 'debugTeleportRoomFour'],
-    ['Digit5', 'debugTeleportRoomFive'],
-  ] as const) {
-    assertOrphanRepeatIsIgnored(code, action);
-  }
-});
-
-test('level completion debug shortcut uses zero without repeat retriggers', () => {
-  assertOrphanRepeatIsIgnored('Digit0', 'debugCompleteLevel');
-});
-
-test('invincibility debug shortcut uses I without repeat retriggers', () => {
-  assertOrphanRepeatIsIgnored('KeyI', 'debugToggleInvincibility');
-});
-
 test('movement-key orphan repeat cannot reactivate after input reset', () => {
   assertOrphanRepeatIsIgnored('KeyW', 'moveForward');
 });

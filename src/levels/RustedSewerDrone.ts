@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /** Damaged armoured scout with exposed machinery and broken rotor guards. */
-export function createRustedSewerDrone(rusted = true): { body: THREE.Mesh; eye: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial> } {
+export function createRustedSewerDrone(rusted = true, authoredReplacement = false): { body: THREE.Mesh; eye: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial> } {
   const rust = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: .96, metalness: .4, side: THREE.DoubleSide });
   const geometry = new THREE.SphereGeometry(1, 32, 20, rusted ? .2 : 0, Math.PI * (rusted ? 1.88 : 2)); geometry.scale(1.25, .62, 1);
   const positions = geometry.getAttribute('position'), colours = new Float32Array(positions.count * 3);
@@ -12,6 +12,15 @@ export function createRustedSewerDrone(rusted = true): { body: THREE.Mesh; eye: 
   }
   geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
   const body = new THREE.Mesh(geometry, rust);
+  if(authoredReplacement){
+    const eye=new THREE.Mesh(new THREE.SphereGeometry(.2,16,12),new THREE.MeshBasicMaterial({color:0x41180a}));
+    eye.position.set(0,.05,-1.18);body.add(eye);
+    for(const stage of [1,2]){
+      const anchor=new THREE.Group();anchor.name=`room-5-wreck-stage-${stage}`;
+      anchor.userData.damageStage=stage;body.add(anchor);
+    }
+    return {body,eye};
+  }
   const dark = new THREE.MeshStandardMaterial({ color: 0x192224, roughness: .72, metalness: .65 });
   const worn = new THREE.MeshStandardMaterial({ color: rusted ? 0x70503a : 0x4c626b, roughness: .88, metalness: .5 });
   const add = (geometry: THREE.BufferGeometry, material: THREE.Material, x: number, y: number, z: number) => {

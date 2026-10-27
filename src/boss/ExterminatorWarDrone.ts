@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { FinalBossReadModel } from './FinalBossController.ts';
+import { ExterminatorBossRig } from './ExterminatorBossRig.ts';
 
 /** Encounter-owned industrial hero asset. Static detail is merged by material;
  * only four fans, two gun drums and the core shutters remain articulated. */
 export class ExterminatorWarDrone {
   readonly root=new THREE.Group();
   readonly coreMount=new THREE.Vector3(0,-.1,-4.65);
+  private authored:ExterminatorBossRig|undefined;
   private readonly geometries=new Set<THREE.BufferGeometry>();
   private readonly materials=new Set<THREE.Material>();
   private readonly rotors:THREE.Group[]=[];
@@ -171,6 +173,7 @@ export class ExterminatorWarDrone {
   update(time:number,open:boolean,phase:1|2,dt:number,model?:Readonly<FinalBossReadModel>,target?:THREE.Vector3Like):void {
     this.hitRemaining=Math.max(0,this.hitRemaining-dt);this.hitTime.value+=dt;
     this.hitStrength.value=(this.hitRemaining/.3)**2;
+    if(this.authored){this.authored.update(time,open,phase,dt,model,target);return;}
     const gun=model?.state==='combat'&&model.attack==='gun-blast',defend=model?.shieldActive===true;
     const spin=gun?(model.stage==='telegraph'?4+model.progress*31:35):model?.attack==='ram'?
       model.stage==='telegraph'?15+model.progress*50:model.stage==='active'?65:25:defend?22:phase===2?25:17;
@@ -187,20 +190,40 @@ export class ExterminatorWarDrone {
     }
     this.red.color.setHex(gun?0xff7337:phase===2?0xff182f:0xff3041);
   }
-  kickGuns():void {for(let i=0;i<2;i++){this.recoil[i]=.24;this.flashTime[i]=.065;this.flashes[i]!.visible=true;}}
+  adoptModel(root:THREE.Object3D):void {
+    if(this.authored)throw new Error('Exterminator model already prepared.');
+    const rig=new ExterminatorBossRig(root);
+    this.root.clear();this.root.add(root);this.authored=rig;
+    for(const g of this.geometries)g.dispose();for(const m of this.materials)m.dispose();
+    this.geometries.clear();this.materials.clear();
+    root.traverse(o=>{
+      if(!(o instanceof THREE.Mesh))return;
+      for(const material of Array.isArray(o.material)?o.material:[o.material]) {
+        if(!(material instanceof THREE.MeshStandardMaterial)||/_(Red|Amber|White)$/.test(material.name))continue;
+        material.onBeforeCompile=shader=>{
+          shader.uniforms.uBossHit=this.hitStrength;shader.uniforms.uBossHitTime=this.hitTime;
+          shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nuniform float uBossHit,uBossHitTime;')
+            .replace('#include <begin_vertex>','#include <begin_vertex>\ntransformed+=uBossHit*vec3(sin(uBossHitTime*135.)*.07,sin(uBossHitTime*111.)*.045,cos(uBossHitTime*127.)*.055);');
+        };
+        material.customProgramCacheKey=()=> 'exterminator-authored-hit-v1';material.needsUpdate=true;
+      }
+    });
+  }
+  kickGuns():void {if(this.authored){this.authored.kickGuns();return;}for(let i=0;i<2;i++){this.recoil[i]=.24;this.flashTime[i]=.065;this.flashes[i]!.visible=true;}}
   reactToChargedHit():void {this.hitRemaining=.3;this.hitTime.value=0;this.hitStrength.value=1;}
   get hitReactionStrength():number {return this.hitStrength.value;}
-  copyGunMuzzle(index:number,out:THREE.Vector3):THREE.Vector3 {return this.muzzles[index]!.getWorldPosition(out);}
-  copyEyeMuzzle(out:THREE.Vector3):THREE.Vector3 {return this.eyeMuzzle.getWorldPosition(out);}
+  copyGunMuzzle(index:number,out:THREE.Vector3):THREE.Vector3 {return this.authored?this.authored.copyGunMuzzle(index,out):this.muzzles[index]!.getWorldPosition(out);}
+  copyEyeMuzzle(out:THREE.Vector3):THREE.Vector3 {return this.authored?this.authored.copyEyeMuzzle(out):this.eyeMuzzle.getWorldPosition(out);}
   reset():void {
     this.hitRemaining=0;this.hitStrength.value=0;this.hitTime.value=0;
+    if(this.authored){this.authored.reset();return;}
     for(const shutter of this.shutters)shutter.position.y=0;
     for(const rotor of this.rotors)rotor.rotation.y=0;
     for(const drum of this.drums)drum.rotation.z=0;
     for(const pod of this.pods)pod.rotation.x=0;
     for(let i=0;i<2;i++){this.recoil[i]=0;this.flashTime[i]=0;this.pods[i]!.position.z=-2.4;this.flashes[i]!.visible=false;}
   }
-  dispose():void {this.root.removeFromParent();this.root.clear();for(const g of this.geometries)g.dispose();for(const m of this.materials)m.dispose();}
+  dispose():void {this.authored?.dispose();this.root.removeFromParent();this.root.clear();for(const g of this.geometries)g.dispose();for(const m of this.materials)m.dispose();}
   private geom<T extends THREE.BufferGeometry>(g:T):T {this.geometries.add(g);return g;}
   private basic(color:number):THREE.MeshBasicMaterial {const m=new THREE.MeshBasicMaterial({color});this.materials.add(m);return m;}
   private armour(color:number,roughness:number,metalness:number):THREE.MeshStandardMaterial {

@@ -11,6 +11,9 @@ import {buildBlackoutEntryVent} from '../render/environment/blackout/BlackoutEnt
 import {BlackoutEntryVentCollapse} from '../render/environment/blackout/BlackoutEntryVentCollapse.ts';
 import {BLACKOUT_ENTRY_VENT as ENTRY} from '../cinematics/BlackoutVentArrivalLayout.ts';
 import { repairStaticBoxSurfaces, trimStaticBoxEnds } from '../render/geometry/CoplanarSurfaceGeometry.ts';
+import {BlackoutMaintenanceArt, type BlackoutMaintenanceArtLoader} from '../render/environment/blackout/BlackoutMaintenanceArt.ts';
+import {BlackoutConnectorAtmosphere} from '../render/environment/blackout/BlackoutConnectorAtmosphere.ts';
+import type {AudioPosition} from '../audio/GameplayAudioEvents.ts';
 
 export const BLACKOUT_BAY_LAYOUT = Object.freeze({
   chamberWidth: 34,
@@ -37,9 +40,11 @@ export class BlackoutMaintenanceBay {
   private readonly arcLights: THREE.PointLight[] = [];
   private readonly hallwayLights: THREE.SpotLight[] = [];
   private readonly hallwayBulbs: THREE.Mesh[] = [];
-  private readonly hallwayFlickerSeeds = [0.3, 1.8, 3.9, 5.2];
+  private readonly connectorAtmosphere=new BlackoutConnectorAtmosphere();
   private elapsed = 0;
-  private readonly staticVisuals: ContainmentStaticBatchResult;
+  private staticVisuals: ContainmentStaticBatchResult;
+  private readonly staticSources: readonly THREE.Mesh[];
+  readonly art: BlackoutMaintenanceArt;
   /** Runtime disposes borrowing door/controller/drone before this owning bay. */
   readonly surfaceMaterials: BlackoutMaintenanceMaterials;
   private readonly replacedMaterials = new Set<THREE.Material>();
@@ -58,7 +63,7 @@ export class BlackoutMaintenanceBay {
     const submergedSteel = new THREE.MeshStandardMaterial({color:0x30391c,roughness:.55,metalness:.18});
     const warning = new THREE.MeshStandardMaterial({ color: 0x8b6b21, roughness: 0.85, metalness: 0.18 });
     const trim = new THREE.MeshStandardMaterial({ color: 0x515956, roughness: 0.72, metalness: 0.58 });
-    this.acidMaterial = new AcidSurfaceMaterial();
+    this.acidMaterial = new AcidSurfaceMaterial({emissionStrength:.01});
 
     const { chamberWidth, rearZ, hallwayWidth, hallwayLength, acidStartZ, acidEndZ } = BLACKOUT_BAY_LAYOUT;
     const halfWidth = chamberWidth / 2;
@@ -207,10 +212,12 @@ export class BlackoutMaintenanceBay {
       bulb.position.set(hallwayCenterX, hallwayHeight - 0.3, z);
       this.root.add(bulb);
       this.hallwayBulbs.push(bulb);
-      const light = new THREE.SpotLight(0xffcf70, 8, 10, 1.1, .18, 2);
+      const light = new THREE.SpotLight(0xffcf70, 8, 8.2, .95, .45, 2);
       light.name = `hallway-flicker-light-${index + 1}`;
       light.position.set(hallwayCenterX, hallwayHeight - 0.8, z);
       light.target.position.set(hallwayCenterX, 0, z);
+      if(index===1)light.target.position.set(4.6,1.0,z+1);
+      if(index===3)light.target.position.set(7,.4,z+2);
       light.castShadow = true;
       light.shadow.mapSize.set(256, 256);
       light.shadow.camera.near = .15;
@@ -230,7 +237,9 @@ export class BlackoutMaintenanceBay {
       object.castShadow = solid && !object.name.startsWith('hallway-flicker-bulb-');
       object.receiveShadow = solid;
     });
-    this.staticVisuals = consolidateStaticRoomVisuals(this.root, [...this.collisionMeshes.filter(mesh => mesh.material !== this.acidMaterial),...entryVentDetails]);
+    this.staticSources = [...this.collisionMeshes.filter(mesh => mesh.material !== this.acidMaterial),...entryVentDetails];
+    this.staticVisuals = consolidateStaticRoomVisuals(this.root, this.staticSources);
+    this.art = new BlackoutMaintenanceArt(this.surfaceMaterials);
     // Keep the moving debris out of the bay's immutable visual batches. Only
     // its separate fixed blocker joins the normal static collision registry.
     this.entryVentCollapse=new BlackoutEntryVentCollapse(this.root,this.surfaceMaterials);
@@ -261,8 +270,10 @@ export class BlackoutMaintenanceBay {
     return (position.x >= -17.4 && position.x <= -14.6 && position.z >= 79 && position.z <= 87 && position.y >= 2 && position.y <= 5) || this.transitAt(position);
   }
 
-  update(dt: number, powered: boolean): void {
+  update(dt: number, powered: boolean,listener?:AudioPosition): void {
     this.elapsed += Math.max(0, dt);
+    this.art.update(dt, powered);
+    this.connectorAtmosphere.update(dt,listener);
     this.advanceAcid(Math.max(0, dt));
     // Fixed buffers: three jagged discharges bridge the vent's grounded edges.
     // Endpoints stay attached to its metal rim while interior nodes crackle.
@@ -281,21 +292,26 @@ export class BlackoutMaintenanceBay {
       light.intensity = (powered ? .35 : .2) + this.arcMaterial.opacity * (index === 0 ? 1.4 : .5);
     });
     this.hallwayLights.forEach((light, index) => {
-      const seed = this.hallwayFlickerSeeds[index] ?? index;
-      const fastFlicker = 0.5 + 0.5 * Math.sin(this.elapsed * (9 + index * 0.7) + seed);
-      const slowFlicker = 0.5 + 0.5 * Math.sin(this.elapsed * (1.7 + index * 0.19) + seed * 3);
-      const dropout = Math.sin(this.elapsed * 0.63 + seed) > 0.9 ? 0.08 : 1;
-      light.intensity = dropout * (2 + fastFlicker * 12 + slowFlicker * 8);
+      light.intensity=this.connectorAtmosphere.lightIntensity(index);
       const material = this.hallwayBulbs[index]?.material;
       if (material instanceof THREE.MeshStandardMaterial) {
-        material.emissiveIntensity = dropout * (0.4 + fastFlicker * 0.8 + slowFlicker * 0.6);
+        material.emissiveIntensity = .015+light.intensity*.12;
       }
     });
   }
 
+  resetConnector():void {this.connectorAtmosphere.reset();this.art.resetConnector();}
+
   /** Continue the visible liquid during a death, without advancing machinery. */
   advanceAcid(deltaSeconds: number): void {
     this.acidMaterial.update(deltaSeconds);
+  }
+
+  /** Replace visible coverage before shader preparation; physics keeps the
+   * original registered meshes and their surface/interaction metadata. */
+  prepareArt(door: THREE.Mesh, loader?: BlackoutMaintenanceArtLoader): Promise<void> {
+    return this.art.prepare(this.root, door, () => this.staticVisuals.dispose(),
+      () => { this.staticVisuals = consolidateStaticRoomVisuals(this.root, this.staticSources); }, loader);
   }
 
   dispose(): void {
@@ -304,6 +320,7 @@ export class BlackoutMaintenanceBay {
     this.acidInteractions.reset();
     this.entryVentCollapse.dispose();
     this.staticVisuals.dispose();
+    this.art.dispose();
     this.root.removeFromParent();
     const geometries=new Set<THREE.BufferGeometry>();
     const materials=new Set<THREE.Material>(this.replacedMaterials);

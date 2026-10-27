@@ -30,6 +30,28 @@ to four point slots, one of them shadowed, plus three shadowed spot slots).
 Level 1/3 keep their existing room-scoped lighting; #190 does not introduce a
 second light-selection algorithm or weaken detection to meet a budget.
 
+The finale arena uses one directional combat shadow map, capped to
+512 / 1024 / 1024 pixels by Low / Medium / High. Its 60 m footprint follows the
+rendered Specimen position and snaps in light space to reduce shadow shimmer.
+Opaque cover, doors and drones cast; the large architectural shell receives,
+avoiding a second draw of the whole room into the map. Glass, lamp apertures,
+effects and invisible collision meshes do not cast. An unshadowed spotlight
+shapes the boss's front, and two finite point lights provide reactor/emergency
+spill without cube shadows. The upper fill is an unshadowed moonlight spotlight
+through the deployment opening, with a single tapered haze mesh. It fades in
+only as the hatch clears, adds one transparent draw and no shadow map or
+post-processing target. All arena
+radiance switches off before encounter power-up and on reset; powered-off and
+paused maps retain their storage without continuous updates. No extra render
+targets are created per frame, and the arena releases its map on unload.
+
+The focused production-browser check verifies actual cover-shadow pixels,
+profile resizing and reuse after reset/phase-two entry, with no GL or console
+errors. At the inspected cover pose, updating the shadow adds five draw calls
+over reusing its cached map. This is a frozen software-renderer submission
+check, not a hardware frame-rate measurement. Captures and measurements are in
+`artifacts/evidence/extermination-room/lighting-*.png` and `lighting-observations.json`.
+
 Canvas MSAA is fixed at context creation. Both presets use the same non-MSAA
 context so switching does not recreate the renderer, invalidate asset ownership
 or silently retain the startup preset's antialiasing. Standard is sharper but

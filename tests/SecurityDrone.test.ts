@@ -34,6 +34,28 @@ function config(): SecurityDroneConfig {
   };
 }
 
+test('distant industrial detail shares buffers and preserves warning, aim and collision state',()=>{
+  const world=new CollisionWorld(),surfaces=new SurfaceRegistry(),damage=new SlimeDamageSystem();
+  const projectiles=new DroneProjectileSystem(world,damage),resources=new SecurityDronePresentationResources(undefined,true,true);
+  const first=new SecurityDrone(config(),world,surfaces,projectiles,resources);
+  const second=new SecurityDrone({...config(),id:'second-drone'},world,surfaces,projectiles,resources);
+  const camera=new THREE.PerspectiveCamera(48,1,.1,200);
+  const shell=first.presentation.aimHead.getObjectByName('test-drone-armoured-shell') as THREE.Mesh;
+  const other=second.presentation.aimHead.getObjectByName('second-drone-armoured-shell') as THREE.Mesh;
+  const full=shell.geometry,collider=first.collider.geometry;
+  const triangles=()=>{let total=0;first.presentation.root.traverseVisible(o=>{if(o instanceof THREE.Mesh)total+=(o.geometry.index?.count??o.geometry.getAttribute('position').count)/3;});return total;};
+  const fullTriangles=triangles();first.presentation.setState('warning',true);
+  const colour=first.frontIndicator.material.color.getHex(),scale=first.frontIndicator.scale.clone(),direction={...first.readModel.scanDirection};
+  try{
+    camera.position.set(0,0,100);first.presentation.updateDetail(camera);second.presentation.updateDetail(camera);
+    assert.notEqual(shell.geometry,full);assert.equal(shell.geometry,other.geometry);
+    assert.ok(triangles()<fullTriangles*.4);
+    assert.equal(first.collider.geometry,collider);assert.deepEqual(first.readModel.scanDirection,direction);
+    assert.equal(first.frontIndicator.material.color.getHex(),colour);assert.deepEqual(first.frontIndicator.scale,scale);
+    camera.position.set(0,0,4);first.presentation.updateDetail(camera);assert.equal(shell.geometry,full);
+  }finally{first.dispose();second.dispose();resources.dispose();projectiles.dispose();damage.dispose();world.clear();surfaces.clear();}
+});
+
 test('stationary surveillance keeps its authored gaze and rejects negative scan settings', () => {
   const world = new CollisionWorld(), surfaces = new SurfaceRegistry();
   const damage = new SlimeDamageSystem(), projectiles = new DroneProjectileSystem(world, damage);

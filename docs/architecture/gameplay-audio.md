@@ -336,6 +336,22 @@ runtime playback remains once-only, at normal speed, without extra repetitions.
 See the Music table in `CREDITS.md` for attribution. No long music enters the
 decoded SFX bank.
 
+Blackout uses two supplied recordings:
+`08-blackout-elevator-quiet-ascent.ogg` and
+`09-blackout-research-the-specimen.ogg`. The ascent owns its cue from boarding
+through the live boarding duration plus the authored 55 seconds. Its 85.068-second
+recording is stopped at handback. Research owns a fixed 277-second cue; its four
+compositions and 123.5–134s blackout silence are baked into one stream. The
+existing 208s fusion, 222s blast and 236s overlook remain unchanged. Playback
+gain is 1.1× for ascent and 1.4× for research, on top of the shared 0.28 gain
+and master/music controls. Both use the existing pause/focus, skip, reset and
+disposal paths. Every original composition is separately credited in
+`CREDITS.md`. The research OGG is copied unchanged from
+`specimen-act3-inevitable-revision.zip`: Inevitable now covers 134–230s with an
+extended/repeated Act III buildup joining the approved Act IV fusion passage.
+The preview is not a runtime asset; no reconstruction or runtime crossfade is
+applied. Acts I, II and V and the elevator recording remain unchanged.
+
 `CinematicMusic` publishes discrete ownership start/stop notifications. The shared
 music owner reads its continuous clock at 20 Hz only while a targeted cinematic
 owns music. Live opening starts on its first prepared cinematic frame, with time
@@ -348,6 +364,12 @@ Cinematic ownership overrides flow routing, including finales while flow is
 non-looping recording. The last second fades according to the cinematic clock;
 Skip/disposal fades for 800 ms before restoring destination flow music. Loading
 stays silent. Title/restart/failed transitions cancel stale cinematic ownership.
+First Sunlight's `ending` cue is the exception: its supplied 179-second stream
+already contains all fades and a 105–111s silent section. It retains unity
+cinematic gain on top of the shared 0.28 music gain, bypasses the extra runtime
+fade/envelope, and stops immediately on completion/skip/reset/disposal. Rolling
+credits at 133s do not change ownership. Rehearsal creates no music token; see
+`docs/boss-defeat-finale.md` for the asset provenance and two composition credits.
 Pause, focus and master/music controls remain shared; SFX gain is independent.
 A stationary live clock pauses playback after 250 ms, including rendering holds
 when background muting is disabled. Media seek drift above 350 ms is corrected;
@@ -375,7 +397,8 @@ URL. The supplied recording is stereo/44.1 kHz and decodes to 169.838 seconds.
 
 `FinalBossEncounter` owns one `BossMusic` token per attempt. It publishes a
 start only upon entering combat, including CP8/CP9 retries; staging and the
-boss introduction keep normal level music. The first combat start preempts
+boss introduction retain their current route (the research score during The
+Specimen). The first combat start preempts
 other music using `BackgroundMusic`'s existing two media elements. Native
 `HTMLAudioElement.loop` plays the whole recording repeatedly at normal speed;
 no combat update polls or seeks music. The token spans the Phase 2 transition,
@@ -396,6 +419,27 @@ a stale fade. The standard music gain is 0.28; the supplied track measures
 about -14.80 dBFS RMS and -1.25 dBFS sample peak before that gain, or about
 -25.86 dBFS RMS / -12.30 dBFS sample peak at full music/master sliders. These
 component measurements do not replace a human listening review of the mix.
+
+### Research drone and Exterminator laser mix
+
+Research's `boss-drone-shot-01` cues use a local 0.15 scale instead of 0.30
+(50% / about 6 dB lower). Its shared catalog gain stays 0.9, so actual boss drones
+and other turret callers keep their existing levels. All authored firing
+events still reach the mixer. The existing 35 ms per-effect limiter, six-voice
+drone budget, 24-voice total budget and SFX compressor already bound overlap;
+no extra shot suppression or firing changes are added.
+
+Boss beam catalog gains are 0.9 for charge, 1.1 for ignition, 1.25 for sustain
+and 0.8 for shutdown (previously 2.0, 2.5, 4.0 and 1.7). The single sustained
+voice is roughly 10 dB lower. Phase 2 retains the same shortened warning
+playback rates. Orb charge/launch/burst stay at 1.0: they were already below
+the former beam gains, and retaining their short attack cues preserves
+telegraph clarity. Music gain stays 0.28 for boss combat, with native looping,
+phase continuity and the 2.5-second victory fade unchanged. Master/SFX/music
+sliders, spatial attenuation and all unrelated effects retain their settings.
+The browser laser-mix audit decodes the shipped OGGs and reports component
+RMS/peaks, including orbs, and checks the Act III/IV seam and blackout silence;
+these measurements do not establish subjective masking in a live fight.
 
 Containment Room 5's two moving platforms use their authored booster-hover
 engines only. Their `MovingPlatform` definitions set `machineryAudio: false`,

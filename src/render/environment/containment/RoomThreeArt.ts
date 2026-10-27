@@ -1,4 +1,5 @@
 import { AcidLiquidInteractions } from './AcidLiquidInteractions.ts';
+import {RoomThreeShell,type RoomThreeShellLoader} from './RoomThreeShell.ts';
 import * as THREE from 'three';
 
 import type { LaserHazard } from '../../../hazards/LaserHazard.ts';
@@ -43,12 +44,15 @@ export const ROOM_THREE_ACID_SURFACE_Y_METRES =
 /** Room 3-only visual layer around the frozen acid, laser and traversal route. */
 export class RoomThreeArt {
   readonly root = new THREE.Group();
+  readonly shell=new RoomThreeShell();
   readonly acidSurfaceMaterial: AcidSurfaceMaterial;
   readonly acidSurface: THREE.Mesh;
   readonly acidInteractions: AcidLiquidInteractions;
 
   private readonly resources: ContainmentArtResources;
   private readonly signGeometries = new Set<THREE.BufferGeometry>();
+  private readonly proxyNames=new Set<string>();
+  private readonly proxyRootNames=new Set<string>();
   private disposed = false;
 
   constructor(
@@ -82,6 +86,25 @@ export class RoomThreeArt {
     this.buildChemicalServiceRuns();
     this.buildTransferDuct();
     this.buildTransitionsAndSignage();
+    for(const child of this.root.children)if(child!==this.acidSurface)this.proxyRootNames.add(child.name);
+    this.root.traverse(object=>{if(object instanceof THREE.Mesh&&object!==this.acidSurface)this.proxyNames.add(object.name);});
+    this.root.add(this.shell.root);
+  }
+
+  async prepare(borrowFinish:(name:string)=>THREE.Material,loader?:RoomThreeShellLoader):Promise<void>{
+    await this.shell.prepare(borrowFinish,this.resources.materials,loader);
+    if(this.disposed)return;
+    for(const child of this.root.children)if(this.isProxy(child))child.visible=false;
+  }
+
+  private isProxy(object:THREE.Object3D):boolean{
+    if(this.proxyRootNames.has(object.name))return true;
+    const names:string[]=object.userData.staticBatchSourceNames??[object.name];
+    return object instanceof THREE.Mesh&&names.every(name=>this.proxyNames.has(name));
+  }
+
+  get renderSources():readonly THREE.Object3D[]{
+    return this.shell.ready?this.root.children.filter(child=>!this.isProxy(child)):[this.root];
   }
 
   update(deltaSeconds: number): void {
@@ -91,6 +114,7 @@ export class RoomThreeArt {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.shell.dispose();
     this.root.removeFromParent();
     this.acidSurfaceMaterial.dispose();
     for (const geometry of this.signGeometries) geometry.dispose();

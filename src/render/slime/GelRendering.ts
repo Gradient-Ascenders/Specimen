@@ -16,6 +16,7 @@ export class GelRendering {
   private readonly bodies = new Map<THREE.MeshPhysicalMaterial, number>();
   private mode: GelRenderingMode = DEFAULT_GEL_RENDERING_MODE;
   private transmissionResolutionScaleCap = 1;
+  private readonly reducedTransmissionCaps = new Map<symbol,number>();
 
   private readonly renderer: Pick<THREE.WebGLRenderer, 'transmissionResolutionScale'>;
 
@@ -51,9 +52,24 @@ export class GelRendering {
     this.applyTransmissionResolutionScale();
   }
 
+  /** A level can budget its reduced-gel capture before first-use preparation.
+   * The full physical mode keeps its requested quality. Each borrower releases
+   * independently, including failed loads, restarts and level handoffs. */
+  requestReducedTransmissionCap(cap:number):()=>void{
+    if(!Number.isFinite(cap)||cap<=0||cap>1)throw new RangeError('Transmission cap must be in (0, 1].');
+    const token=Symbol();this.reducedTransmissionCaps.set(token,cap);this.applyTransmissionResolutionScale();
+    let released=false;
+    return ()=>{
+      if(released)return;released=true;
+      this.reducedTransmissionCaps.delete(token);this.applyTransmissionResolutionScale();
+    };
+  }
+
   private applyTransmissionResolutionScale(): void {
+    let cap=this.transmissionResolutionScaleCap;
+    if(this.mode==='reduced-transmission')for(const limit of this.reducedTransmissionCaps.values())cap=Math.min(cap,limit);
     this.renderer.transmissionResolutionScale = resolveGelTransmissionResolutionScale(
-      this.mode, this.transmissionResolutionScaleCap);
+      this.mode, cap);
   }
 
   private apply(body: THREE.MeshPhysicalMaterial, authoredTransmission: number): void {

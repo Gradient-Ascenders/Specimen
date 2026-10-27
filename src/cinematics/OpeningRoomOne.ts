@@ -12,12 +12,14 @@ export const OPENING_ROOM_ONE_LAYOUT = Object.freeze({ halfWidth: 7, backZ: -6, 
 export class OpeningRoomOne {
   readonly root = new THREE.Group();
   private readonly sourceArt: RoomOneArt;
+  private readonly shellProxy = new THREE.Group();
   private readonly batching: ReturnType<typeof consolidateContainmentRoomStaticVisuals>;
   private readonly sourceInstances = new Set<THREE.InstancedMesh>();
   private disposed = false;
 
   constructor(resources: ContainmentArtResources) {
     this.root.name = 'opening-authored-room-one';
+    this.shellProxy.userData.staticBatchExcluded = true;
     this.root.userData.presentationOnly = true;
     this.sourceArt = new RoomOneArt(resources);
     // Retain ownership of every source resource, including excluded specimen
@@ -28,9 +30,11 @@ export class OpeningRoomOne {
       this.root.add(child);
     }
     const m = resources.materials;
+    let shellParent: THREE.Group = this.shellProxy;
     const add = (name: string, size: readonly [number, number, number], position: readonly [number, number, number], material: THREE.Material) => {
-      this.root.add(createBorrowedBox(resources, { name: `opening-room-one-${name}`, size, position, material }));
+      shellParent.add(createBorrowedBox(resources, { name: `opening-room-one-${name}`, size, position, material }));
     };
+    this.root.add(this.shellProxy);
     // Match ContainmentTeachingScene's 14 x 12 x 8 metre shell. Its north wall
     // has the real sticky/vent recess plus a physical portal at the authored door.
     add('floor', [14, 0.4, 12], [0, -0.2, 0], m.clinicalFloor);
@@ -44,6 +48,7 @@ export class OpeningRoomOne {
     add('north-east', [1.15, 8, 0.4], [6.425, 4, 6], m.mechanicalBacking);
     add('north-over-door', [3.1, 4.1, 0.4], [4.3, 5.95, 6], m.mechanicalBacking);
     add('north-above-vent', [2, 1.2, 0.4], [-4.8, 7.4, 6], m.mechanicalBacking);
+    shellParent = this.root;
     // A short enclosed continuation gives the visible vent depth, not a view
     // through the back of the presentation scene. No gameplay section is loaded.
     add('vent-end', [2.2, 1.7, 0.15], [-4.8, 6.03, 6.8], m.mechanicalBacking);
@@ -60,6 +65,15 @@ export class OpeningRoomOne {
     // The batch result owns its generated instance buffers; retain only the
     // original source instances here, including those removed by batching.
     this.batching = consolidateContainmentRoomStaticVisuals(this.root, { cellSize: 32 });
+  }
+
+  async prepare(): Promise<void> {
+    await this.sourceArt.prepare();
+    if (!this.disposed) this.shellProxy.visible = false;
+  }
+
+  borrowShellFinish(name: string): THREE.Material {
+    return this.sourceArt.shell.borrowFinish(name);
   }
 
   dispose(): void {

@@ -77,7 +77,8 @@ import {
   BobCharacterPresentation,
   type BobCharacterPresentationState,
 } from '../render/bob/BobCharacterPresentation.ts';
-import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
+import { CultivationRadiance } from '../render/environment/cultivation/CultivationRadiance.ts';
+import { CultivationLightingPass } from '../render/environment/cultivation/CultivationLightingPass.ts';
 import type { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
 import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
 import { ventEntranceLightingWeight } from '../render/slime/VentEntranceLighting.ts';
@@ -134,6 +135,7 @@ export interface CultivationLevelRuntimeOptions {
 }
 
 interface CultivationRuntimeResources {
+  readonly lightingPass: CultivationLightingPass;
   readonly roomFiveFinale: CultivationFinale | undefined;
   readonly roomFiveEncounter: RoomFiveDroneEncounter | undefined;
   readonly roomFiveDamage: SlimeDamageVignette | undefined;
@@ -191,7 +193,7 @@ interface CultivationRuntimeResources {
   readonly goopMovementEvents: EventBus<MovementEvents>;
   readonly goopPresentation: GoopCharacterPresentation;
   readonly goopPresentationState: GoopCharacterPresentationState;
-  readonly bobReflectionEnvironment: BobReflectionEnvironment;
+  readonly bobReflectionEnvironment: CultivationRadiance;
   readonly bobPresentation: BobCharacterPresentation;
   readonly pairPresentation: SlimePairPresentation;
   readonly deathSequence: DeathSequence;
@@ -222,6 +224,7 @@ export class CultivationLevelRuntime {
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
   private shadowRequest: RenderShadowRequest | undefined;
+  private releaseReducedTransmissionCap:(()=>void)|undefined;
   private readonly hostWindow: Window;
   private readonly debugAvailable: boolean;
   private readonly sentryPreviewAvailable = import.meta.env?.DEV === true;
@@ -356,13 +359,17 @@ export class CultivationLevelRuntime {
 
   preparePresentation(): Promise<void> {
     const resources = this.requireResources();
+    // Set the capture budget before the queue primes its retained framebuffer;
+    // gameplay must not resize it on the first controllable frame.
+    this.releaseReducedTransmissionCap??=this.renderLayer.gelRendering.requestReducedTransmissionCap(.25);
     return this.presentationPreparation ??= Promise.all([
       resources.bobPresentation.prepare(),
       resources.goopPresentation.prepare(),
       resources.voltPresentation.prepare(),
+      ...(resources.authoredPreview ? [resources.authoredPreview.blenderArt.prepare(this.renderLayer.renderer)] : []),
       ...(resources.authoredPreview ? [resources.authoredPreview.roomFive.captiveVoltPresentation.prepare()] : []),
     ])
-      .then(() => {
+      .then(async () => {
         if (this.resources !== resources) return;
         if (!resources.authoredPreview) return;
         // Keep compact light loops and contribution guards. Early-zero guards
@@ -373,6 +380,13 @@ export class CultivationLevelRuntime {
             if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material);
           }
         });
+        resources.roomFiveEncounter?.setLightingQuality(this.renderLayer.graphicsConfiguration, this.renderLayer.renderer.shadowMap.type);
+        await resources.lightingPass.prepare(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.graphicsConfiguration);
+        if (this.resources !== resources) return;
+        resources.scene.setBakedIndirectLighting(true);
+        for (const presentation of [resources.bobPresentation, resources.goopPresentation, resources.voltPresentation,
+          resources.authoredPreview.roomFive.captiveVoltPresentation])
+          presentation.setReflectionEnvironment(resources.bobReflectionEnvironment.texture);
         // Match the first gameplay draw before cloning preparation layouts or
         // priming live PCF receivers. Newly built room roots are all visible.
         this.renderLayer.cameraRig.update(1, 0);
@@ -424,7 +438,7 @@ export class CultivationLevelRuntime {
     if (this.lifecycle.state === 'unloaded') this.presentationPreparation = undefined;
     const started = performance.now();
     this.lifecycle.load();
-    this.shadowRequest ??= this.renderLayer.requestShadowConfiguration('cultivation', { enabled: true });
+    this.shadowRequest ??= this.renderLayer.requestShadowConfiguration('cultivation', { enabled: true, contactHardening: true });
     this.constructionMs = performance.now() - started;
   }
   start(): void { this.lifecycle.start(); }
@@ -865,6 +879,9 @@ export class CultivationLevelRuntime {
       this.preparationQueue?.anticipateLiftExit();
     }
     const darkRoom = this.isDarkRoom(resources, lightingRoom);
+    resources.roomFiveEncounter?.setLightingQuality(this.renderLayer.graphicsConfiguration, this.renderLayer.renderer.shadowMap.type);
+    resources.lightingPass.setQuality(this.renderLayer.graphicsConfiguration, this.renderLayer.renderer.shadowMap.type);
+    resources.lightingPass.update(this.lifecycle.state === 'running' ? stats.frameDeltaSeconds : 0);
     resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds,
       lightingRoom !== undefined && lightingRoom <= 3);
     const bobLightingRoom = resources.authoredPreview?.resolveRoomId(
@@ -944,6 +961,10 @@ export class CultivationLevelRuntime {
       }
       if (resources.roomThreeEncounter && resources.authoredPreview) {
         resources.roomThreeEncounter.root.visible = resources.authoredPreview.roomThree.root.visible;
+        if (resources.roomThreeEncounter.root.visible) {
+          for (const entry of resources.roomThreeEncounter.ceilingDrones) entry.drone.presentation.updateDetail(this.renderLayer.cameraRig.camera);
+          for (const entry of resources.roomThreeEncounter.groundDrones) entry.drone.presentation.updateDetail(this.renderLayer.cameraRig.camera);
+        }
       }
       resources.pairPresentation.update(
         resources.renderedBobPosition,
@@ -967,6 +988,7 @@ export class CultivationLevelRuntime {
       }
       if (resources.authoredPreview) resources.roomFiveView?.update(resources.authoredPreview.roomFive.controller, this.authoredPreviewRoomId === 5);
       const inRoomFour = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position) === 4;
+      if (inRoomFour) resources.roomFourEncounter?.updateDetail(this.renderLayer.cameraRig.camera);
       if (resources.authoredPreview) resources.roomFourView?.update(resources.authoredPreview.roomFour.controller, inRoomFour);
       const damageSlimeId = resources.manager.activeSlimeId === 'goop' ? 'goop' : 'bob';
       resources.roomFiveDamage?.update(stats.frameDeltaSeconds, damageSlimeId,
@@ -990,8 +1012,12 @@ export class CultivationLevelRuntime {
       }
       this.cameraShadowCulling?.prepare(this.renderLayer.cameraRig.camera);
       try {
+        // The finale borrows these craft and flies them out of the chamber.
+        resources.authoredPreview?.roomFiveCulling.prepare(this.renderLayer.cameraRig.camera,
+          resources.pair.activeBody.position,!resources.roomFiveFinale?.active);
         this.renderLayer.render();
       } finally {
+        resources.authoredPreview?.roomFiveCulling.restore();
         this.cameraShadowCulling?.restore();
       }
     } finally {
@@ -1202,6 +1228,7 @@ export class CultivationLevelRuntime {
       const voltBody = new KinematicBody({ world: collisionWorld, surfaces: surfaceRegistry,
         initialPosition: new THREE.Vector3(), events: voltMovementEvents, config: { adhesionEnabled: false, reboundEnabled: false, chargedJumpEnabled: false } });
       const voltPresentation = new VoltCharacterPresentation(voltBody.radiusMetres, this.renderLayer.gelRendering);
+      voltPresentation.setSpawnYaw(Math.PI);
       voltPresentation.setCameraView(this.renderLayer.cameraRig, voltBody);
       rollback(() => voltPresentation.dispose());
       voltPresentation.setCollisionWorld(collisionWorld);
@@ -1303,6 +1330,8 @@ export class CultivationLevelRuntime {
             goopBody,
             radiationSurface: authoredPreview.roomThree.radiationHazard,
             surfaceMaps: authoredPreview.coverArt.droneSurfaceMaps,
+            presentationModels:authoredPreview.securityDroneModels,
+            attachPresentation:root=>authoredPreview.blenderArt.attachRuntimeOwners(root),
             requestDeath: (slimeId) => this.requestRoomThreeDroneDeath(slimeId),
           })
         : undefined;
@@ -1322,6 +1351,7 @@ export class CultivationLevelRuntime {
         previewDissolveTargets, dissolveSystem,
         (slimeId) => this.requestPlayerDeath(() => this.resetAndRecoverAuthoredPreviewRoom(this.requireResources()), slimeId),
         authoredPreview.coverArt.droneSurfaceMaps,
+        authoredPreview.securityDroneModels,
       ) : undefined;
       if (roomFourEncounter) rollback(() => roomFourEncounter.dispose());
       const roomFourView = authoredPreview ? new gameplay.ElevatorEncounterView() : undefined;
@@ -1402,13 +1432,12 @@ export class CultivationLevelRuntime {
         },
       ];
 
-      const bobReflectionEnvironment = new BobReflectionEnvironment(
-        this.renderLayer.renderer,
-      );
+      const bobReflectionEnvironment = new CultivationRadiance(authoredPreview.root.getWorldPosition(new THREE.Vector3()));
       rollback(() => bobReflectionEnvironment.dispose());
       voltPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       authoredPreview?.roomFive.captiveVoltPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       const goopPresentation = new GoopCharacterPresentation(goopBody.radiusMetres, this.renderLayer.gelRendering);
+      goopPresentation.setSpawnYaw(Math.PI);
       goopPresentation.setCameraView(this.renderLayer.cameraRig, goopBody);
       rollback(() => goopPresentation.dispose());
       goopPresentation.setPosition(goopBody.position);
@@ -1416,6 +1445,7 @@ export class CultivationLevelRuntime {
       goopPresentation.setReflectionIntensity(CULTIVATION_BOB_REFLECTION.normal.body, CULTIVATION_BOB_REFLECTION.normal.eyes, true);
       this.renderLayer.scene.add(goopPresentation.root);
       const bobPresentation = new BobCharacterPresentation(bobBody.radiusMetres, this.renderLayer.gelRendering);
+      bobPresentation.setSpawnYaw(Math.PI);
       bobPresentation.setCameraView(this.renderLayer.cameraRig, bobBody);
       bobPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       bobPresentation.setReflectionIntensity(
@@ -1428,9 +1458,11 @@ export class CultivationLevelRuntime {
       const roomFiveEncounter = authoredPreview ? new gameplay.RoomFiveDroneEncounter(
         authoredPreview.roomFive, collisionWorld, surfaceRegistry, bobBody, goopBody,
         id => this.requestPlayerDeath(() => this.resetAndRecoverAuthoredPreviewRoom(this.requireResources()), id),
-        authoredPreview.labArt.metal, authoredPreview.root) : undefined;
+        authoredPreview.labArt.metal, authoredPreview.root, authoredPreview.securityDroneModels) : undefined;
       if (roomFiveEncounter) {
         rollback(() => roomFiveEncounter.dispose());
+        authoredPreview!.roomFiveCulling.registerChamber(...roomFiveEncounter.chamberPresentationRoots,
+          authoredPreview!.roomFive.captiveVoltPresentation.root);
         addCultivationRoomThreeBoosters(roomFiveEncounter.platformBoosters, authoredPreview!.roomThree);
         addCultivationButtonPlatformBooster(roomFiveEncounter.platformBoosters, authoredPreview!.roomTwo);
         roomFiveEncounter.presentation.mesh.name = 'cultivation-room-5-drone-projectiles';
@@ -1548,6 +1580,7 @@ export class CultivationLevelRuntime {
             ({ slimeId }) => {
               if (slimeId === 'bob') bobPresentation.onDamage(1);
               else if (slimeId === 'goop') goopPresentation.onDamage(1);
+              else if (slimeId === 'volt') voltPresentation.onDamage(1);
             },
           )),
       ];
@@ -1585,7 +1618,10 @@ export class CultivationLevelRuntime {
         for (const unsubscribe of unsubscribeManager) unsubscribe();
       });
 
+      const lightingPass = new CultivationLightingPass(authoredPreview, bobReflectionEnvironment);
+      rollback(() => lightingPass.dispose());
       this.resources = {
+        lightingPass,
         roomFiveFinale,
         roomFiveEncounter, roomFiveDamage, roomFiveView, voltBody, voltPresentation, voltPresentationState, voltMovementEvents, renderedVoltPosition: new THREE.Vector3(),
         scene, authoredPreview, collisionWorld, surfaceRegistry,
@@ -1726,6 +1762,7 @@ export class CultivationLevelRuntime {
     this.gameplayAudio = undefined;
     const resources = this.requireResources();
     this.cameraShadowCulling = undefined;
+    resources.lightingPass.dispose();
     this.preparationQueue?.dispose(); this.preparationQueue = undefined;
     this.lightLayout?.dispose(); this.lightLayout = undefined;
     this.lightLayoutKey = ''; this.lastShadowLayoutKey = '';
@@ -1755,6 +1792,7 @@ export class CultivationLevelRuntime {
     resources.roomFiveEncounter?.dispose();
     this.shadowRequest?.dispose();
     this.shadowRequest = undefined;
+    this.releaseReducedTransmissionCap?.();this.releaseReducedTransmissionCap=undefined;
     resources.voltPresentation.dispose();
     resources.damageVignette?.dispose();
     resources.droneProjectilePresentation?.dispose();
@@ -2230,11 +2268,14 @@ export class CultivationLevelRuntime {
 
   private resetRecoveryCamera(resources: CultivationRuntimeResources): void {
     this.renderLayer.cameraRig.reset();
+    let yaw = Math.PI;
     if (this.authoredPreviewRoomId === 5 && resources.manager.activeSlimeId === 'bob' &&
       resources.authoredPreview?.roomFive.controller.checkpoint === 'controls') {
       // Camera-back is opposite the route from the checkpoint toward the first landing.
-      this.renderLayer.cameraRig.setGroundOrbitYawRadians(Math.atan2(2.5, -5.2));
+      yaw = Math.atan2(2.5, -5.2);
     }
+    resources.bobPresentation.setSpawnYaw(yaw);
+    this.renderLayer.cameraRig.setGroundOrbitYawRadians(yaw);
   }
 
   private retargetCamera(resources: CultivationRuntimeResources): void {

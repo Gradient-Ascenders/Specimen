@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {RoomFourShell,type RoomFourShellLoader} from './RoomFourShell.ts';
 
 import type { LaserHazard } from '../../../hazards/LaserHazard.ts';
 import type { ContainmentArtResources } from './ContainmentArtResources.ts';
@@ -36,10 +37,13 @@ const UP = new THREE.Vector3(0, 1, 0);
  */
 export class RoomFourArt {
   readonly root = new THREE.Group();
+  readonly shell=new RoomFourShell();
 
   private readonly resources: ContainmentArtResources;
   private readonly signGeometries = new Set<THREE.BufferGeometry>();
   private disposed = false;
+  private readonly proxyNames=new Set<string>();
+  private readonly proxyRootNames=new Set<string>();
 
   constructor(
     resources: ContainmentArtResources,
@@ -58,11 +62,29 @@ export class RoomFourArt {
     this.buildBottomMachinery();
     this.buildTopArrival();
     this.buildSectorSignage();
+    for(const child of this.root.children)this.proxyRootNames.add(child.name);
+    this.root.traverse(object=>{if(object instanceof THREE.Mesh)this.proxyNames.add(object.name);});
+    this.root.add(this.shell.root);
+  }
+
+  async prepare(borrowFinish:(name:string)=>THREE.Material,loader?:RoomFourShellLoader):Promise<void>{
+    await this.shell.prepare(borrowFinish,loader);
+    if(this.disposed)return;
+    for(const child of this.root.children)if(this.isProxy(child))child.visible=false;
+  }
+  private isProxy(object:THREE.Object3D):boolean{
+    if(this.proxyRootNames.has(object.name))return true;
+    const names:string[]=object.userData.staticBatchSourceNames??[object.name];
+    return object instanceof THREE.Mesh&&names.every(name=>this.proxyNames.has(name));
+  }
+  get renderSources():readonly THREE.Object3D[]{
+    return this.shell.ready?[this.shell.root]:[this.root];
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.shell.dispose();
     this.root.removeFromParent();
     for (const geometry of this.signGeometries) geometry.dispose();
     this.signGeometries.clear();

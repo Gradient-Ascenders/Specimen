@@ -13,6 +13,11 @@ the movie with a relative, hashed URL for subdirectory hosting. Ordinary Start
 does not request the file. The backup does not render the live cinematic or
 upload video frames into WebGL. The main menu remains live 3D in both modes.
 
+The default live opening uses the Blender-authored containment wing and custom
+surveillance cameras in `assets/environments/opening-laboratory/`, sharing Room
+1's baked surface finishes. These assets prepare under the initial blackout.
+The opt-in MP4 backup currently predates this environment pass.
+
 ## Loading and handoff
 
 ### Default live opening

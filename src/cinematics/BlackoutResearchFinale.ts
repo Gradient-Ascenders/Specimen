@@ -8,6 +8,7 @@ import type { FinalBossPresentation } from '../boss/FinalBossPresentation.ts';
 import type { ExterminationArena } from '../boss/ExterminationArena.ts';
 import { SecurityDronePresentation, SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
 import { BlackoutResearchAudio } from '../audio/BlackoutCutsceneAudio.ts';
+import { CinematicMusic } from '../audio/CinematicMusic.ts';
 import { TypewriterAudio } from '../audio/TypewriterAudio.ts';
 import { BlackoutResearchWing } from './BlackoutResearchWing.ts';
 import { RESEARCH_WING_ORIGIN as ORIGIN, RESEARCH_OVERLOAD_LAMP, createResearchObservationCutout } from './BlackoutResearchLayout.ts';
@@ -50,6 +51,7 @@ export class BlackoutResearchFinale {
   private readonly effects = new BlackoutResearchEffects();
   private readonly arenaReveal = new ResearchArenaReveal();
   private readonly options: Options;
+  private music?: CinematicMusic;
   private readonly cinematicCamera = new BlackoutResearchCamera();
   private readonly resources = new SecurityDronePresentationResources(undefined, true);
   private readonly drones: SecurityDronePresentation[] = [];
@@ -262,6 +264,8 @@ export class BlackoutResearchFinale {
       sampleResearchSlime(actor.id, 0, actor.position); actor.position.add(ORIGIN); actor.previous.copy(actor.position);
     }
     this.options.specimen.reset(); this.options.specimen.setVisible(false); this.options.boss.root.visible = false;
+    this.music = new CinematicMusic('research', T.duration);
+    this.music.update(0);
     this.options.host.dataset.cinematic = 'blackout-research'; this.scientistVoice.reset();
     this.presentActors(0, 1 / 60, true); this.presentWorld(0); this.overlay.present(0); return true;
   }
@@ -269,6 +273,7 @@ export class BlackoutResearchFinale {
     if (!this.playing) return false;
     if (!Number.isFinite(dt) || dt <= 0) throw new RangeError('Invalid research cinematic timestep.');
     this.previousElapsed = this.elapsed; this.elapsed = skip || this.skipRequested ? T.duration : Math.min(T.duration, this.elapsed + dt);
+    this.music?.update(this.elapsed);
     this.presentActors(this.elapsed, dt, false);
     if (!skip && !this.skipRequested) this.sound.update(this.previousElapsed, this.elapsed, this.options.boss.machine.position);
     this.presentWorld(this.elapsed); this.overlay.present(this.elapsed);
@@ -385,6 +390,7 @@ export class BlackoutResearchFinale {
   }
   reset(complete = false): void { this.release(true); this.played = complete; this.elapsed = this.previousElapsed = 0; this.wing.reset(complete); }
   private release(restoreBodies: boolean): void {
+    this.music?.stop(); this.music = undefined;
     this.sound.stop();
     if (this.playing) {
       for (const actor of this.actors) {

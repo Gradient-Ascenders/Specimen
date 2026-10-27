@@ -10,6 +10,7 @@ type Size = readonly [number, number, number];
 
 /** Presentation attached to the authored lift and scrolling modules; no simulation writes. */
 export class CultivationElevatorArt {
+  readonly depthPointer = new THREE.Group();
   private readonly materials: THREE.MeshStandardMaterial[] = [];
   private readonly meshes: THREE.Mesh[] = [];
   private readonly geometries = new Set<THREE.BufferGeometry>();
@@ -17,7 +18,7 @@ export class CultivationElevatorArt {
   private disposed = false;
 
   constructor(room: LevelTwoRoomFourGreybox, lab: CultivationLabMaterials, chamber: CultivationChamberMaterials,
-    contamination: CultivationContaminationArt) {
+    contamination: CultivationContaminationArt, options: {authoredReplacement?: boolean} = {}) {
     const variant = (source: THREE.MeshStandardMaterial, name: string, colour: number, roughness: number) => {
       const material = source.clone();
       // Cloning does not retain shader hooks. Reuse the established wear, but
@@ -102,6 +103,7 @@ export class CultivationElevatorArt {
     this.fitBoardingFrame(room);
     const tread = room.root.getObjectByName('room-4-lift-tread') as THREE.Mesh;
     mapCultivationPlatformWear(tread.geometry, tread.name, 12);
+    if (options.authoredReplacement) return;
 
     // Group boxes by finish once. Each scrolling module reuses the same merged geometry.
     type Parts = Map<THREE.Material, THREE.BufferGeometry[]>;
@@ -187,6 +189,18 @@ export class CultivationElevatorArt {
     }
   }
 
+  /** Install after offline repair paths resolve; borrow the real deck's frame. */
+  installDepthPointer(room: LevelTwoRoomFourGreybox): void {
+    this.depthPointer.name = 'room-4-depth-pointer';
+    this.depthPointer.userData.presentationOnly = true;
+    room.root.getObjectByName('room-4-lift-floor')!.add(this.depthPointer);
+  }
+
+  update(progress: number): void {
+    this.depthPointer.position.y = -1.8 * THREE.MathUtils.clamp(progress, 0, 1);
+    this.depthPointer.updateMatrix();
+  }
+
   /** Close the reveal around the four-metre shutter without narrowing its opening.
    * Edit only the presentation copies owned/restored by lab.bind. The frame and
    * boarding partitions already share the same scrolling entrance motion.
@@ -230,6 +244,7 @@ export class CultivationElevatorArt {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.depthPointer.removeFromParent(); this.depthPointer.clear();
     for (const [light, colour] of this.lightColours) light.color.copy(colour);
     this.lightColours.clear();
     for (const mesh of this.meshes) mesh.removeFromParent();

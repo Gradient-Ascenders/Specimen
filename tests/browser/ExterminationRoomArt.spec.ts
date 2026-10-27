@@ -42,8 +42,7 @@ async function capture(page: Page, name: string, position?: number[], target?: n
   await writeFile(`${evidence}/${name}.png`, Buffer.from(png, 'base64'));
 }
 
-test('the industrial lair prepares its art, preserves warning contrast and reuses resources on retry', async ({ page }) => {
-  test.setTimeout(420_000); await page.setViewportSize({ width: 800, height: 500 });
+async function prepareArena(page: Page): Promise<string[]> {
   await page.addInitScript(settings => localStorage.setItem('specimen.graphics-preferences.v1', JSON.stringify({ mode: 'manual', settings })), GRAPHICS_PROFILES.standard.settings);
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -63,6 +62,12 @@ test('the industrial lair prepares its art, preserves warning contrast and reuse
   await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'playing');
   await page.evaluate(() => window.__exterminationArt.layer.setAnimationLoop(null));
   await press(page, 'Digit4'); await step(page, 240); await press(page, 'Enter'); await step(page, 60);
+  return errors;
+}
+
+test('the industrial lair prepares its art, preserves warning contrast and reuses resources on retry', async ({ page }) => {
+  test.setTimeout(420_000); await page.setViewportSize({ width: 800, height: 500 });
+  const errors = await prepareArena(page);
   const initial = await page.evaluate(async () => {
     const { resources } = window.__exterminationArt, boss = resources.finalBoss;
     await boss['options'].arena.prepare();
@@ -102,5 +107,74 @@ test('the industrial lair prepares its art, preserves warning contrast and reuse
   });
   expect(after.materials).toBe(initial.materials); expect(after.textures).toBe(initial.textures); expect(after.colliderCount).toBe(initial.colliderCount);
   await writeFile(`${evidence}/observations.json`, JSON.stringify({ initial, after, errors }, null, 2));
+  expect(errors).toEqual([]);
+});
+
+test('arena lighting renders cover shadows with one bounded map, scales profiles and reuses storage on retry', async ({ page }) => {
+  test.setTimeout(420_000); await page.setViewportSize({ width: 800, height: 500 });
+  const errors = await prepareArena(page); await mkdir(evidence, { recursive: true });
+  await page.evaluate(() => { window.__exterminationArt.resources.finalBoss.controller.damagePlayer = () => false; });
+  await capture(page, 'lighting-gameplay');
+  const z = FINAL_ARENA.centreZ;
+  await page.evaluate(() => { window.__exterminationArt.resources.specimenCharacter.placement.visible = false; });
+  await capture(page, 'lighting-boss', [-29, 26, z - 39], [0, 18, z], 55);
+  const lighting = await page.evaluate(() => {
+    const { layer, resources } = window.__exterminationArt;
+    const arena = resources.finalBoss['options'].arena, rig = arena.lighting, camera = layer.cameraRig.camera;
+    const p = arena.cover[0]!.position;
+    rig.prepareFrame(p);
+    camera.position.set(p.x + 12, 18, p.z + 18); camera.lookAt(p.x, .4, p.z);
+    camera.fov = 58; camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
+    const canvas = document.createElement('canvas'); canvas.width = layer.canvas.width; canvas.height = layer.canvas.height;
+    const context = canvas.getContext('2d')!;
+    const pixels = () => { layer.render(); context.drawImage(layer.canvas, 0, 0); return context.getImageData(0, 0, canvas.width, canvas.height).data; };
+    const shaded = pixels(), withUpdates = layer.renderer.info.render.calls;
+    rig.key.shadow.autoUpdate = false; rig.key.shadow.needsUpdate = false;
+    pixels(); const cached = layer.renderer.info.render.calls;
+    rig.key.shadow.intensity = 0; const unshaded = pixels(); rig.key.shadow.intensity = 1;
+    let shadowPixels = 0;
+    for (let i = 0; i < shaded.length; i += 4) {
+      if (unshaded[i]! + unshaded[i + 1]! + unshaded[i + 2]! - shaded[i]! - shaded[i + 1]! - shaded[i + 2]! > 12) shadowPixels++;
+    }
+    rig.key.shadow.autoUpdate = true;
+    return { ...rig.diagnostics, allocated: rig.key.shadow.map !== null, shadowPixels,
+      shadowDrawCalls: withUpdates - cached, glError: layer.renderer.getContext().getError() };
+  });
+  expect(lighting.shadowMaps).toBe(1); expect(lighting.pointShadowMaps).toBe(0);
+  expect(lighting.allocated).toBe(true); expect(lighting.mapSize).toBe(1024);
+  expect(lighting.shadowPixels).toBeGreaterThan(200);
+  expect(lighting.shadowDrawCalls).toBeGreaterThan(0); expect(lighting.shadowDrawCalls).toBeLessThan(128);
+  expect(lighting.glError).toBe(0); await capture(page, 'lighting-cover-shadow');
+  for (const [profile, size] of [['minimum', 512], ['high', 1024]] as const) {
+    await page.evaluate(settings => window.__exterminationArt.layer.setGraphicsSettings(settings), GRAPHICS_PROFILES[profile].settings);
+    await capture(page, `lighting-${profile}`);
+    expect(await page.evaluate(() => window.__exterminationArt.resources.finalBoss['options'].arena.lighting.key.shadow.mapSize.x)).toBe(size);
+  }
+  const lifecycle = await page.evaluate(() => {
+    const { layer, resources } = window.__exterminationArt, boss = resources.finalBoss, arena = boss['options'].arena;
+    const map = arena.lighting.key.shadow.map;
+    boss.reset(); const dark = arena.lighting.key.intensity === 0 && !arena.lighting.key.shadow.autoUpdate;
+    boss.startPhaseTwo(); arena.lighting.prepareFrame(boss['options'].body.position);
+    layer.render();
+    return { reused: map === arena.lighting.key.shadow.map, dark, phaseTwo: boss.controller.readModel.phase,
+      glError: layer.renderer.getContext().getError() };
+  });
+  expect(lifecycle.reused).toBe(true); expect(lifecycle.dark).toBe(true); expect(lifecycle.phaseTwo).toBe(2); expect(lifecycle.glError).toBe(0);
+  await capture(page, 'moonlight', [-58, 24, z - 82], [0, 40, z - 42], 72);
+  const moonlight = await page.evaluate(() => {
+    const { layer, resources } = window.__exterminationArt;
+    const rig = resources.finalBoss['options'].arena.lighting, moon = rig.moonlight;
+    const automatic = rig.key.shadow.autoUpdate;
+    rig.key.shadow.autoUpdate = false; rig.key.shadow.needsUpdate = false;
+    layer.render(); const withShaft = layer.renderer.info.render.calls;
+    const visible = moon.shaft.visible;
+    moon.shaft.visible = false; layer.render(); const withoutShaft = layer.renderer.info.render.calls;
+    moon.shaft.visible = visible; rig.key.shadow.autoUpdate = automatic;
+    return { visible, lit: moon.light.intensity > 0, shadowMap: moon.light.shadow.map !== null,
+      addedDrawCalls: withShaft - withoutShaft, glError: layer.renderer.getContext().getError() };
+  });
+  expect(moonlight.visible).toBe(true); expect(moonlight.lit).toBe(true); expect(moonlight.shadowMap).toBe(false);
+  expect(moonlight.addedDrawCalls).toBe(1); expect(moonlight.glError).toBe(0);
+  await writeFile(`${evidence}/lighting-observations.json`, JSON.stringify({ lighting, lifecycle, moonlight, errors }, null, 2));
   expect(errors).toEqual([]);
 });

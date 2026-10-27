@@ -176,6 +176,11 @@ export class DissolveTarget {
     return this.dissolveMaterials.createCorrosionMaterial(source);
   }
 
+  /** Authored children borrow the original burn/aim/progress uniforms. */
+  createPresentationMaterial(source: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
+    return this.dissolveMaterials.createPresentationMaterial(source);
+  }
+
   /** Presentation-only input; cannot mutate gameplay progress or collision. */
   setCorrosionPresentation(
     aimStrength: number,

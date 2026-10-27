@@ -87,6 +87,7 @@ export class SpecimenCharacterPresentation {
   private eyeReflection = 0;
   private seeded = false;
   private clock = 0;
+  private spawnYaw = 0;
   private yaw = 0;
   private previousYaw = 0;
   private targetYaw = 0;
@@ -167,6 +168,8 @@ export class SpecimenCharacterPresentation {
   }
   setCameraView(rig: CameraRig, target: CameraFollowTarget): void { this.cameraVisibility.configure(rig, target); }
   setPosition(position: Vector3State): void { this.placement.position.set(position.x, position.y, position.z); }
+  /** Level heading restored on recovery, independent of temporary cinematic turns. */
+  setSpawnYaw(yaw: number): void { this.spawnYaw = yaw; this.setYaw(yaw); }
   setYaw(yaw: number): void {
     this.yaw = this.previousYaw = this.targetYaw = yaw;
     this.reversing = this.hasTravelHeading = false; this.reversalRemaining = 0;
@@ -365,7 +368,7 @@ export class SpecimenCharacterPresentation {
   }
   reset(): void {
     this.dead = false; this.burst.reset(); this.seeded = false; this.clock = 0;
-    this.yaw = this.previousYaw = this.targetYaw = 0;
+    this.yaw = this.previousYaw = this.targetYaw = this.spawnYaw;
     this.moving = this.hasTravelHeading = this.reversing = false; this.reversalRemaining = 0;
     this.lean = this.previousLean = this.turnBank = this.previousTurnBank = 0;
     this.compression = this.previousCompression = 0;

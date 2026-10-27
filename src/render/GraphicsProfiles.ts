@@ -27,9 +27,9 @@ export interface GraphicsSettings {
   readonly gelRenderingMode: GelRenderingMode;
 }
 
-/** Current profiles change shader source only when transmission crosses zero.
- * Capture scale, canvas scale, shadow-map dimensions and point draw counts are
- * resource/uniform changes. Physical and reduced transmission share programs. */
+/** Gel shader features change only when transmission crosses zero. High's
+ * opted-in raw-depth shadow programs are covered by graphicsPreparationKey's
+ * shadow cap. Physical and reduced transmission share gel programs. */
 export function graphicsShaderKey(settings: Pick<GraphicsSettings, 'gelRenderingMode'>): string {
   return settings.gelRenderingMode === 'minimum' ? 'opaque-gel' : 'transmissive-gel';
 }
@@ -41,13 +41,13 @@ export function graphicsPreparationKey(settings: GraphicsSettings): string {
   return `${graphicsShaderKey(settings)}:shadow-cap:${settings.shadowMapSizeCap}`;
 }
 
-/** Target storage can change without shader source changing. Include requested
- * capture dimensions as well as scale; harmless input/audio settings stay free. */
+/** Target storage can change without shader source changing. Include the gel
+ * mode too: levels can budget reduced capture below the global preset cap. */
 export function graphicsTransmissionResourceKey(settings: GraphicsSettings): string {
   if (settings.gelRenderingMode === 'minimum') return 'no-transmission';
   const quality = resolveGraphicsQuality(settings.graphicsPreset, settings.renderPixelRatioCap);
   const scale = resolveGelTransmissionResolutionScale(settings.gelRenderingMode, quality.transmissionResolutionScale);
-  return [scale, quality.pixelRatioCap, settings.renderScale, settings.pixelBudget].join(':');
+  return [settings.gelRenderingMode, scale, quality.pixelRatioCap, settings.renderScale, settings.pixelBudget].join(':');
 }
 
 function profile<T extends GraphicsSettings>(label: string, settings: T) {

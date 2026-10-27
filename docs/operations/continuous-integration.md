@@ -18,6 +18,15 @@ under `docs/`.
 Each smoke shard uses one software-rendering worker. The `Production smoke`
 aggregate check passes only when both shards succeed.
 
+The unit suite is capped at **500 expanded test cases**, including cases
+registered by parameter loops. The curated suite contains 483 cases across 57
+files, counted from retained source and the last completed CI log without a new
+test run. It prioritises collision and movement, abilities, level progression,
+checkpoints and recovery, boss combat, loading cancellation and shadow preparation.
+Detailed art, material, animation and audio assertions have been removed from
+the unit suite; production smoke and browser journeys remain available. Replace
+overlapping coverage when adding a regression rather than growing past the cap.
+
 Repository rules should require both checks, an up-to-date branch, one approval,
 and resolved review threads. Verify the live ruleset before relying on this
 document because repository settings can change independently of source.

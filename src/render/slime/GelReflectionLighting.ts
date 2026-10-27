@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Vector3State } from './SlimePresentationContract.ts';
 
 /** Bounded reflection fill from existing local lights; owns no environment map.
- * Register the final level hierarchy once, then sample Goop's own position. */
+ * Register the final level hierarchy once, then sample each character's position. */
 export class GelReflectionLighting {
   private readonly lights: (THREE.PointLight | THREE.SpotLight)[] = [];
   private readonly position = new THREE.Vector3();

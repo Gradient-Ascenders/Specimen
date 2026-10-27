@@ -8,13 +8,14 @@ import {
   type SlimeHUDSnapshot,
 } from '../slimes/SlimeHUDState.ts';
 import type { LevelLifecycleState } from './LevelLifecycle.ts';
-import type { GameLevelRuntime } from './GameLevelRuntime.ts';
+import type { CheckpointReachedEvent, GameLevelRuntime } from './GameLevelRuntime.ts';
 import type { LevelProgressionSnapshot } from './LevelProgression.ts';
 import type { SlimeHealthReadModel } from '../systems/SlimeDamageSystem.ts';
 
 export type SessionLevelId = 'level-2' | 'level-3';
 
 export interface GameSessionEvents {
+  checkpointReached: CheckpointReachedEvent;
   graphicsPreparationChanged: { readonly pending: boolean; readonly failed: boolean };
   objectiveChanged: { readonly roomId: string | number; readonly objective: string };
   transitionStarted: { readonly levelId: SessionLevelId; readonly message: string };
@@ -240,6 +241,7 @@ export class GameSessionCoordinator {
   private bindRuntime(runtime: GameLevelRuntime): void {
     this.renderedInterpolationAlpha = 0;
     this.unsubscribeRuntimeEvents = [
+      runtime.events.on('checkpointReached', (event) => this.events.emit('checkpointReached', event)),
       runtime.events.on('objectiveChanged', (event) => this.events.emit('objectiveChanged', event)),
       runtime.events.on('completed', (event) => this.onLevelCompleted(event.nextLevelId)),
     ];

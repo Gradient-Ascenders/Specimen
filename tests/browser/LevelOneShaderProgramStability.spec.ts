@@ -470,11 +470,12 @@ test('Level 1 traversal creates no programs after hidden-boot warm-up', async ({
   await expect.poll(
     async () => (await diagnostics.textContent()) ?? '',
     { message: 'Waiting for measured resource prewarm diagnostics' },
-  ).toContain('measured first-use geometries / primes: primed 23 / 1');
+  ).toContain('measured first-use geometries / primes: primed 137 / 1');
   const prewarmProfile = parseLightingPrewarmProfile(
     (await diagnostics.textContent()) ?? '',
   );
-  expect(prewarmProfile.measuredFirstUseResourcePrimeCount).toBe(23);
+  // Six historical owners, fifteen Room 2, eighteen Room 3, five shared camera, thirty Room 4 and forty-one Room 5 buffers.
+  expect(prewarmProfile.measuredFirstUseResourcePrimeCount).toBe(137);
   expect(
     prewarmProfile.measuredFirstUseResourcePrimeGeometriesAfter -
       prewarmProfile.measuredFirstUseResourcePrimeGeometriesBefore,
@@ -876,13 +877,13 @@ test('Bob reflections snap across restart and recreate across level reload', asy
   });
 
   expect(await readReflectionState()).toEqual({
-    mapName: 'bob-laboratory-pmrem',
+    mapName: 'containment-five-room-parallax-pmrem',
     body: 0.42,
     eyes: 1.12,
     zone: 'room',
     bodyTarget: 0.42,
     eyeTarget: 1.12,
-    environmentName: 'bob-laboratory-pmrem',
+    environmentName: 'containment-five-room-parallax-pmrem',
   });
 
   await page.evaluate(() => {
@@ -993,8 +994,8 @@ test('Bob reflections snap across restart and recreate across level reload', asy
   expect(reloaded).toEqual({
     oldEnvironmentDisposed: true,
     newEnvironmentDisposed: false,
-    mapName: 'bob-laboratory-pmrem',
-    environmentName: 'bob-laboratory-pmrem',
+    mapName: 'containment-five-room-parallax-pmrem',
+    environmentName: 'containment-five-room-parallax-pmrem',
     body: 0.42,
     eyes: 1.12,
   });

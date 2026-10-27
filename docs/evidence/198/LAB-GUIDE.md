@@ -5,6 +5,25 @@ the lab evidence. Use the supplied **production ZIP or benchmark URL**, Chrome,
 keyboard/mouse and this checklist. Allow 30–45 minutes after a practice pass.
 The lab run is pending; proposed limits are not approved performance promises.
 
+For a focused **Medium loading check** from a development checkout with the
+project dependencies and Google Chrome installed, serve a production build with
+`npm run build` and `npm run preview -- --host 127.0.0.1`. In a second terminal run:
+
+```bash
+npm run benchmark:loading
+```
+
+This opens a temporary Chrome context, selects Medium and measures Start/Skip
+three times using the ordinary production bundle and normal HTTP caching. It
+records the actual GPU, viewport, drawing buffer, settings, build identity and
+nine-configuration readiness in a timestamped `artifacts/loading-benchmark/`
+folder. Software/unverifiable renderers, focus loss and browser errors reject
+the run. `-- --url http://127.0.0.1:4173/group-folder/` supports nested packages;
+`-- --viewport 1920x1080` fixes the comparison viewport. The first pass launches
+a fresh browser process; later passes reuse its context. OS/driver caches remain
+uncontrolled. This loading-only diagnostic does not replace the full assessment
+or qualify a dirty build. The manual procedure below needs no Node/Playwright.
+
 ## 1. Obtain the package and prepare a results folder
 
 Ask the maintainer for the tested production ZIP/URL, its SHA-256 and the exact

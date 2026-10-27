@@ -55,6 +55,9 @@ export class CultivationSewerArt {
     };
     // Keep original drainage visibility under the existing lights; this is surface finish only.
     for (const m of [this.lining, this.bank]) {
+      // Most of the finish stays matte; the shader's wet patches still need
+      // the local environment even though the base roughness is high.
+      m.userData.cultivationLocalReflection = true;
       m.emissive.setHex(0x68776c); m.emissiveIntensity = .05; m.emissiveMap = m.map;
       const prior = m.onBeforeCompile;
       m.onBeforeCompile = (shader, renderer) => {
@@ -80,7 +83,7 @@ export class CultivationSewerArt {
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.24, .22, .13), sewerCrust * .35);
         `);
         shader.fragmentShader = shader.fragmentShader.replace('#include <metalnessmap_fragment>',
-          'roughnessFactor = mix(roughnessFactor, .38, sewerTide * sewerExposure * .55);\n#include <metalnessmap_fragment>');
+          'roughnessFactor = mix(roughnessFactor, .30, sewerTide * sewerExposure * .7);\n#include <metalnessmap_fragment>');
       };
     }
   }

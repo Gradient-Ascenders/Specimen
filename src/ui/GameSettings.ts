@@ -68,7 +68,8 @@ export const GRAPHICS_PREFERENCES_KEY = 'specimen.graphics-preferences.v1';
 export const PRESENTATION_PREFERENCES_KEY = 'specimen.presentation-preferences.v1';
 export type SettingsStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
-const PERSISTED_KEYS = ['showFPS', 'reduceMenuMotion', 'musicVolume', 'frameRateLimit', 'brightness',
+const PERSISTED_KEYS = ['mouseSensitivity', 'invertVerticalLook', 'masterVolume', 'soundEffectsVolume', 'cameraDistanceMetres',
+  'showFPS', 'reduceMenuMotion', 'musicVolume', 'frameRateLimit', 'brightness',
   'fieldOfViewDegrees', 'cameraShake', 'hudVisibility', 'interfaceScale', 'pauseInBackground', 'muteInBackground', 'keyBindings'] as const;
 
 const clamp = (value: number, minimum: number, maximum: number): number =>
@@ -97,6 +98,11 @@ export class GameSettings {
           typeof preferences[key] === 'number' && Number.isFinite(preferences[key])
             ? clamp(preferences[key] as number, min, max) : DEFAULT_GAME_SETTINGS[key] as number;
         this.current = { ...this.current,
+          mouseSensitivity: savedNumber('mouseSensitivity', 0.5, 2),
+          invertVerticalLook: typeof preferences.invertVerticalLook === 'boolean' ? preferences.invertVerticalLook : false,
+          masterVolume: savedNumber('masterVolume', 0, 1),
+          soundEffectsVolume: savedNumber('soundEffectsVolume', 0, 1),
+          cameraDistanceMetres: savedNumber('cameraDistanceMetres', MIN_FOLLOW_DISTANCE_METRES, MAX_FOLLOW_DISTANCE_METRES),
           musicVolume: savedNumber('musicVolume', 0, 1), brightness: savedNumber('brightness', 0.7, 1.3),
           fieldOfViewDegrees: savedNumber('fieldOfViewDegrees', 40, 75), interfaceScale: savedNumber('interfaceScale', 0.75, 1.5),
           frameRateLimit: [0, 30, 60, 120].includes(preferences.frameRateLimit as number) ? preferences.frameRateLimit as FrameRateLimit : 0,

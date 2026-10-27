@@ -4,6 +4,7 @@ import type { BobCharacterPresentation, BobCharacterPresentationState } from '..
 import type { GoopCharacterPresentation } from '../render/goop/GoopCharacterPresentation.ts';
 import type { VoltCharacterPresentation } from '../render/volt/VoltCharacterPresentation.ts';
 import { BlackoutElevatorAudio } from '../audio/BlackoutCutsceneAudio.ts';
+import { CinematicMusic } from '../audio/CinematicMusic.ts';
 import { TypewriterAudio } from '../audio/TypewriterAudio.ts';
 import { BlackoutAscentLift, BLACKOUT_ASCENT_LIFT as V } from '../levels/BlackoutAscentLift.ts';
 import { BlackoutElevatorOverlay } from './BlackoutElevatorOverlay.ts';
@@ -29,6 +30,7 @@ export class BlackoutElevatorAscent {
   readonly overlay: BlackoutElevatorOverlay;
   private readonly options: Options;
   private readonly sound = new BlackoutElevatorAudio();
+  private music?: CinematicMusic;
   private playing = false;
   private played = false;
   private disposed = false;
@@ -84,6 +86,8 @@ export class BlackoutElevatorAscent {
       actor.parent = actor.presentation.root.parent; actor.pose.add(actor.presentation.root); actor.pose.position.copy(actor.position); actor.pose.visible = true;
       actor.presentation.setPosition(ZERO); actor.presentation.reset(); actor.presentation.setYaw(Math.PI); actor.presentation.setVisible(true); actor.presentation.setOpacity(1); actor.voice.reset();
     }
+    this.music = new CinematicMusic('ascent', this.boardEnd + T.duration);
+    this.music.update(0);
     this.options.host.dataset.cinematic = 'blackout-elevator'; this.overlay.present(-this.boardEnd);
     return true;
   }
@@ -93,6 +97,7 @@ export class BlackoutElevatorAscent {
     if (!Number.isFinite(dt) || dt <= 0) throw new RangeError('Invalid elevator cinematic timestep.');
     this.previousElapsed = this.elapsed;
     this.elapsed = skip || this.skipRequested ? this.boardEnd + T.duration : Math.min(this.boardEnd + T.duration, this.elapsed + dt);
+    this.music?.update(this.elapsed);
     const t = this.elapsed - this.boardEnd, before = this.previousElapsed - this.boardEnd;
     for (const actor of this.actors) {
       actor.previous.copy(actor.position); const airborne = this.sampleActor(actor, this.elapsed, actor.position);
@@ -116,7 +121,14 @@ export class BlackoutElevatorAscent {
         (sound,position,volume,vary)=>this.sound.cue(sound,position,volume,vary));
       actor.voice.update(dt, { text: line ? line.text.slice(0, Math.floor((t - line.start) * 24)) : '', pageIndex: Math.max(0, lineIndex) });
     }
-    if (!skip && !this.skipRequested) this.sound.update(before,t);
+    if (!skip && !this.skipRequested) {
+      this.sound.update(before,t);
+      // Keep the authored shaft accents alongside the dedicated lift recordings.
+      if (t-before <= .25) {
+        if (before < 19.4 && t >= 19.4) this.sound.cue('world-release-01',{x:-5.6,y:5,z:179.5},.10);
+        if (before < 35.8 && t >= 35.8) this.sound.cue('world-lever-lock-01',{x:5.6,y:-2,z:181.5},.08);
+      }
+    }
     this.presentLift(t); this.overlay.present(t);
     if (t >= T.duration) {
       for (const actor of this.actors) actor.body.teleport(actor.position);
@@ -183,6 +195,7 @@ export class BlackoutElevatorAscent {
     this.release(); this.played = arrived; this.elapsed = this.previousElapsed = 0; this.options.lift.setArrived(arrived);
   }
   private release(): void {
+    this.music?.stop(); this.music = undefined;
     this.sound.stop();
     if (this.playing) {
       for (const actor of this.actors) {

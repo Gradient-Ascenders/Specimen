@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import type { ContainmentArtResources } from './ContainmentArtResources.ts';
+import {RoomTwoShell,type RoomTwoShellLoader} from './RoomTwoShell.ts';
 import {
   createBorrowedBox,
   createBorrowedCylinder,
@@ -72,9 +73,11 @@ const PLATFORM_DRESSINGS: readonly PlatformDressing[] = [
 /** Room 2-only visual dressing layered around the frozen teaching route. */
 export class RoomTwoArt {
   readonly root = new THREE.Group();
+  readonly shell=new RoomTwoShell();
 
   private readonly resources: ContainmentArtResources;
   private readonly uniqueGeometries = new Set<THREE.BufferGeometry>();
+  private readonly proxyNames=new Set<string>();
   private disposed = false;
 
   constructor(resources: ContainmentArtResources) {
@@ -89,11 +92,32 @@ export class RoomTwoArt {
     this.buildStickyCatchWall();
     this.buildObservationBay();
     this.buildTransitionsAndSignage();
+    // Keep the synchronous storyboard for CPU-only tooling. Production hides
+    // all its source/batched meshes before the authored set is first shown.
+    this.root.traverse(object=>{if(object instanceof THREE.Mesh)this.proxyNames.add(object.name);});
+    this.root.add(this.shell.root);
+  }
+
+  async prepare(borrowFinish:(name:string)=>THREE.Material,loader?:RoomTwoShellLoader):Promise<void>{
+    await this.shell.prepare(borrowFinish,this.resources.materials,loader);
+    if(this.disposed)return;
+    this.root.traverse(object=>{
+      if(!(object instanceof THREE.Mesh))return;
+      const names:string[]=object.userData.staticBatchSourceNames??[object.name];
+      if(names.every(name=>this.proxyNames.has(name)))object.visible=false;
+    });
+  }
+
+  /** The storyboard stays available to CPU tooling, but never needs GPU
+   * programs or buffers once the authored hall has replaced it. */
+  get renderSources():readonly THREE.Object3D[]{
+    return this.shell.ready?[this.shell.root]:[this.root];
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.shell.dispose();
     this.root.removeFromParent();
     for (const geometry of this.uniqueGeometries) geometry.dispose();
     this.uniqueGeometries.clear();

@@ -1,5 +1,5 @@
 {
-  "glb_sha256": "4e1d5d7d6ea3f368e96cbc0d13ff6b1a232a7d9154e73602ee54f809ec6d2807",
+  "glb_sha256": "7784bfef3694150064110026f15722c3f40958ac71995fbaa50a9772b16ceb77",
   "meshes": {
     "Volt-Body": {
       "triangles": 32064,
@@ -36,19 +36,19 @@
   },
   "outward_normals_and_manifoldness": "passed",
   "floating_electrical_effects": 0,
-  "preserved_body_geometry_sha256": "f2b6621829b0a2117b5d46feb04c842e6edbb368b559a9f7935f28bd760fbd0f",
-  "preserved_eyes_geometry_sha256": {
-    "Volt-Eye-Left": "cdb019211f0d6d45de030360ae817c7ac17bd9a2b18ff423dc922e3a8e9eb9c6",
-    "Volt-Eye-Right": "d92fc20506cb14964dae9f0b5c06b26078bd7df9d4ae3b67d23cbfad51168720"
+  "sculpt_geometry_sha256": {
+    "Volt-Body": "1ca81b474bf2125600585572cee753f0dec0673d992c1d0420f769c44b61e494",
+    "Volt-Eye-Left": "cc0acc00aede3119b8269639de213ececb51583b96bde46f546109bda016bf56",
+    "Volt-Eye-Right": "cac70b498d517b9ca9b5e070f1edc3966571308c717b43b2ecdc25895fb5605c"
   },
-  "subtle_compositor_bloom_strength": 0.08,
+  "subtle_compositor_bloom_strength": 0,
   "morph_position_errors_metres": {
     "Volt-Body": {
-      "Squash": 3.725290298461914e-09,
-      "Stretch": 4.656612873077393e-10,
+      "Squash": 5.820766091346741e-11,
+      "Stretch": 3.725290298461914e-09,
       "Blink": 0.0,
-      "CrestFlexLeft": 3.725290298461914e-09,
-      "CrestFlexRight": 3.725290298461914e-09
+      "CrestFlexLeft": 1.862645149230957e-09,
+      "CrestFlexRight": 9.313225746154785e-10
     },
     "Volt-Eye-Left": {
       "Squash": 3.725290298461914e-09,

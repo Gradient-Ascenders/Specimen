@@ -74,9 +74,9 @@ export class ContainmentTeachingScene {
     this.root.name = 'containment-climb-and-bounce-greybox';
 
     const roomOneMaterials = {
-      floor: artResources.materials.clinicalFloor,
-      wall: artResources.materials.mechanicalBacking,
-      ceiling: artResources.materials.mainCeramic,
+      floor: this.collisionOnlyMaterial('containment-room-1-shell-collision-only'),
+      wall: this.collisionOnlyMaterial('containment-room-1-wall-collision-only'),
+      ceiling: this.collisionOnlyMaterial('containment-room-1-ceiling-collision-only'),
       // The round pod supplies the visible shell; its compound support surfaces
       // stay collision-only instead of exposing an old square greybox.
       support: this.collisionOnlyMaterial('containment-room-1-pedestal-collision-only'),
@@ -127,6 +127,8 @@ export class ContainmentTeachingScene {
     this.bob = new BobCharacterPresentation(
       DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres, options.gelRendering,
     );
+    this.bob.setSpawnYaw(Math.PI);
+    this.goop.setSpawnYaw(Math.PI);
     this.root.add(this.bob.root, this.goop.root);
     this.resetTeachingPresentation();
   }
