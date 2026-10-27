@@ -470,6 +470,7 @@ export class BlackoutLevelRuntime {
       resources.finalBoss?.prepare(),
       resources.dronePresentation?.prepare(),
       resources.transit?.prepareArt(),
+      resources.scene.bossStaging?.ascentLift?.prepareArt(),
       resources.maintenanceBay && resources.scene.maintenanceBay?.prepareArt(resources.maintenanceBay.door.collisionMesh),
     ]).then(async () => {
       if (this.resources !== resources) return;

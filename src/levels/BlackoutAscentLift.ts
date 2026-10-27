@@ -1,4 +1,10 @@
 import * as THREE from 'three';
+import type {BlackoutMaintenanceMaterials} from '../render/environment/blackout/BlackoutMaintenanceMaterials.ts';
+import {BlackoutAscentArt,type BlackoutAscentArtLoader} from '../render/environment/blackout/BlackoutAscentArt.ts';
+import {consolidateStaticRoomVisuals} from '../render/StaticRoomVisuals.ts';
+import type {ContainmentStaticBatchResult} from '../render/environment/containment/ContainmentStaticBatching.ts';
+
+const REPLACED_CABINET=new Set(['lift-damaged-power-cabinet','lift-power-cabinet-rim','lift-power-cabinet-side','lift-broken-cabinet-door']);
 
 export const BLACKOUT_ASCENT_LIFT = Object.freeze({
   centreZ: 180.7, floorY: .4, rearZ: 176.4, frontZ: 184.8,
@@ -27,6 +33,9 @@ export class BlackoutAscentLift {
   readonly frontGate: THREE.Mesh;
   readonly labDoor: THREE.Mesh;
   readonly outlet = new THREE.Object3D();
+  readonly art?:BlackoutAscentArt;
+  private readonly retainedCabinet=new Set<THREE.Mesh>();
+  private cabinetVisuals?:ContainmentStaticBatchResult;
   private readonly geometries = new Set<THREE.BufferGeometry>();
   private readonly materials = new Set<THREE.Material>();
   private readonly unit = this.geometry(new THREE.BoxGeometry(1, 1, 1));
@@ -52,7 +61,7 @@ export class BlackoutAscentLift {
   private readonly arcUp = new THREE.Vector3(0, 1, 0);
   private disposed = false;
 
-  constructor() {
+  constructor(kit?:BlackoutMaintenanceMaterials) {
     const V = BLACKOUT_ASCENT_LIFT;
     this.root.name = 'blackout-damaged-service-lift-and-lab-landing';
     this.solid('lift-entry-apron', [8.8, .8, 2.5], [0, 0, 175.25], this.worn);
@@ -119,7 +128,23 @@ export class BlackoutAscentLift {
       const arc = new THREE.Mesh(arcGeometry, arcMaterial); arc.name = `lift-electric-burst-${i}`; arc.visible = false;
       this.arcSegments.push(arc); this.root.add(arc);
     }
-    this.buildLab(); this.present(0, 0, 0, 0, 0);
+    this.buildLab();
+    this.root.getObjectByName('lift-power-cabinet')!.traverse(object=>{
+      if(object instanceof THREE.Mesh&&!REPLACED_CABINET.has(object.name))this.retainedCabinet.add(object);
+    });
+    this.art=kit?new BlackoutAscentArt(kit,this.status,this.strip):undefined;
+    this.present(0, 0, 0, 0, 0);
+  }
+
+  prepareArt(loader?:BlackoutAscentArtLoader):Promise<void>{
+    if(!this.art||this.disposed)return Promise.resolve();
+    const owners=new Map<string,THREE.Object3D>([['RearGate',this.rearGate],['FrontGate',this.frontGate],['LabDoor',this.labDoor],
+      ['Cover',this.root.getObjectByName('lift-open-cabinet-cover')!]]);
+    return this.art.prepare(this.root,{owners,shaft:this.shaft,retainedCabinet:this.retainedCabinet},loader).then(()=>{
+      if(!this.disposed&&!this.cabinetVisuals&&this.art?.diagnostics.ready){
+        this.cabinetVisuals=consolidateStaticRoomVisuals(this.root,[...this.retainedCabinet]);
+      }
+    });
   }
 
   canBoard(body: { isSupportedBy(collider: THREE.Mesh): boolean }): boolean {
@@ -133,6 +158,7 @@ export class BlackoutAscentLift {
   }
 
   present(distance: number, rearClosed: number, frontOpen: number, charge: number, seconds: number, source?: THREE.Vector3): void {
+    this.art?.update(charge);
     this.rearGate.position.y = THREE.MathUtils.lerp(8.4, 3.05, rearClosed);
     this.frontGate.position.y = THREE.MathUtils.lerp(3.05, 8.4, frontOpen);
     this.status.color.setHex(charge > .8 ? 0x80cdb6 : 0x947042);
@@ -141,6 +167,9 @@ export class BlackoutAscentLift {
     for (let i = 0; i < this.shaft.length; i++) {
       const y = THREE.MathUtils.euclideanModulo(i * 8 - distance + 16, 48) - 16;
       this.shaft[i]!.position.y = y;
+      // Only the shaft span seen by the authored shots is submitted. Higher
+      // copies would pass through the arena's overhang in this shared frame.
+      this.shaft[i]!.visible=y>-12&&y<10;
     }
     for (let i = 0; i < this.washes.length; i++) {
       const y = THREE.MathUtils.euclideanModulo(4 + i * 8 - distance + 12, 24) - 12;
@@ -176,6 +205,7 @@ export class BlackoutAscentLift {
 
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
+    this.cabinetVisuals?.dispose();this.art?.dispose();
     this.root.removeFromParent(); this.root.clear();
     this.geometries.forEach(g => g.dispose()); this.materials.forEach(m => m.dispose());
   }

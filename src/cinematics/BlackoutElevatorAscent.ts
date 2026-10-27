@@ -122,6 +122,10 @@ export class BlackoutElevatorAscent {
         gameplayAudioEvents.emit('cue', { sound: 'world-lift-start-01', position: V.outlet, volumeScale: .24, maxDistance: 30 });
         gameplayAudioEvents.emit('loop', { key: 'blackout-elevator-motor', sound: 'world-machinery-loop-01', position: V.outlet, volumeScale: .035 });
       }
+      // Quiet shaft accents occupy existing silent beats, without extending
+      // the cinematic or changing dialogue/boarding timing.
+      if(crosses(19.4))gameplayAudioEvents.emit('cue',{sound:'world-release-01',position:{x:-5.6,y:5,z:179.5},volumeScale:.10,maxDistance:18});
+      if(crosses(35.8))gameplayAudioEvents.emit('cue',{sound:'world-lever-lock-01',position:{x:5.6,y:-2,z:181.5},volumeScale:.08,maxDistance:18});
       if (crosses(T.arrival)) {
         gameplayAudioEvents.emit('stop', { key: 'blackout-elevator-motor' });
         gameplayAudioEvents.emit('cue', { sound: 'world-lift-stop-01', position: V.outlet, volumeScale: .2, maxDistance: 25 });

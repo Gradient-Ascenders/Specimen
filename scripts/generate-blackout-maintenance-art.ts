@@ -7,6 +7,7 @@ for(const [path,bundle,name,asset]of [
   ['environments/blackout-maintenance/maintenance-bay.glb','maintenance-art.bin','B3_R1_Architecture','blackout-maintenance-v1'],
   ['vehicles/maintenance-drone/maintenance-drone.glb','maintenance-drone.bin','MD_Drone','maintenance-drone-v1'],
   ['environments/blackout-transit/transit-hall.glb','transit-art.bin','B3_R2_Architecture','blackout-transit-v1'],
+  ['environments/blackout-ascent/research-ascent.glb','ascent-art.bin','B3_ASC_Architecture','blackout-ascent-v1'],
 ]){
 const source=new URL('../assets/'+path,import.meta.url);
 const target=new URL('../src/assets/blackout/'+bundle,import.meta.url);

@@ -22,7 +22,7 @@ export class BlackoutLevelScene {
       if (!mapData) throw new Error('Room 1 texture maps must be prepared before scene construction.');
       this.maintenanceBay = new BlackoutMaintenanceBay(mapData);
       this.transitRoom = new BlackoutTransitRoom(this.maintenanceBay.surfaceMaterials);
-      this.bossStaging = new BlackoutBossStaging(true);
+      this.bossStaging = new BlackoutBossStaging(true,this.maintenanceBay.surfaceMaterials);
       this.finalArena = new ExterminationArena();
       this.root.add(this.maintenanceBay.root, this.transitRoom.root, this.bossStaging.root);
       this.root.add(this.finalArena.root);
