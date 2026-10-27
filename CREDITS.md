@@ -26,11 +26,10 @@ All 3D models were created independently for Specimen.
 | Soundscape - Synthwave Horror J60 - Loop | Tri-Tachyon (Ellary) | [OpenGameArt](https://opengameart.org/content/soundscape-synthwave-horror-j60-loop) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | The Quiet Ascent elevator cutscene · original loop extended using crossfades · harsh static reduced · opening and ending fades · converted to game-ready OGG · Music by Tri-Tachyon - https://soundcloud.com/tri-tachyon/albums. |
 | Sci-Fi Textures | [Marcelo Fernandez](https://soundcloud.com/marcelofernandezmusic) | [OpenGameArt](https://opengameart.org/content/sci-fi-textures) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | The Specimen, Act I · laboratory discovery · trimmed to 66 seconds · minor volume adjustment and boundary fades. |
 | Article 160 Section 2 | [Zander Noriega](https://opengameart.org/users/zander-noriega) | [OpenGameArt](https://opengameart.org/content/article-160-section-2) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | The Specimen, Act II · laboratory containment failure · original opening trimmed to 57.5 seconds · boundary fades · soundtrack stops at blackout. |
-| Perpetual Tension | [Zander Noriega](https://opengameart.org/users/zander-noriega) | [OpenGameArt](https://opengameart.org/content/perpetual-tension) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | The Specimen, Act III · drone pursuit and Volt's plan · first 61 seconds retained · slight volume adjustment and boundary fades. |
-| Inevitable | vitalezzz | [OpenGameArt](https://opengameart.org/content/inevitable) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | The Specimen, Act IV · crossfire, fusion and awakening · selected 35-second passage aligned to the fusion and first attack · minor volume adjustment and fades · attribution notice: Vitalezzz - Inevitable. |
+| Inevitable | vitalezzz | [OpenGameArt](https://opengameart.org/content/inevitable) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | The Specimen, Acts III and IV · drone pursuit, crossfire, fusion and awakening · extended/repeated buildup in Act III flows into the synchronized 35-second fusion passage in Act IV · volume adjustment and fades · attribution notice: Vitalezzz - Inevitable. |
 | Derelict Spaceship | vitalezzz | [OpenGameArt](https://opengameart.org/content/derelict-spaceship) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | The Specimen, Act V · arena reveal and Exterminator introduction · selected 47-second passage aligned to the first arena reveal · volume adjustment and fades · attribution notice: Vitalezzz - Derelict Spaceship. |
 
-The Specimen uses one synchronized 277-second OGG containing the five individually
+The Specimen uses one synchronized 277-second OGG containing the four individually
 credited compositions above. Music is silent from 2:03.5–2:14; existing sound
 effects continue through the blackout.
 
@@ -135,14 +134,20 @@ texture assets, external code or third-party dependencies were introduced.
 The requester-supplied `specimen-cinematic-music-integration.zip` provides the
 two final runtime recordings, copied unchanged into `public/assets/audio/music/`:
 `08-blackout-elevator-quiet-ascent.ogg` (85.068 seconds) and
-`09-blackout-research-the-specimen.ogg` (277 seconds). Original edits and the
-rebuild script remain in the supplied package; only the two compiled OGGs ship.
+`09-blackout-research-the-specimen.ogg` (277 seconds, subsequently replaced
+unchanged from `specimen-act3-inevitable-revision.zip`). Original edits and the
+rebuild script remain in the original package; only the two compiled OGGs ship.
+The revision's 96-second preview is for listening only and is not shipped.
 The research suite uses Sci-Fi Textures at 0–66s, Article 160 Section 2 at
-66–123.5s, silence at 123.5–134s, Perpetual Tension at 134–195s, Inevitable at
-195–230s and Derelict Spaceship at 230–277s. The suite retains the approved
-relative levels and boundary fades, with 1 dB of output headroom. Inevitable's
-excerpt starts near original 0:42.55; Derelict Spaceship's starts at 2:14.
-All six creator/source/licence/edit credits remain separate in the Music table.
+66–123.5s, silence at 123.5–134s, Inevitable at 134–230s and Derelict Spaceship
+at 230–277s. Inevitable's Act III extends/repeats its intro using the supplied
+1.4-second equal-power loop crossfade and +2.7 dB initial lift, tapering into
+the approved Act IV level. The 195s seam is filled for continuity; subsequent
+fusion and blast accents remain unshifted. Act IV starts near original 0:42.55;
+Derelict Spaceship starts at original 2:14. No runtime edits or extra players
+are applied. All five active creator/source/licence/edit credits (including the
+separate elevator track) remain in the Music table. Perpetual Tension is no
+longer used in the runtime score.
 
 | Resource | Author / creator | Source | Licence | Use in Specimen |
 | --- | --- | --- | --- | --- |

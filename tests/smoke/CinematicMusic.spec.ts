@@ -111,7 +111,6 @@ test('cinematic recordings decode at the nested URL and credits use the existing
     ['Soundscape - Synthwave Horror J60 - Loop', 'Tri-Tachyon (Ellary)', 'soundscape-synthwave-horror-j60-loop', 'licenses/by/4.0/'],
     ['Sci-Fi Textures', 'Marcelo Fernandez', 'sci-fi-textures', 'licenses/by/3.0/'],
     ['Article 160 Section 2', 'Zander Noriega', 'article-160-section-2', 'licenses/by/3.0/'],
-    ['Perpetual Tension', 'Zander Noriega', 'perpetual-tension', 'licenses/by/3.0/'],
     ['Inevitable', 'vitalezzz', 'inevitable', 'publicdomain/zero/1.0/'],
     ['Derelict Spaceship', 'vitalezzz', 'derelict-spaceship', 'publicdomain/zero/1.0/'],
   ]) {
@@ -122,6 +121,8 @@ test('cinematic recordings decode at the nested URL and credits use the existing
     await expect(row.locator('.credits-licence a')).toHaveAttribute('href', `https://creativecommons.org/${licence}`);
   }
   await expect(page.locator('.credits-use').filter({ hasText: 'Music by Tri-Tachyon - https://soundcloud.com/tri-tachyon/albums' })).toHaveCount(1);
+  await expect(page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: /^Perpetual Tension$/ }) })).toHaveCount(0);
+  await expect(page.locator('.credits-use').filter({ hasText: 'extended/repeated buildup in Act III' })).toHaveCount(1);
   await page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: /^High Tech Lab$/ }) }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('cinematic-music-credits.png') });
   expect(errors).toEqual([]);

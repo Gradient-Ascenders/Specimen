@@ -143,7 +143,7 @@ export class BlackoutResearchAudio extends CutsceneSoundTrack {
       const start=researchDroneFireStart(i),interval=researchDroneFireInterval(i),death=researchDroneDeathTime(i);
       if (regular && t>=start && before<death) {
         const shot=Math.floor((Math.min(t,death-1e-8)-start)/interval);
-        if (shot>=0 && start+shot*interval>before) this.cue('boss-drone-shot-01',this.dronePose.position,.6,true);
+        if (shot>=0 && start+shot*interval>before) this.cue('boss-drone-shot-01',this.dronePose.position,.3,true);
       }
       this.at(before,t,death,'research-drone-destroy-01',this.dronePose.position,.85,true);
       if (i>=8) this.at(before,t,researchPursuerShotTime(i-8),'volt-shoot-01',this.specimen,.9);

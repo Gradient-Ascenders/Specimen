@@ -78,7 +78,7 @@ test('Blackout cinematic music follows both live clocks, pause, skip, recovery a
     r.fixedUpdate(1 / 60);
   });
   await expectMusic(page, '09-blackout-research');
-  for (const seconds of [66, 125, 134, 208, 222, 236]) {
+  for (const seconds of [66, 125, 134, 194.8, 195.2, 208, 222, 230, 236, 262]) {
     await advance(page, 'researchFinale', seconds);
     await expect.poll(async () => (await snapshot(page)).find(p => !p.paused && p.src.includes('09-'))?.time).toBeGreaterThan(seconds - .4);
   }
