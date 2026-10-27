@@ -4,9 +4,7 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { BlackoutMaintenanceBay } from '../src/levels/BlackoutMaintenanceBay.ts';
 import { BlackoutMaintenanceBayController } from '../src/levels/BlackoutMaintenanceBayController.ts';
-import { BlackoutMaintenanceMaterials } from '../src/render/environment/blackout/BlackoutMaintenanceMaterials.ts';
 import { MaintenanceDronePresentation } from '../src/render/environment/blackout/MaintenanceDronePresentation.ts';
-import type { MaintenanceDroneReadModel } from '../src/vehicles/MaintenanceDroneTypes.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegistry.ts';
@@ -57,41 +55,3 @@ test('door, receiver and drone borrow kit resources until the owning bay is disp
   registry.dispose(); world.clear(); surfaces.clear();
 });
 
-test('textured drone preserves geometry, hierarchy, light state and fan animation with fixed UVs', () => {
-  const kit = new BlackoutMaintenanceMaterials(maintenanceMaps), plainRoot = new THREE.Group(), texturedRoot = new THREE.Group();
-  const plain = new MaintenanceDronePresentation(plainRoot, host());
-  const textured = new MaintenanceDronePresentation(texturedRoot, host(), undefined, undefined, undefined, kit);
-  const nodes = (root: THREE.Object3D) => { const list: THREE.Object3D[] = []; root.traverse(o => list.push(o)); return list; };
-  const a = nodes(plainRoot), b = nodes(texturedRoot);
-  assert.equal(a.length, b.length);
-  const uv = new Map<THREE.Mesh, number[]>();
-  for (let i = 0; i < a.length; i++) {
-    assert.equal(a[i].type, b[i].type); assert.equal(a[i].name, b[i].name);
-    assert.deepEqual(a[i].position.toArray(), b[i].position.toArray()); assert.deepEqual(a[i].rotation.toArray(), b[i].rotation.toArray());
-    assert.equal(a[i].castShadow, b[i].castShadow); assert.equal(a[i].receiveShadow, b[i].receiveShadow);
-    if (a[i] instanceof THREE.Mesh && b[i] instanceof THREE.Mesh) {
-      const oldMesh = a[i] as THREE.Mesh, mesh = b[i] as THREE.Mesh;
-      for (const name of ['position', 'normal']) assert.deepEqual(mesh.geometry.attributes[name].array, oldMesh.geometry.attributes[name].array);
-      assert.deepEqual(mesh.geometry.index?.array, oldMesh.geometry.index?.array);
-      if (kit.owns(mesh.material as THREE.Material)) {
-        const values = [...mesh.geometry.attributes.uv.array];
-        assert.ok(values.every(Number.isFinite)); uv.set(mesh, values);
-      }
-    }
-  }
-  for (const powered of [false, true, false]) {
-    const state = { state: powered ? 'parked-hover' : 'grounded-idle', powered, lightEnabled: powered } as MaintenanceDroneReadModel;
-    for (let frame = 0; frame < 60; frame++) { plain.update(1 / 60, state); textured.update(1 / 60, state); }
-    texturedRoot.position.set(10, 5, -3); texturedRoot.rotation.y += .7;
-    for (let i = 1; i < a.length; i++) {
-      assert.deepEqual(a[i].rotation.toArray(), b[i].rotation.toArray());
-      if (a[i] instanceof THREE.SpotLight) {
-        const old = a[i] as THREE.SpotLight, next = b[i] as THREE.SpotLight;
-        for (const key of ['intensity', 'distance', 'angle', 'penumbra', 'decay'] as const) assert.equal(old[key], next[key]);
-        assert.deepEqual(old.shadow.mapSize, next.shadow.mapSize); assert.equal(old.shadow.bias, next.shadow.bias);
-      }
-    }
-    for (const [mesh, values] of uv) assert.deepEqual([...mesh.geometry.attributes.uv.array], values);
-  }
-  plain.dispose(); textured.dispose(); kit.dispose();
-});

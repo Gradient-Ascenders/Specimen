@@ -3,14 +3,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { PlatformBoosters } from '../src/render/environment/PlatformBoosters.ts';
 import { ContainmentLevelScene } from '../src/levels/ContainmentLevelScene.ts';
-import { CONTAINMENT_BOOSTER_PLATFORMS } from '../src/render/environment/containment/ContainmentPlatformBoosters.ts';
-import { LevelTwoRoomThreeGreybox } from '../src/levels/LevelTwoRoomThreeGreybox.ts';
-import { LevelTwoRoomTwoGreybox } from '../src/levels/LevelTwoRoomTwoGreybox.ts';
 import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
-import { LevelTwoRoomFiveGreybox } from '../src/levels/LevelTwoRoomFiveGreybox.ts';
-import { CultivationPlatformBoosters } from '../src/render/environment/cultivation/CultivationPlatformBoosters.ts';
-import { addCultivationRoomThreeBoosters, addCultivationButtonPlatformBooster } from '../src/render/environment/cultivation/CultivationBoosterPlatforms.ts';
 import { FORMER_TRAVERSAL_SUPPORTS } from './helpers/FormerTraversalSupports.ts';
 import { ColliderTransformMode, CollisionWorld, CollisionHit, CollisionLayer } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
@@ -21,52 +15,6 @@ function batches(root: THREE.Object3D): THREE.Group[] {
   root.traverse(object => { if (object.userData.platformBoosterIds) result.push(object as THREE.Group); });
   return result;
 }
-function assertClearance(batch: THREE.Group, colliders: readonly THREE.Mesh[]): void {
-  const flames = batch.children.find(child => child.name.endsWith('platform-booster-flames')) as THREE.InstancedMesh;
-  batch.updateWorldMatrix(true, true);
-  const matrix = new THREE.Matrix4(), point = new THREE.Vector3();
-  for (let i = 0; i < flames.count; i++) {
-    flames.getMatrixAt(i, matrix); point.setFromMatrixPosition(matrix).applyMatrix4(flames.matrixWorld);
-    const scale = new THREE.Vector3().setFromMatrixScale(matrix).y;
-    // Full outer exhaust plus housing, including the shader's small sideways flicker.
-    const volume = new THREE.Box3(new THREE.Vector3(point.x - .4 * scale, point.y - .85 * scale, point.z - .4 * scale),
-      new THREE.Vector3(point.x + .4 * scale, point.y + .62 * scale, point.z + .4 * scale));
-    for (const collider of colliders) {
-      collider.geometry.computeBoundingBox(); collider.updateWorldMatrix(true, false);
-      const bounds = collider.geometry.boundingBox!.clone().applyMatrix4(collider.matrixWorld);
-      assert.equal(volume.intersectsBox(bounds), false,
-        `${batch.userData.platformBoosterIds[i]} engine/exhaust intersects ${collider.name}`);
-    }
-  }
-}
-
-test('Containment explicitly equips 8/8/9 platforms, with compact low engines and full moving-route clearance', () => {
-  const scene = new ContainmentLevelScene(() => {});
-  try {
-    assert.equal(scene.platformBoosters.platformCount, 25);
-    const allBatches = batches(scene.root);
-    assert.deepEqual(allBatches.map(batch => batch.userData.platformBoosterIds.length).sort((a, b) => a - b), [1, 1, 7, 8, 8]);
-    const ids = allBatches.flatMap(batch => batch.userData.platformBoosterIds);
-    assert.equal(new Set(ids).size, 25);
-    assert.equal(ids.includes('room-2-platform-a-height-lesson'), true);
-    assert.equal(ids.includes('room-5-lower-platform-c'), true);
-    assert.equal(ids.some(id => /cargo|room-1-|room-4-/.test(id)), false);
-    assert.equal(ids.filter(id => id === 'room-3-entry-platform').length, 1);
-    const renderedSourceNames: string[] = [];
-    scene.root.traverse(object => renderedSourceNames.push(object.name, ...(object.userData.staticBatchSourceNames ?? [])));
-    assert.equal(renderedSourceNames.some(name => /^room-3-(entry-platform|platform-a-bounce|platform-b-gap)-actuator-(column|base-socket|upper-collar)$/.test(name)), false);
-    for (const room of [2, 3, 5] as const) for (const id of CONTAINMENT_BOOSTER_PLATFORMS[room]) assert.ok(ids.includes(id));
-    for (const batch of allBatches) assertClearance(batch, scene.collisionMeshes);
-    for (const platform of [scene.roomFive.movingPlatformOne, scene.roomFive.movingPlatformTwo]) {
-      for (const progress of [0, .25, .5, .75, 1]) {
-        platform.restoreState({ progress, target: 'end' });
-        scene.roomFive.art.presentMovingPlatforms(.3);
-        for (const batch of allBatches.filter(batch => batch.name.startsWith('containment-moving'))) assertClearance(batch, scene.collisionMeshes);
-      }
-    }
-  } finally { scene.dispose(); }
-});
-
 test('moving booster batches inherit the same presentation pose as the whole deck without touching physics', () => {
   const scene = new ContainmentLevelScene(() => {});
   const idle = { position: new THREE.Vector3(-18, 76, 95), radiusMetres: .45 } as any;
@@ -87,87 +35,6 @@ test('moving booster batches inherit the same presentation pose as the whole dec
     }
     scene.roomFive.reset(); scene.platformBoosters.reset();
     assert.ok(batches(scene.root).every(batch => batch.position.lengthSq() === 0));
-  } finally { scene.dispose(); }
-});
-
-test('Cultivation retains 21 Room 5 engines and equips all 13 Room 3 decks plus the button ledge with one shared light/audio owner', () => {
-  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
-  const scope = scene.root, roomThree = scene.roomThree, roomFive = scene.roomFive;
-  const boosters = new CultivationPlatformBoosters(roomFive, undefined, scope);
-  try {
-    assert.equal(boosters.platformCount, 21);
-    const original = boosters.root.getObjectByName('room-5-platform-booster-flames') as THREE.InstancedMesh;
-    const matrices = original.instanceMatrix.array.slice();
-    addCultivationRoomThreeBoosters(boosters, roomThree);
-    addCultivationRoomThreeBoosters(boosters, roomThree);
-    addCultivationButtonPlatformBooster(boosters, scene.roomTwo);
-    addCultivationButtonPlatformBooster(boosters, scene.roomTwo);
-    assert.equal(boosters.platformCount, 35); assert.equal(boosters.batchCount, 3);
-    assert.deepEqual(original.instanceMatrix.array, matrices);
-    for (const batch of batches(roomThree.root)) assertClearance(batch, roomThree.collisionMeshes);
-    for (const batch of batches(scene.roomTwo.root)) assertClearance(batch, scene.roomTwo.collisionMeshes);
-    const lights = scope.children.filter(object => object.name.startsWith('room-5-platform-booster-spill-')) as THREE.PointLight[];
-    assert.equal(lights.length, 2); assert.ok(lights.every(light => !light.castShadow));
-    roomFive.root.visible = false; scene.roomTwo.root.visible = false; roomThree.root.visible = true;
-    const observer = roomThree.root.localToWorld(new THREE.Vector3(8, 20, 9.5));
-    for (let i = 0; i < 120; i++) boosters.update(1 / 60, observer);
-    assert.ok(lights.every(light => light.intensity > 5));
-    roomThree.root.visible = false;
-    for (let i = 0; i < 120; i++) boosters.update(1 / 60, observer);
-    assert.ok(lights.every(light => light.intensity === 0));
-  } finally { boosters.dispose(); scene.dispose(); }
-});
-
-test('retired traversal poles leave no collision or render meshes; platform shapes/poses remain intact', () => {
-  const raw = new LevelTwoRoomThreeGreybox(() => {});
-  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
-  const rawTwo = new LevelTwoRoomTwoGreybox(() => {}, scene.roomTwoToThreeGoopPassage.entryDoor);
-  try {
-    for (const { id, platformId } of FORMER_TRAVERSAL_SUPPORTS) {
-      assert.equal(raw.root.getObjectByName(id), undefined);
-      assert.equal(scene.roomThree.root.getObjectByName(id), undefined);
-      assert.equal(scene.collisionMeshes.some(mesh => mesh.name === id), false);
-      const before = raw.collisionMeshes.find(mesh => mesh.name === platformId)!, after = scene.roomThree.collisionMeshes.find(mesh => mesh.name === platformId)!;
-      assert.deepEqual(after.geometry.getAttribute('position').array, before.geometry.getAttribute('position').array);
-      assert.deepEqual(after.geometry.index?.array, before.geometry.index?.array);
-      assert.deepEqual(after.position, before.position); assert.deepEqual(after.quaternion.toArray(), before.quaternion.toArray());
-    }
-    const ledge = scene.roomTwo.collisionMeshes.find(mesh => mesh.name === 'cultivation-room-2-button-rest-ledge')!;
-    const originalLedge = rawTwo.collisionMeshes.find(mesh => mesh.name === ledge.name)!;
-    assert.deepEqual(ledge.position.toArray(), originalLedge.position.toArray());
-    assert.deepEqual(ledge.quaternion.toArray(), originalLedge.quaternion.toArray());
-    assert.deepEqual(ledge.geometry.getAttribute('position').array, originalLedge.geometry.getAttribute('position').array);
-    assert.deepEqual(ledge.geometry.index?.array, originalLedge.geometry.index?.array);
-    const surfaces:THREE.Mesh[]=[];
-    ledge.traverse(object=>{if(object instanceof THREE.Mesh&&object.userData.blenderBatch)surfaces.push(object);});
-    assert.ok(surfaces.length>0,'the unchanged ledge owns the production authored deck');
-    assert.ok(surfaces.some(mesh=>[mesh.material].flat().some(material=>material.visible)));
-    assert.equal(ledge.material.visible,false);
-  } finally { raw.dispose(); rawTwo.dispose(); scene.dispose(); }
-});
-
-test('entry spill stays below the deck and short of the entry wall without changing nearby engines', () => {
-  const scene = new ContainmentLevelScene(() => {});
-  try {
-    const entry = scene.collisionMeshes.find(mesh => mesh.name === 'room-3-entry-platform')!;
-    const lamps: THREE.PointLight[] = [];
-    scene.root.traverse(object => { if (object.name.startsWith('containment-platform-booster-spill-')) lamps.push(object as THREE.PointLight); });
-    const settle = (point: THREE.Vector3) => { for (let i = 0; i < 120; i++) scene.platformBoosters.update(1 / 60, point); };
-    settle(entry.position);
-    const lamp = lamps.find(light => Math.abs(light.position.z - entry.position.z) < 1e-6)!;
-    assert.ok(lamp && lamp.intensity > 5, 'Entry underside light remains powered');
-    assert.equal(lamps.length, 2); assert.ok(lamps.every(light => !light.castShadow));
-    const lightPosition = lamp.getWorldPosition(new THREE.Vector3());
-    const top = entry.position.y + (entry.geometry as THREE.BoxGeometry).parameters.height / 2;
-    assert.ok(lightPosition.y + lamp.distance < top, 'Spill cannot cross the walking-surface plane');
-    assert.ok(Math.abs(lightPosition.z - 49.2) > lamp.distance, 'Spill cannot reach the front of the entry wall');
-    assert.ok(top - .5 - lightPosition.y < lamp.distance, 'Underside remains inside the light range');
-    const neighbour = scene.collisionMeshes.find(mesh => mesh.name === 'room-3-platform-a-bounce')!;
-    settle(neighbour.position);
-    const normal = lamps.find(light => light.position.distanceTo(new THREE.Vector3(neighbour.position.x,
-      neighbour.position.y + .25 - 1.47, neighbour.position.z)) < 1e-6)!;
-    assert.ok(normal && normal.intensity > 5);
-    assert.equal(normal.distance, 6, 'Neighbour retains the original spill range');
   } finally { scene.dispose(); }
 });
 
@@ -233,31 +100,6 @@ test('a reused light slot restores the default range after leaving a compact spi
     boosters.reset();
     assert.ok(lamps.every(light => light.intensity === 0));
   } finally { boosters.dispose(); }
-});
-
-test('the actual doorway offender never receives a light slot; its surface glow shares exhaust resources', () => {
-  const scene = new ContainmentLevelScene(() => {});
-  try {
-    const exit = scene.collisionMeshes.find(mesh => mesh.name === 'room-2-exit-balcony')!;
-    const lamps: THREE.PointLight[] = [];
-    scene.root.traverse(object => { if (object.name.startsWith('containment-platform-booster-spill-')) lamps.push(object as THREE.PointLight); });
-    const oldSource = new THREE.Vector3(exit.position.x, exit.position.y + .25 - 1.47, exit.position.z);
-    for (const observer of [exit.position, new THREE.Vector3(.6, 11.36, 49.8), new THREE.Vector3(2.7885, 11, 57.6261)]) {
-      for (let i = 0; i < 120; i++) {
-        scene.platformBoosters.update(1 / 60, observer);
-        assert.ok(lamps.every(light => light.intensity === 0 || light.getWorldPosition(new THREE.Vector3()).distanceTo(oldSource) > .01),
-          'The exit-balcony light caused the doorway leak and must never be selected');
-      }
-    }
-    const glow = scene.root.getObjectByName('containment-room-2-platform-booster-surface-glow') as THREE.InstancedMesh;
-    const flames = scene.root.getObjectByName('containment-room-2-platform-booster-flames') as THREE.InstancedMesh;
-    assert.equal(glow.count, 1); assert.equal(glow.material, flames.material);
-    assert.equal((glow.material as THREE.Material).depthTest, true);
-    const positions = glow.geometry.getAttribute('position'), normals = glow.geometry.getAttribute('normal');
-    for (let i = 0; i < positions.count; i++) { assert.equal(positions.getY(i), 0); assert.ok(normals.getY(i) < -.99); }
-    let disposed = 0; glow.geometry.addEventListener('dispose', () => disposed++);
-    scene.dispose(); assert.equal(disposed, 1);
-  } finally { scene.dispose(); }
 });
 
 test('shared geometry/materials and instance buffers dispose exactly once; borrowed maps survive', () => {

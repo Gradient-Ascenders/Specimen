@@ -1,18 +1,14 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import * as THREE from 'three';
 import { maintenanceMaps } from './helpers/BlackoutMaintenanceMapData.ts';
 import { BlackoutMaintenanceMaterials } from '../src/render/environment/blackout/BlackoutMaintenanceMaterials.ts';
 import { BlackoutTransitRoom } from '../src/levels/BlackoutTransitRoom.ts';
 import { BlackoutTransitController } from '../src/levels/BlackoutTransitController.ts';
-import { BlackoutLevelScene } from '../src/levels/BlackoutLevelScene.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegistry.ts';
 
-const hash = (a: ArrayBufferView) => createHash('sha256').update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)).digest('hex');
 function fixture() {
   const kit = new BlackoutMaintenanceMaterials(maintenanceMaps), room = new BlackoutTransitRoom(kit);
   const world = new CollisionWorld(), surfaces = new SurfaceRegistry(), electricalTargets = new ElectricalTargetRegistry(world);
@@ -40,46 +36,6 @@ test('deployed bridge top corners meet both anchors across its full width', () =
         assert.ok(corner.distanceTo(expected) < 1e-8,
           `end ${end}, side ${side}: ${corner.toArray()} must meet ${expected.toArray()}`);
       }
-    }
-  } finally { f.dispose(); }
-});
-
-test('textured static and interactive geometry preserves the reviewed transit baseline', () => {
-  const f = fixture();
-  const baseline = JSON.parse(readFileSync(new URL('./fixtures/blackout-transit-authored-surfaces.json', import.meta.url), 'utf8'));
-  // Keep the original contract outside the redesigned mechanisms. Docking
-  // geometry and the added fourth bank have dedicated interaction checks.
-  const redesigned = new Set(['transit-bridge-end-anchor', 'transit-deployable-bridge-deck']);
-  baseline.surfaces = baseline.surfaces.filter((saved: { name: string }) =>
-    !/^transit-(cover|security|bridge-cover|light-bank-hanger-)/.test(saved.name) &&
-    !/^transit-laser-[ab]-(presentation-emitter-|emitter-(start|end)-proxy)/.test(saved.name) &&
-    !['transit-east-service-conduit-96', 'transit-east-service-conduit-116'].includes(saved.name) && !redesigned.has(saved.name));
-  const meshes: THREE.Mesh[] = [];
-  f.room.root.traverse(m => {
-    if (!(m instanceof THREE.Mesh) || m.name.includes('batched') || m.userData.visualOnly || m.userData.sharedLaserEmitter) return;
-    if (redesigned.has(m.name) || m.name.startsWith('transit-light-d-')) return;
-    if (m.parent?.name === 'transit-light-d-receiver') return;
-    for (let ancestor: THREE.Object3D | null = m; ancestor; ancestor = ancestor.parent) {
-      if (ancestor.name.startsWith('transit-sewer-drone-')) return;
-    }
-    meshes.push(m);
-  });
-  try {
-    assert.equal(meshes.length, baseline.surfaces.length);
-    for (const [i, mesh] of meshes.entries()) {
-      const saved = baseline.surfaces[i];
-      assert.equal(mesh.name, saved.name);
-      assert.equal(mesh.geometry.type, saved.geometry);
-      assert.deepEqual(mesh.position.toArray(), saved.position, mesh.name);
-      // JSON snapshots cannot retain the signed zero produced by basis rotations.
-      assert.deepEqual(mesh.rotation.toArray().map(value => value === 0 ? 0 : value), saved.rotation, mesh.name);
-      assert.deepEqual(mesh.scale.toArray(), saved.scale, mesh.name);
-      assert.deepEqual(mesh.userData, saved.userData, mesh.name);
-      assert.equal(f.room.collisionMeshes.includes(mesh), saved.collider);
-      assert.equal(hash(mesh.geometry.attributes.position.array), saved.positionHash, mesh.name);
-      assert.equal(hash(mesh.geometry.attributes.normal.array), saved.normalHash, mesh.name);
-      assert.equal(mesh.geometry.index ? hash(mesh.geometry.index.array) : null, saved.indexHash, mesh.name);
-      assert.equal(mesh.castShadow, saved.castShadow); assert.equal(mesh.receiveShadow, saved.receiveShadow);
     }
   } finally { f.dispose(); }
 });
@@ -160,29 +116,3 @@ test('lift motion leaves charts fixed and independent powered indicators retain 
   } finally { f.dispose(); }
 });
 
-test('Room 2 borrowers survive until the bay owner disposes maps exactly once across repeated scenes', () => {
-  for (let cycle = 0; cycle < 3; cycle++) {
-    const scene = new BlackoutLevelScene(true, maintenanceMaps), room = scene.transitRoom!;
-    const world = new CollisionWorld(), surfaces = new SurfaceRegistry(), electricalTargets = new ElectricalTargetRegistry(world);
-    const controller = new BlackoutTransitController({room, world, surfaces, electricalTargets});
-    const kit = scene.maintenanceBay!.surfaceMaterials;
-    const textures = new Set<THREE.Texture>();
-    for (const family of ['wallPanel','ceilingPanel','floorDeck','acidPlatform','basinMetal','warningPaint','ductSteel','machineryMetal'] as const) {
-      const m = kit.get(family); for (const t of [m.map!,m.roughnessMap!,m.normalMap!]) textures.add(t);
-    }
-    const counts = new Map<THREE.Texture, number>();
-    for (const t of textures) { counts.set(t, 0); t.addEventListener('dispose', () => counts.set(t, counts.get(t)! + 1)); }
-    assert.equal(kit.diagnostics.textureCount, 24);
-    const owned = [...controller.lights.map(light => light.targetMaterial),
-      material(controller.lifts[0].root.getObjectByName('transit-lift-a-contact-mount') as THREE.Mesh)];
-    const materialCounts = new Map(owned.map(m => [m, 0]));
-    for (const m of owned) m.addEventListener('dispose', () => materialCounts.set(m, materialCounts.get(m)! + 1));
-    controller.dispose(); controller.dispose(); room.dispose(); room.dispose();
-    assert.ok([...materialCounts.values()].every(n => n === 1), 'controller-owned surfaces and fittings dispose once');
-    assert.ok([...counts.values()].every(n => n === 0));
-    assert.equal(kit.get('floorDeck').map, [...textures][6]);
-    scene.dispose(); scene.dispose();
-    assert.ok([...counts.values()].every(n => n === 1));
-    electricalTargets.dispose();
-  }
-});

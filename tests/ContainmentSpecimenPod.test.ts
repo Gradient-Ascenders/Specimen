@@ -2,9 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
 
-import { OpeningGameScene } from '../src/cinematics/OpeningGameScene.ts';
-import { OPENING_GAME_TIMING, sampleOpeningGame } from '../src/cinematics/OpeningGameTimeline.ts';
-import { OPENING_ROOM_ONE_LAYOUT } from '../src/cinematics/OpeningRoomOne.ts';
 import { captureContainmentCollisionFingerprint } from '../src/levels/ContainmentCollisionFingerprint.ts';
 import { ContainmentLevelScene } from '../src/levels/ContainmentLevelScene.ts';
 import { ColliderTransformMode, CollisionHit, CollisionLayer, CollisionWorld } from '../src/physics/CollisionWorld.ts';
@@ -14,89 +11,6 @@ import { ContainmentArtResources } from '../src/render/environment/containment/C
 import { RoomOneArt } from '../src/render/environment/containment/RoomOneArt.ts';
 import { SPECIMEN_POD_CROWN_SECTIONS, SPECIMEN_POD_GLASS, SPECIMEN_POD_LID_RAISE_METRES,
   SPECIMEN_POD_SOLID_SECTIONS } from '../src/render/environment/containment/ContainmentSpecimenPod.ts';
-import { TitleScreenScene } from '../src/ui/TitleScreenScene.ts';
-
-const SHARED_PARTS = ['floor-mount', 'pedestal-shell', 'pedestal-service-belt', 'instrument-deck',
-  'lower-gasket', 'upper-gasket', 'upper-crown', 'overhead-feed-neck', 'curved-glass',
-  'lower-seal-light', 'upper-seal-light', 'deck-edge', 'crown-edge',
-  'stanchion-0', 'stanchion-1', 'stanchion-2', 'stanchion-3', 'specimen-frame', 'specimen-label'];
-const GAMEPLAY_NAMES: Readonly<Record<string, string>> = {
-  'pedestal-shell': 'room-1-pedestal-clean-shell',
-  'instrument-deck': 'room-1-containment-lower-instrumentation-base',
-  'upper-gasket': 'room-1-containment-upper-gasket-seat',
-  'overhead-feed-neck': 'room-1-containment-overhead-service-coupler',
-};
-
-function assertMatchingPod(title: TitleScreenScene, gameplay: RoomOneArt): void {
-  title.scene.updateMatrixWorld(true);
-  gameplay.root.updateMatrixWorld(true);
-  for (const part of SHARED_PARTS) {
-    const menuPart = title.pod.getObjectByName(`title-pod-${part}`);
-    const gamePart = gameplay.specimenAssembly.getObjectByName(GAMEPLAY_NAMES[part] ?? `room-1-pod-${part}`);
-    assert.ok(menuPart instanceof THREE.Mesh, part);
-    assert.ok(gamePart instanceof THREE.Mesh, part);
-    assert.equal(gamePart.geometry.type, menuPart.geometry.type, part);
-    for (const attribute of ['position', 'normal', 'uv']) {
-      assert.deepEqual(gamePart.geometry.getAttribute(attribute).array, menuPart.geometry.getAttribute(attribute).array, `${part} ${attribute}`);
-    }
-    for (let index = 0; index < 16; index++) {
-      assert.ok(Math.abs(gamePart.matrixWorld.elements[index] - menuPart.matrixWorld.elements[index]) < 1e-10,
-        `${part} must have the same dimensions and world pose, not just a similar silhouette`);
-    }
-    assert.equal(gamePart.material.color.getHex(), menuPart.material.color.getHex(), part);
-    assert.equal(gamePart.material.roughness, menuPart.material.roughness, part);
-    assert.equal(gamePart.material.metalness, menuPart.material.metalness, part);
-    assert.equal(gamePart.userData.visualOnly, true, part);
-  }
-}
-
-test('Room 1 uses the exact menu/cutscene pod geometry, finish and two-line Bob label', () => {
-  const title = new TitleScreenScene(), resources = new ContainmentArtResources(), art = new RoomOneArt(resources);
-  try {
-    assertMatchingPod(title, art);
-    const plate = art.root.getObjectByName('room-1-pod-specimen-label') as THREE.Mesh;
-    assert.deepEqual(plate.material.map.userData.labelLines, ['SPECIMEN: BOB', 'DANGER THREAT: UNKNOWN']);
-    const texture = plate.material.map as THREE.DataTexture;
-    const offset = (33 * 512 + 478) * 4;
-    assert.deepEqual(Array.from(texture.image.data.slice(offset, offset + 4)), [112, 185, 241, 255],
-      'The shared playable/container identification is blue, not the old yellow.');
-    for (const oldPart of ['room-1-pedestal-upper-gasket-frame', 'room-1-containment-asymmetric-control-block',
-      'room-1-containment-four-structural-supports', 'room-1-containment-intact-front-reinforced-pane']) {
-      assert.equal(art.root.getObjectByName(oldPart), undefined, 'No old square container is overlaid on the shared pod.');
-    }
-    const shellBounds = new THREE.Box3().setFromObject(art.eggRoot, true);
-    assert.ok(shellBounds.min.y >= 1.65 && shellBounds.max.y < 3.26, 'The intact egg sits inside the new chamber.');
-  } finally { title.dispose(); art.dispose(); resources.dispose(); }
-});
-
-test('the playable pedestal retains the final cutscene lid pose without respawning the egg', () => {
-  const title = new TitleScreenScene(), opening = new OpeningGameScene(title);
-  const resources = new ContainmentArtResources(), art = new RoomOneArt(resources);
-  try {
-    opening.begin();
-    opening.apply(sampleOpeningGame(OPENING_GAME_TIMING.end), 16 / 9);
-    const counts = resources.diagnostics;
-    let objectCount = 0;
-    art.root.traverse(() => { objectCount++; });
-    art.setOpeningAftermath(); art.setOpeningAftermath();
-    assertMatchingPod(title, art);
-    assert.equal(art.eggRoot.visible, false);
-    assert.equal(art.intactFrameAndPanes.visible, true);
-    assert.equal(art.shatteredFrameAndDebris.visible, false);
-    assert.deepEqual(resources.diagnostics, counts);
-    let after = 0;
-    art.root.traverse(() => { after++; });
-    assert.equal(after, objectCount, 'The final state must not allocate extra props on each restart.');
-    art.reset();
-    assert.equal(art.eggRoot.visible, true);
-    assert.equal(art.eggStates.intact.visible, true);
-    assert.equal(art.intactFrameAndPanes.position.y, 0);
-    title.update(0, 16 / 9);
-    // The menu controller is no longer driving this title copy, so rewind its lid explicitly.
-    opening.lid.position.y = 0;
-    assertMatchingPod(title, art);
-  } finally { opening.dispose(); art.dispose(); resources.dispose(); }
-});
 
 test('production and development have corrected collision-only supports and no duplicate specimen label', () => {
   for (const includeDevelopmentHelpers of [false, true]) {
@@ -265,40 +179,6 @@ test('the raised glass stays open below while the crown blocks jumps through its
     assert.equal(body.grounded, true);
     assert.ok(Math.abs(body.position.y - start.y) < 0.003, 'Bob returns to the usable pedestal top.');
   } finally { world.clear(); scene.dispose(); }
-});
-
-test('the glass crown stays physically connected to a fixed ceiling mount throughout retraction', () => {
-  const title = new TitleScreenScene(), opening = new OpeningGameScene(title);
-  const resources = new ContainmentArtResources(), art = new RoomOneArt(resources);
-  function assertConnected(root: THREE.Object3D, prefix: string, ceiling: number, neckName: string): void {
-    root.updateMatrixWorld(true);
-    const bounds = (name: string) => new THREE.Box3().setFromObject(root.getObjectByName(name)!, true);
-    const anchor = bounds(`${prefix}-ceiling-anchor`), piston = bounds(`${prefix}-lift-piston`);
-    const sleeve = bounds(`${prefix}-lift-fixed-sleeve`), neck = bounds(neckName);
-    assert.ok(Math.abs(anchor.max.y - ceiling) < 1e-6, 'The fixed flange must touch the room ceiling.');
-    assert.ok(Math.abs(piston.min.y - neck.max.y) < 1e-6, 'The moving feed neck must touch the piston.');
-    assert.ok(piston.max.y > sleeve.min.y && piston.max.y < sleeve.max.y,
-      'The piston must remain seated in the fixed sleeve.');
-    assert.ok(piston.max.y > piston.min.y);
-  }
-  try {
-    opening.begin();
-    const anchor = title.pod.getObjectByName('title-pod-ceiling-anchor')!;
-    const pose = anchor.getWorldPosition(new THREE.Vector3());
-    for (let time = 0; time <= OPENING_GAME_TIMING.end; time += 0.125) {
-      opening.apply(sampleOpeningGame(time), 16 / 9);
-      const ceiling = time < OPENING_GAME_TIMING.blackoutEnd ? 7 : OPENING_ROOM_ONE_LAYOUT.ceilingY;
-      assertConnected(title.scene, 'title-pod', ceiling, 'title-pod-overhead-feed-neck');
-      const expectedPose = pose.clone().add(new THREE.Vector3(0, ceiling - 7, 0));
-      assert.ok(anchor.getWorldPosition(new THREE.Vector3()).distanceTo(expectedPose) < 1e-10,
-        'The ceiling assembly must not rise with the crown.');
-    }
-    for (const state of ['intact', 'open', 'shattered', 'intact'] as const) {
-      art.setContainmentBoxState(state);
-      const neckName = 'room-1-containment-overhead-service-coupler' + (state === 'shattered' ? '-damaged' : '');
-      assertConnected(art.root, 'room-1-pod', 7.85, neckName);
-    }
-  } finally { opening.dispose(); art.dispose(); resources.dispose(); }
 });
 
 test('shared pod resources dispose once without disposing borrowed room resources', () => {

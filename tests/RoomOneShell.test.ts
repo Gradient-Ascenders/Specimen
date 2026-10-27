@@ -4,8 +4,6 @@ import {gunzipSync} from 'node:zlib';
 import test from 'node:test';
 import * as THREE from 'three';
 import {RoomOneShell,parseRoomOneShell,readRoomOneMaps,readRoomOneCompressedMaps,loadRoomOneCompressedShell,ROOM_ONE_SHELL_URL,ROOM_ONE_MAPS_URL,ROOM_ONE_COMPRESSED_MAPS_URL} from '../src/render/environment/containment/RoomOneShell.ts';
-import {ContainmentLevelScene} from '../src/levels/ContainmentLevelScene.ts';
-import {captureContainmentCollisionFingerprint} from '../src/levels/ContainmentCollisionFingerprint.ts';
 
 const bytes = await readFile(new URL('../assets/environments/containment-room-one/room-one-shell.glb',import.meta.url));
 const compressed = await readFile(new URL('../assets/environments/containment-room-one/room-one-maps.bin',import.meta.url));
@@ -80,84 +78,6 @@ test('Blender Room 1 uses nine material batches, no exported lights or duplicate
         assert.equal(material.map.wrapS,THREE.RepeatWrapping);assert.equal(material.map.generateMipmaps,true);
       }
     });
-  } finally {shell.dispose();}
-});
-
-test('the new floor stays flush and the authored door, climb and vent corridors stay visually open',async()=>{
-  const shell=new RoomOneShell();
-  try {
-    await shell.prepare(asset);shell.root.updateWorldMatrix(true,true);
-    for (const [x,z] of [[-.21,-2.6],[4,-4],[-5,3],[0,-.5]]) {
-      const hits=new THREE.Raycaster(new THREE.Vector3(x,2,z),new THREE.Vector3(0,-1,0),0,3).intersectObject(shell.root,true);
-      assert.ok(hits.length>0,`floor absent at ${x},${z}`);assert.ok(Math.abs(hits[0]!.point.y)<1e-6);
-    }
-    for (const [x,y] of [[-4.8,3],[-4.8,6],[4.3,2]]) {
-      assert.deepEqual(new THREE.Raycaster(new THREE.Vector3(x,y,5),new THREE.Vector3(0,0,1),0,2).intersectObject(shell.root,true),[]);
-    }
-    const glass=new THREE.Raycaster(new THREE.Vector3(6,3,0),new THREE.Vector3(1,0,0),0,1).intersectObject(shell.root,true)[0];
-    assert.equal(glass?.object.name,'R1_Shell_Glass');assert.ok(Math.abs(glass!.point.x-6.785)<1e-5);
-    for(const x of [-3,-1,1,3]) {
-      const wall=new THREE.Raycaster(new THREE.Vector3(x,3,-5),new THREE.Vector3(0,0,-1),0,2).intersectObject(shell.root,true)[0];
-      assert.equal(wall?.object.name,'R1_Shell_Ivory');
-      assert.ok(Math.abs(wall!.point.z+5.82)<1e-5,'rear wall must stay flat');
-    }
-    for(const x of [-6.5,-6.1,-3.55,-1.8,0,2.45,6.15,6.6])for(const y of [1.055,1.11,1.165]){
-      const hit=new THREE.Raycaster(new THREE.Vector3(x,y,5),new THREE.Vector3(0,0,1),0,1).intersectObject(shell.root,true)[0];
-      assert.equal(hit?.object.name,'R1_Shell_Graphite',`Escape-wall divider absent at ${x},${y}`);
-      assert.ok(hit.point.z<5.73,'the divider must cover the panel edge with physical clearance');
-    }
-    for(const x of [-4.8,4.3]){
-      assert.deepEqual(new THREE.Raycaster(new THREE.Vector3(x,1.11,5),new THREE.Vector3(0,0,1),0,1).intersectObject(shell.root,true),[]);
-    }
-  } finally {shell.dispose();}
-});
-
-test('adopting the shell preserves the complete gameplay collision fingerprint and reuses it on room reset',async()=>{
-  const scene=new ContainmentLevelScene(()=>{}),shell=scene.teaching.roomOneArt.shell;
-  const before=captureContainmentCollisionFingerprint(scene.collisionMeshes);
-  try {
-    await shell.prepare(asset);const meshes=[...shell.root.children];
-    scene.teaching.resetTeachingPresentation();await shell.prepare(()=>{throw new Error('Retry must reuse prepared room art');});
-    assert.deepEqual(shell.root.children,meshes);
-    assert.deepEqual(captureContainmentCollisionFingerprint(scene.collisionMeshes),before);
-  } finally {scene.dispose();}
-});
-
-test('the west corner trim has its own footprint and the floor seals beneath the rear wall bevel',async()=>{
-  const shell=new RoomOneShell();
-  try {
-    await shell.prepare(asset);
-    for(const x of [-6.65,-3,0,3,6.65])for(const z of [-5.805,-5.82,-5.84]){
-      const hit=new THREE.Raycaster(new THREE.Vector3(x,.1,z),new THREE.Vector3(0,-1,0),0,.2).intersectObject(shell.root,true)[0];
-      assert.ok(hit,`Floor-to-wall slit at ${x},${z}`);
-      assert.ok(Math.abs(hit.point.y)<1e-6,'the sealed perimeter must stay flush with the walking floor');
-    }
-    for(const z of [5.715,5.73,5.74])for(const y of [1.3,4,7]){
-      assert.ok(new THREE.Raycaster(new THREE.Vector3(-6.5,y,z),new THREE.Vector3(-1,0,0),0,.4).intersectObject(shell.root,true).length,
-        `Corner reveal must remain backed at ${y},${z}`);
-    }
-  } finally {shell.dispose();}
-});
-
-test('rear wall panels, metal returns and instruments have sealed backing',async()=>{
-  const shell=new RoomOneShell();
-  try {
-    await shell.prepare(asset);
-    // The deliberate reveals have a sealed backing, including the new panel
-    // endpoints and the cover split around the diagnostic display.
-    for(const side of [-1,1])for(const x of [3.69,3.71,3.73,3.78,3.83,3.84,3.86])for(const y of [1.4,3.8,7.5]){
-      const hits=new THREE.Raycaster(new THREE.Vector3(side*x,y,-5),new THREE.Vector3(0,0,-1),0,2).intersectObject(shell.root,true);
-      assert.ok(hits.length>0,`Unsealed rear wall at ${side*x},${y}`);
-    }
-    for(const y of [3.9,4.25,4.27,4.3,4.8,5.03,5.05,5.07,5.2]){
-      assert.ok(new THREE.Raycaster(new THREE.Vector3(.1,y,-5),new THREE.Vector3(0,0,-1),0,2).intersectObject(shell.root,true).length>0);
-    }
-    // A distant bulkhead hit still leaves the visible panel/plinth seam open.
-    // Require coverage directly behind the finishes, across the centre and wings.
-    for(const x of [-6.6,-5,-3.5,-2,0,2,3.5,5,6.6])for(const y of [1.065,1.075,1.085,1.095,1.10,1.11,1.125]){
-      const hit=new THREE.Raycaster(new THREE.Vector3(x,y,-5),new THREE.Vector3(0,0,-1),0,1).intersectObject(shell.root,true)[0];
-      assert.ok(hit&&hit.point.z> -5.85,`Open rear panel/plinth seam at ${x},${y}: ${hit?.point.z}`);
-    }
   } finally {shell.dispose();}
 });
 

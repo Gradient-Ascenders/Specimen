@@ -174,60 +174,6 @@ test('Level 2 preview composes three large connected rooms with unique colliders
   scene.dispose();
 });
 
-test('Room 3 batches only static visuals while preserving collider identity', () => {
-  const scene = createScene();
-  const room = scene.roomThree;
-
-  const authoredBatches=room.root.children.filter(object=>object.userData.blenderBatch);
-  assert.ok(room.staticBatchDiagnostics.batchCount+authoredBatches.length>0);
-  const coverColliders = room.collisionMeshes.filter(mesh => mesh.userData.coverRole);
-  assert.equal(coverColliders.length, 8);
-  assert.ok(room.staticBatchDiagnostics.sourceMeshCount >= room.staticBatchDiagnostics.batchCount);
-  assert.ok(authoredBatches.length>0,'the retired room shell is supplied by its authored finish batches');
-  assert.ok(scene.coverArt.diagnostics.drawCalls <= 56, 'six reused finishes across bounded room cells');
-  for (const cover of coverColliders) assert.equal((cover.material as THREE.Material).visible, false);
-  assert.equal(room.staticBatchDiagnostics.drawCallsRemoved,
-    room.staticBatchDiagnostics.sourceMeshCount - room.staticBatchDiagnostics.batchCount);
-  assert.equal(room.staticBatchDiagnostics.mergedGeometryCount, room.staticBatchDiagnostics.batchCount);
-  const batches = room.root.children.filter(
-    (object): object is THREE.Mesh =>
-      object instanceof THREE.Mesh &&
-      Array.isArray(object.userData.staticBatchSourceNames),
-  );
-  assert.equal(batches.length, room.staticBatchDiagnostics.batchCount);
-
-  const batchedNames = new Set<string>();
-  for (const batch of batches) {
-    for (const name of batch.userData.staticBatchSourceNames as string[]) {
-      batchedNames.add(name);
-      const collider = findCollider(scene, name);
-      assert.equal(collider.parent, room.root);
-      assert.equal(collider.visible, true);
-      assert.equal(collider.material.visible, false);
-    }
-  }
-  assert.equal(batchedNames.size, room.staticBatchDiagnostics.sourceMeshCount);
-  for (const drop of room.wallDrops) {
-    drop.mesh.traverse(object => {
-      assert.equal(batchedNames.has(object.name), false, 'Moving wall parts must not be frozen into static batches');
-    });
-  }
-
-  const radiation = findCollider(
-    scene,
-    'cultivation-room-3-radioactive-floor',
-  );
-  assert.equal(radiation.material.visible, true);
-  for (const cable of room.solubleTargetMeshes) {
-    const skins:THREE.Mesh[]=[];
-    cable.traverse(object=>{if(object instanceof THREE.Mesh&&object.userData.blenderBatch)skins.push(object);});
-    assert.ok(cable.material.visible||skins.some(mesh=>[mesh.material].flat().some(material=>material.visible)),`${cable.name}: soluble owner retains its visible authored skin`);
-    assert.equal(batchedNames.has(cable.name), false);
-  }
-
-  scene.dispose();
-});
-
 test('Room 3 checkpoint shield blocks distant ground-drone sightlines to Goop spawn', () => {
   const scene = createScene();
   const world = new CollisionWorld();

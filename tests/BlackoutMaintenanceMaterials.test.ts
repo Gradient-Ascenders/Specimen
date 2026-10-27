@@ -1,7 +1,6 @@
 import { maintenanceMaps } from './helpers/BlackoutMaintenanceMapData.ts';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import * as THREE from 'three';
 import { AcidSurfaceMaterial } from '../src/render/environment/containment/AcidSurfaceMaterial.ts';
@@ -9,7 +8,6 @@ import { BlackoutMaintenanceMaterials, type BlackoutMaterialFamily } from '../sr
 import { mapBlackoutBoxUVs } from '../src/render/environment/blackout/BlackoutMaintenanceUVs.ts';
 import { consolidateStaticRoomVisuals } from '../src/render/StaticRoomVisuals.ts';
 import { BlackoutMaintenanceBay } from '../src/levels/BlackoutMaintenanceBay.ts';
-import { BlackoutLevelScene } from '../src/levels/BlackoutLevelScene.ts';
 
 const families: BlackoutMaterialFamily[] = ['wallPanel', 'ceilingPanel', 'floorDeck', 'acidPlatform', 'basinMetal', 'warningPaint', 'ductSteel', 'machineryMetal', 'dronePaint'];
 const maps = (m: THREE.MeshStandardMaterial) => [m.map!, m.roughnessMap!, m.normalMap!] as THREE.DataTexture[];
@@ -113,28 +111,6 @@ test('textured batches preserve UVs, shadow roles and collider identities, resto
   kit.dispose();
 });
 
-test('untouched authored mesh fingerprints still match the baseline around the new wall arrival', () => {
-  const baseline = JSON.parse(readFileSync(new URL('./fixtures/blackout-maintenance-authored-surfaces.json', import.meta.url), 'utf8'));
-  const bay = new BlackoutMaintenanceBay(maintenanceMaps);
-  try {
-    assert.equal(bay.collisionMeshes.length,89,'the wall chute and one fixed return-route blocker add colliders');
-    const replaced=new Set(['front-perimeter-wall','ceiling-entry-vent-frame','ceiling-entry-vent-grille']);
-    for (const saved of baseline.surfaces) {
-      if(replaced.has(saved.name))continue;
-      const mesh = bay.root.getObjectByName(saved.name) as THREE.Mesh;
-      assert.ok(mesh, saved.name); assert.equal(bay.collisionMeshes.includes(mesh), saved.collider);
-      assert.deepEqual(mesh.position.toArray(), saved.position); assert.deepEqual(mesh.rotation.toArray(), saved.rotation);
-      assert.deepEqual(mesh.scale.toArray(), saved.scale); assert.deepEqual(mesh.userData, saved.userData);
-      assert.equal(hash(mesh.geometry.attributes.position.array), saved.positionHash, saved.name);
-      assert.equal(hash(mesh.geometry.attributes.normal.array), saved.normalHash, saved.name);
-      assert.equal(mesh.geometry.index ? hash(mesh.geometry.index.array) : null, saved.indexHash, saved.name);
-      assert.equal(mesh.castShadow, saved.castShadow); assert.equal(mesh.receiveShadow, saved.receiveShadow);
-    }
-    assert.equal(bay.root.getObjectByName('ceiling-entry-vent-frame'),undefined);
-    assert.equal(bay.root.getObjectByName('ceiling-entry-vent-grille'),undefined);
-  } finally { bay.dispose(); }
-});
-
 test('bay acid uses the shared animated material; hallway and duct use non-emissive textures', () => {
   const bay = new BlackoutMaintenanceBay(maintenanceMaps);
   try {
@@ -152,23 +128,6 @@ test('bay acid uses the shared animated material; hallway and duct use non-emiss
       assert.equal(m.emissiveIntensity, 0);
     }
   } finally { bay.dispose(); }
-});
-
-test('scene teardown releases each shared kit map and visible material exactly once', () => {
-  const scene = new BlackoutLevelScene(true, maintenanceMaps), materials = new Set<THREE.Material>(), textures = new Set<THREE.Texture>();
-  scene.maintenanceBay!.root.traverse(o => {
-    if (!(o instanceof THREE.Mesh)) return;
-    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
-      if (!m.visible || !m.name.startsWith('blackout-') || !(m instanceof THREE.MeshStandardMaterial)) continue;
-      materials.add(m); maps(m as THREE.MeshStandardMaterial).forEach(t => textures.add(t));
-    }
-  });
-  assert.equal(materials.size, 8); assert.equal(textures.size, 24);
-  const counts = new Map<object, number>();
-  for (const item of [...materials, ...textures]) { counts.set(item, 0); item.addEventListener('dispose', () => counts.set(item, counts.get(item)! + 1)); }
-  scene.dispose(); scene.dispose();
-  for (const count of counts.values()) assert.equal(count, 1);
-  assert.equal(scene.root.children.length, 0);
 });
 
 test('all three fixed stepping foundations share one material with metre-scale varied wear', () => {

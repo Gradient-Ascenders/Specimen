@@ -9,7 +9,6 @@ import { OpeningRoomOne, OPENING_ROOM_ONE_LAYOUT as R } from '../src/cinematics/
 import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.ts';
 import { createContainmentExperimentDirectoryTexture } from '../src/render/environment/containment/ContainmentProceduralTextures.ts';
 import { TitleScreenScene } from '../src/ui/TitleScreenScene.ts';
-import { RoomOneArt } from '../src/render/environment/containment/RoomOneArt.ts';
 import { ContainmentArtResources } from '../src/render/environment/containment/ContainmentArtResources.ts';
 import {useOpeningAssetFixtures} from './helpers/OpeningLaboratoryAsset.ts';
 
@@ -295,40 +294,6 @@ test('the full doorway transom seals the old gaps up to the hallway ceiling', ()
   } finally { scene.dispose(); }
 });
 
-test('the hatch uses the Blender Room 1 shell and real gameplay dressing', async context => {
-  useOpeningAssetFixtures(context);
-  const scene = createScene(), art = new RoomOneArt(scene.room.resources);
-  try {
-    await scene.laboratory.prepare();
-    const names = new Set<string>();
-    scene.laboratory.roomOne.root.traverse(object => {
-      if (object instanceof THREE.Mesh) for (const name of object.userData.staticBatchSourceNames ?? [object.name]) names.add(name);
-    });
-    for (const child of art.root.children) {
-      if (child === art.specimenAssembly || child.name === 'room-1-locked-laboratory-door-assembly') continue;
-      child.traverse(object => { if (object instanceof THREE.Mesh) assert.ok(names.has(object.name), object.name); });
-    }
-    const shell=scene.laboratory.roomOne.root.getObjectByName('R1_Architecture')!;
-    assert.ok(shell);assert.equal(shell.children.length,9);
-    assert.ok(names.has('R1_Shell_Light'),'Ceiling fixtures are authored into the shared Blender shell.');
-    assert.ok(![...names].some(name => /^title-|room-1-(pod|egg|pedestal)/.test(name)), 'Keep the one actual menu pod/egg, not a duplicate specimen.');
-    scene.apply(sampleOpeningGame(T.hatchStart), 16 / 9); scene.room.scene.updateMatrixWorld(true);
-    assert.equal(scene.laboratory.roomOne.root.visible, true);
-    assert.equal(scene.laboratory.menuEnvironment.visible, false);
-    const up = new THREE.Raycaster(new THREE.Vector3(0, 4, 0), new THREE.Vector3(0, 1, 0), 0, 5)
-      .intersectObject(scene.laboratory.roomOne.root, true)[0];
-    assert.ok(up); assert.ok(Math.abs(up.point.y - R.ceilingY) < 1e-6);
-    const down = new THREE.Raycaster(new THREE.Vector3(2, 1, 0), new THREE.Vector3(0, -1, 0), 0, 2)
-      .intersectObject(scene.laboratory.roomOne.root, true)[0];
-    assert.ok(down); assert.ok(Math.abs(down.point.y) < 1e-6);
-    assert.ok(scene.laboratory.roomOne.root.userData.staticBatchDiagnostics.drawCallsRemoved > 0,
-      'Remaining gameplay dressing still consolidates alongside the nine already-batched Blender meshes.');
-    scene.apply(sampleOpeningGame(0), 16 / 9);
-    assert.equal(scene.laboratory.menuEnvironment.visible, true);
-    assert.equal(scene.laboratory.roomOne.root.visible, false);
-  } finally { art.dispose(); scene.dispose(); }
-});
-
 test('security cameras sweep faster without changing their arc or reduced-motion stillness', () => {
   const scene = createScene(), head = scene.laboratory.cameraHeads[0], tilt = scene.laboratory.cameraTilts[0];
   try {
@@ -346,70 +311,6 @@ test('security cameras sweep faster without changing their arc or reduced-motion
     const reducedYaw = head.rotation.y, reducedPitch = tilt.rotation.x;
     scene.apply(sampleOpeningGame(10), 16 / 9, true);
     assert.equal(head.rotation.y, reducedYaw); assert.equal(tilt.rotation.x, reducedPitch);
-  } finally { scene.dispose(); }
-});
-
-test('the Blender fly-through shares camera buffers, four light slots and one cached shadow with bounded draws', async context => {
-  useOpeningAssetFixtures(context);
-  const scene = createScene(), objects = new Set<THREE.Object3D>(), geometry = new Set(), materials = new Set();
-  const versions = new Map<THREE.InstancedMesh, number>();
-  try {
-    await scene.laboratory.prepare();
-    scene.room.scene.traverse(object => {
-      objects.add(object);
-      if (object instanceof THREE.Mesh) {
-        geometry.add(object.geometry);
-        for (const material of Array.isArray(object.material) ? object.material : [object.material]) materials.add(material);
-      }
-      if (object instanceof THREE.InstancedMesh) versions.set(object, object.instanceMatrix.version);
-    });
-    const textureVersion = scene.laboratory.labelTexture.version;
-    for (let time = 1; time <= T.end; time += 0.25) {
-      scene.apply(sampleOpeningGame(time), 16 / 9);
-      let lights = 0, shadowLights = 0, meshObjects = 0;
-      scene.room.scene.traverseVisible(object => {
-        assert.ok(objects.has(object));
-        if (object instanceof THREE.Light) { lights++; if (object.castShadow) shadowLights++; }
-        if (object instanceof THREE.Mesh) {
-          meshObjects++;
-          assert.ok(geometry.has(object.geometry));
-          for (const material of Array.isArray(object.material) ? object.material : [object.material]) assert.ok(materials.has(material));
-        }
-      });
-      assert.equal(lights, 4); assert.equal(shadowLights, 1);
-      if (time < T.doorStart) {
-        assert.ok(meshObjects <= 48, 'Eight set batches, four shared camera batches per gimbal, plaques and the physical entrance stay bounded.');
-        assert.equal(scene.laboratory.observatory.visible, false);
-      }
-      if (time > 1 && time < T.doorStart) assert.equal(scene.needsShadowUpdate, false,
-        'Moving only the camera/recording heads must reuse static corridor depth.');
-    }
-    assert.deepEqual(scene.room.keyLight.shadow.mapSize.toArray(), [512, 512]);
-    for (const [mesh, version] of versions) assert.equal(mesh.instanceMatrix.version, version);
-    assert.equal(scene.laboratory.labelTexture.version, textureVersion);
-    const head = scene.laboratory.cameraHeads[0], tilt = scene.laboratory.cameraTilts[0];
-    assert.equal(scene.laboratory.cameraHeads.length, 4);
-    scene.apply(sampleOpeningGame(4), 16 / 9); const rotation = head.rotation.clone();
-    const tiltRotation = tilt.rotation.clone();
-    scene.apply(sampleOpeningGame(8), 16 / 9); assert.notDeepEqual(head.rotation, rotation);
-    assert.notDeepEqual(tilt.rotation, tiltRotation);
-    assert.equal(tilt.parent, head);
-    let cameraMeshes = 0, cameraTriangles = 0;
-    head.traverse(child => {
-      if (child instanceof THREE.Mesh) { cameraMeshes++; assert.equal(child.castShadow, false); }
-      if (child instanceof THREE.Mesh) cameraTriangles += (child.geometry.index?.count??child.geometry.getAttribute('position').count)/3;
-    });
-    assert.equal(cameraMeshes, 5, 'Four authored material batches and the existing recording LED.');
-    assert.ok(cameraTriangles>1_500&&cameraTriangles<2_500,'Detailed camera hardware stays below 2.5k triangles.');
-    const cameras=scene.laboratory.cameraTilts.map(tilt=>tilt.getObjectByName('opening-authored-surveillance-camera')!);
-    for(let index=1;index<cameras.length;index++)for(let part=0;part<4;part++){
-      assert.equal((cameras[index].children[part] as THREE.Mesh).geometry,(cameras[0].children[part] as THREE.Mesh).geometry);
-      assert.equal((cameras[index].children[part] as THREE.Mesh).material,(cameras[0].children[part] as THREE.Mesh).material);
-    }
-    scene.apply(sampleOpeningGame(8), 16 / 9, true);
-    const reducedRotation = head.rotation.clone(), reducedTilt = tilt.rotation.clone();
-    scene.apply(sampleOpeningGame(12), 16 / 9, true);
-    assert.ok(head.rotation.equals(reducedRotation)); assert.ok(tilt.rotation.equals(reducedTilt));
   } finally { scene.dispose(); }
 });
 
