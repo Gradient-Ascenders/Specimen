@@ -65,6 +65,7 @@ export class BlackoutTransitArt{
   readonly diagnostics={ready:false,meshes:0,triangles:0,deviceMeshes:0,retiredMeshes:0,newTextures:0,newLights:0};
   private readonly abort=new AbortController();
   private readonly materials=new Map<Finish,THREE.Material>();
+  private readonly edgeMaterial:THREE.MeshStandardMaterial;
   private readonly hidden=new THREE.MeshStandardMaterial({name:'blackout-transit-retired',visible:false});
   private readonly bindings:{mesh:THREE.Mesh;material:THREE.Material|THREE.Material[];device:boolean}[]=[];
   private readonly deviceMeshes:THREE.Mesh[]=[];
@@ -80,6 +81,9 @@ export class BlackoutTransitArt{
     // before actors, even though geometry arrives asynchronously, so walls can
     // reject obscured actor/effect pixels early without another render pass.
     for(const finish of FINISHES)this.finish(finish);
+    this.edgeMaterial=kit.get('machineryMetal').clone();this.edgeMaterial.map=null;
+    this.edgeMaterial.name='blackout-transit-structural-trim';this.edgeMaterial.color.setHex(0x425457);
+    this.edgeMaterial.vertexColors=true;this.edgeMaterial.roughness=.9;this.edgeMaterial.metalness=.18;
   }
 
   prepare(room:THREE.Group,devices:BlackoutTransitArtBindings,beforeAdoption:()=>void,afterAdoption:()=>void,
@@ -110,8 +114,8 @@ export class BlackoutTransitArt{
         source.traverse(object=>{
           if(!(object instanceof THREE.Mesh))return;
           for(const material of [object.material].flat())replaced.add(material);
-          object.material=this.finish(object.userData.finish);
           const region=object.userData.region as string;
+          object.material=object.userData.finish==='Graphite'&&/^(Bob|Lift|Volt|Bridge|Bank)/.test(region)?this.edgeMaterial:this.finish(object.userData.finish);
           object.castShadow=/^(Bob|Lift)/.test(region)||region==='Bridge';
           object.receiveShadow=true;object.userData.visualOnly=true;
           object.updateMatrix();object.matrixAutoUpdate=false;
@@ -161,7 +165,7 @@ export class BlackoutTransitArt{
     for(const {mesh,material}of this.bindings)mesh.material=material;
     this.bindings.length=0;
     if(this.source)disposeSource(this.source,false);
-    for(const material of this.materials.values())material.dispose();
+    for(const material of this.materials.values())material.dispose();this.edgeMaterial.dispose();
     this.materials.clear();this.hidden.dispose();this.root.removeFromParent();this.root.clear();
     this.source=undefined;this.deviceMeshes.length=0;this.diagnostics.ready=false;
   }

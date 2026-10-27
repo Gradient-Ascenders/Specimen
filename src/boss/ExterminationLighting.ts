@@ -49,7 +49,7 @@ export class ExterminationLighting {
     this.powered = powered;
     this.key.intensity = powered ? (phaseTwo ? 1.85 : 2.15) : 0;
     this.ambient.intensity = powered ? .24 : 0;
-    this.fill.intensity = powered ? (phaseTwo ? 12500 : 16000) : 0;
+    this.fill.intensity = powered ? (phaseTwo ? 14500 : 16500) : 0;
     this.reactor.intensity = powered ? (phaseTwo ? 5600 : 4200) : 0;
     this.moonlight.setStrength(powered ? this.roofOpening : 0);
     this.emergency.intensity = powered && phaseTwo ? 2400 : 0;

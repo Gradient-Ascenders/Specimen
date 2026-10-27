@@ -64,7 +64,8 @@ test('the entrance preserves native pointer capture while blocking movement/jump
   const input={enabled:true,resetState(){},setEnabled(enabled:boolean){this.enabled=enabled;},endFixedUpdate(){},
     wasPressed:(action:string)=>['switchSlime','jump','fireAbility'].includes(action),wasReleased:()=>false,
     isDown:(action:string)=>['moveForward','jump','aimAbility'].includes(action)} as unknown as Input;
-  const cameraRig={reset(){},setFollowTarget(){}};
+  let cameraYaw = 0, bobYaw = 0;
+  const cameraRig={reset(){},setFollowTarget(){},setGroundOrbitYawRadians(yaw:number){cameraYaw=yaw;}};
   const runtime=new CultivationLevelRuntime({authoredAssets:cultivationAssets,
     host:{dataset:{}} as unknown as HTMLElement,input,renderLayer:{cameraRig} as unknown as RenderLayer,
     progression:{unlockedSlimeIds:['bob','goop'],activeSlimeId:'goop'},window:new EventTarget() as unknown as Window,debugAvailable:false});
@@ -74,7 +75,7 @@ test('the entrance preserves native pointer capture while blocking movement/jump
   const bob=makeBody(),goop=makeBody(),poses:THREE.Vector3[]=[];
   const room=new THREE.Group();room.position.x=64;
   const resources={authoredPreview:{roomOne:{root:room}},pair:{bobBody:bob,goopBody:goop},
-    bobPresentation:{setPosition(p:THREE.Vector3){poses.push(p.clone());}},goopPresentation:{setPosition(p:THREE.Vector3){poses.push(p.clone());}},
+    bobPresentation:{setPosition(p:THREE.Vector3){poses.push(p.clone());},setSpawnYaw(yaw:number){bobYaw=yaw;}},goopPresentation:{setPosition(p:THREE.Vector3){poses.push(p.clone());}},
     goopAcidPresentation:{resume(){},suspend(){}},acidProjectileSystem:{cancelAim(){}},
     controller:{readModel:{state:'playing'}},deathSequence:{isPlaying:true}};
   const internal=runtime as unknown as {resources:typeof resources;lifecycle:{state:string};preparationQueue:unknown;
@@ -82,6 +83,7 @@ test('the entrance preserves native pointer capture while blocking movement/jump
     beginVentArrival(r:typeof resources):void;startResources():void;stopResources():void};
   internal.resources=resources;internal.lifecycle={state:'running'};
   internal.beginVentArrival(resources);assert.equal(input.enabled,false);assert.equal(internal.ventArrival.active,true);
+  assert.equal(cameraYaw,Math.PI);assert.equal(bobYaw,Math.PI);
   assert.deepEqual(poses.map(p=>p.toArray()),[[53,24,4],[55,21.5,4]]);
   internal.startResources();assert.equal(input.enabled,true,'Native input stays enabled so the Enter Level gesture can capture the pointer.');
   internal.stopResources();const frozen=internal.ventArrival.seconds;internal.lifecycle.state='stopped';runtime.fixedUpdate(1);

@@ -1228,6 +1228,7 @@ export class CultivationLevelRuntime {
       const voltBody = new KinematicBody({ world: collisionWorld, surfaces: surfaceRegistry,
         initialPosition: new THREE.Vector3(), events: voltMovementEvents, config: { adhesionEnabled: false, reboundEnabled: false, chargedJumpEnabled: false } });
       const voltPresentation = new VoltCharacterPresentation(voltBody.radiusMetres, this.renderLayer.gelRendering);
+      voltPresentation.setSpawnYaw(Math.PI);
       voltPresentation.setCameraView(this.renderLayer.cameraRig, voltBody);
       rollback(() => voltPresentation.dispose());
       voltPresentation.setCollisionWorld(collisionWorld);
@@ -1436,6 +1437,7 @@ export class CultivationLevelRuntime {
       voltPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       authoredPreview?.roomFive.captiveVoltPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       const goopPresentation = new GoopCharacterPresentation(goopBody.radiusMetres, this.renderLayer.gelRendering);
+      goopPresentation.setSpawnYaw(Math.PI);
       goopPresentation.setCameraView(this.renderLayer.cameraRig, goopBody);
       rollback(() => goopPresentation.dispose());
       goopPresentation.setPosition(goopBody.position);
@@ -1443,6 +1445,7 @@ export class CultivationLevelRuntime {
       goopPresentation.setReflectionIntensity(CULTIVATION_BOB_REFLECTION.normal.body, CULTIVATION_BOB_REFLECTION.normal.eyes, true);
       this.renderLayer.scene.add(goopPresentation.root);
       const bobPresentation = new BobCharacterPresentation(bobBody.radiusMetres, this.renderLayer.gelRendering);
+      bobPresentation.setSpawnYaw(Math.PI);
       bobPresentation.setCameraView(this.renderLayer.cameraRig, bobBody);
       bobPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       bobPresentation.setReflectionIntensity(
@@ -2265,11 +2268,14 @@ export class CultivationLevelRuntime {
 
   private resetRecoveryCamera(resources: CultivationRuntimeResources): void {
     this.renderLayer.cameraRig.reset();
+    let yaw = Math.PI;
     if (this.authoredPreviewRoomId === 5 && resources.manager.activeSlimeId === 'bob' &&
       resources.authoredPreview?.roomFive.controller.checkpoint === 'controls') {
       // Camera-back is opposite the route from the checkpoint toward the first landing.
-      this.renderLayer.cameraRig.setGroundOrbitYawRadians(Math.atan2(2.5, -5.2));
+      yaw = Math.atan2(2.5, -5.2);
     }
+    resources.bobPresentation.setSpawnYaw(yaw);
+    this.renderLayer.cameraRig.setGroundOrbitYawRadians(yaw);
   }
 
   private retargetCamera(resources: CultivationRuntimeResources): void {

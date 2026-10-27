@@ -52,7 +52,7 @@ test('distribution hall preserves live collision and electrical targets, with pr
       assert.ok(hit&&Math.abs(hit.point.y-y)<1e-5,`rendered landing at ${x},${y},${z}`);
     }
     const acid=f.room.root.getObjectByName('transit-acid-surface') as THREE.Mesh<THREE.BufferGeometry,THREE.MeshStandardMaterial>;
-    assert.equal(acid.material.emissiveIntensity,.12,'acid has a faint room-local glow');
+    assert.equal(acid.material.emissiveIntensity,.048,'acid has a faint room-local glow');
     f.room.art!.root.traverse(o=>{if(o instanceof THREE.Mesh&&o.material instanceof THREE.MeshStandardMaterial)assert.equal(o.material.emissiveIntensity,0,'architecture cannot illuminate a blackout');});
   }finally{f.dispose();}
 });

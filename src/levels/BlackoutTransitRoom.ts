@@ -145,7 +145,7 @@ export class BlackoutTransitRoom {
   });
 
   private readonly materials: THREE.Material[] = [];
-  private readonly acidMaterial = new AcidSurfaceMaterial({ emissionStrength: 0.12 });
+  private readonly acidMaterial = new AcidSurfaceMaterial({ emissionStrength: 0.048 });
   private readonly hallwayLights: THREE.PointLight[] = [];
   private readonly hallwayBulbs: THREE.MeshStandardMaterial[] = [];
   private hallwayElapsed = 0;

@@ -62,6 +62,7 @@ export class VoltCharacterPresentation {
   private bodyReflection = 0;
   private eyeReflection = 0;
   private reflectionSnapPending = true;
+  private spawnYaw = 0;
   private yaw = 0;
   private previousYaw = 0;
   private targetYaw = 0;
@@ -208,6 +209,8 @@ export class VoltCharacterPresentation {
   get detailDiagnostics() { return this.detail?.diagnostics; }
   setPosition(position: Vector3State): void { this.placement.position.set(position.x, position.y, position.z); }
   setCollisionWorld(world: CollisionWorld): void { this.headroom.setCollisionWorld(world); }
+  /** Level heading restored on recovery, independent of temporary cinematic turns. */
+  setSpawnYaw(yaw: number): void { this.spawnYaw = yaw; this.setYaw(yaw); }
   setYaw(yaw: number): void {
     this.yaw = this.previousYaw = this.targetYaw = yaw;
     this.reversing = this.hasTravelHeading = false; this.reversalRemaining = 0; this.present();
@@ -409,7 +412,8 @@ export class VoltCharacterPresentation {
   reset(): void {
     this.headroom.reset();
     this.deathActive = false; this.deathElapsed = 0; this.burst.reset();
-    this.yaw = this.previousYaw = this.targetYaw = this.bodyWeight = this.previousBodyWeight = this.flex = this.previousFlex = 0;
+    this.yaw = this.previousYaw = this.targetYaw = this.spawnYaw;
+    this.bodyWeight = this.previousBodyWeight = this.flex = this.previousFlex = 0;
     this.blink = this.previousBlink = this.blinkClock = this.blinkCount = this.speed = this.previousLateralSpeed = 0;
     this.nextBlink = 3.7; this.launchRemaining = this.landingRemaining = this.damageRemaining = this.damageStrength = this.landingStrength = 0;
     this.launchStrength = this.lean = this.previousLean = this.previousForwardSpeed = this.reversalRemaining = 0;

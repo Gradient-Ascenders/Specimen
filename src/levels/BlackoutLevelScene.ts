@@ -27,7 +27,8 @@ export class BlackoutLevelScene {
       this.root.add(this.maintenanceBay.root, this.transitRoom.root, this.bossStaging.root);
       this.root.add(this.finalArena.root);
       this.collisionMeshes = [...this.maintenanceBay.collisionMeshes, ...this.transitRoom.collisionMeshes, ...this.bossStaging.collisionMeshes, ...this.finalArena.collisionMeshes];
-      this.root.add(new THREE.HemisphereLight(0x34404a, 0x080a0b, .025));
+      const ambient=new THREE.HemisphereLight(0x34404a,0x080a0b,.025);
+      ambient.name='blackout-emergency-ambience';this.root.add(ambient);
       return;
     }
 

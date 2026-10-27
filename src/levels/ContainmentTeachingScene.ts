@@ -127,6 +127,8 @@ export class ContainmentTeachingScene {
     this.bob = new BobCharacterPresentation(
       DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres, options.gelRendering,
     );
+    this.bob.setSpawnYaw(Math.PI);
+    this.goop.setSpawnYaw(Math.PI);
     this.root.add(this.bob.root, this.goop.root);
     this.resetTeachingPresentation();
   }

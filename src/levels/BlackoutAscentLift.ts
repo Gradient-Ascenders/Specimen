@@ -33,6 +33,7 @@ export class BlackoutAscentLift {
   readonly frontGate: THREE.Mesh;
   readonly labDoor: THREE.Mesh;
   readonly outlet = new THREE.Object3D();
+  readonly lightingState={charge:0,arrival:0};
   readonly art?:BlackoutAscentArt;
   private readonly retainedCabinet=new Set<THREE.Mesh>();
   private cabinetVisuals?:ContainmentStaticBatchResult;
@@ -158,6 +159,7 @@ export class BlackoutAscentLift {
   }
 
   present(distance: number, rearClosed: number, frontOpen: number, charge: number, seconds: number, source?: THREE.Vector3): void {
+    this.lightingState.charge=THREE.MathUtils.clamp(charge,0,1);this.lightingState.arrival=THREE.MathUtils.clamp(frontOpen,0,1);
     this.art?.update(charge);
     this.rearGate.position.y = THREE.MathUtils.lerp(8.4, 3.05, rearClosed);
     this.frontGate.position.y = THREE.MathUtils.lerp(3.05, 8.4, frontOpen);

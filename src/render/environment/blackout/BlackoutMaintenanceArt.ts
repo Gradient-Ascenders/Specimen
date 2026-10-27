@@ -48,6 +48,7 @@ export class BlackoutMaintenanceArt{
   readonly root=new THREE.Group();
   private readonly abort=new AbortController();
   private readonly materials=new Map<Finish,THREE.MeshStandardMaterial|THREE.MeshBasicMaterial>();
+  private readonly edgeMaterial:THREE.MeshStandardMaterial;
   private readonly bindings:{mesh:THREE.Mesh;material:THREE.Material|THREE.Material[]}[]=[];
   private readonly hidden=new THREE.MeshStandardMaterial({visible:false});
   private readonly doorMeshes:THREE.Mesh[]=[];
@@ -72,6 +73,10 @@ export class BlackoutMaintenanceArt{
       enabled:()=>this.diagnostics.ready,volumeScale:()=>.025,playbackRate:()=>.68});
     // Allocate enclosure finishes before actors for early opaque depth rejection.
     for(const finish of FINISHES)this.finish(finish);
+    this.edgeMaterial=kit.get('machineryMetal').clone();
+    this.edgeMaterial.name='blackout-maintenance-structural-trim';this.edgeMaterial.map=null;
+    this.edgeMaterial.color.setHex(0x45575a);this.edgeMaterial.vertexColors=true;
+    this.edgeMaterial.roughness=.9;this.edgeMaterial.metalness=.18;
   }
 
   prepare(bay:THREE.Group,door:THREE.Mesh,beforeAdoption:()=>void,afterAdoption:()=>void,
@@ -96,7 +101,7 @@ export class BlackoutMaintenanceArt{
         source.traverse(object=>{
           if(!(object instanceof THREE.Mesh))return;
           const old=[object.material].flat();
-          object.material=this.finish(object.userData.finish);
+          object.material=object.userData.finish==='Dark'&&/^(Pad|Door|Dock|Vent)/.test(object.userData.region)?this.edgeMaterial:this.finish(object.userData.finish);
           for(const material of old)replaced.add(material);
           object.castShadow=object.userData.region==='Door'||/^Pad|^Hall/.test(object.userData.region);
           object.receiveShadow=true;object.userData.visualOnly=true;
@@ -186,7 +191,7 @@ export class BlackoutMaintenanceArt{
     if(this.source){for(const mesh of [...this.doorMeshes,...this.fanMeshes])this.source.add(mesh);disposeSource(this.source,false);}
     this.fanMeshes.length=0;
     this.source=undefined;this.doorMeshes.length=0;
-    for(const material of this.materials.values())material.dispose();
+    for(const material of this.materials.values())material.dispose();this.edgeMaterial.dispose();
     this.materials.clear();this.hidden.dispose();this.root.removeFromParent();this.root.clear();
     this.diagnostics.ready=false;
   }

@@ -63,7 +63,7 @@ export class BlackoutMaintenanceBay {
     const submergedSteel = new THREE.MeshStandardMaterial({color:0x30391c,roughness:.55,metalness:.18});
     const warning = new THREE.MeshStandardMaterial({ color: 0x8b6b21, roughness: 0.85, metalness: 0.18 });
     const trim = new THREE.MeshStandardMaterial({ color: 0x515956, roughness: 0.72, metalness: 0.58 });
-    this.acidMaterial = new AcidSurfaceMaterial();
+    this.acidMaterial = new AcidSurfaceMaterial({emissionStrength:.01});
 
     const { chamberWidth, rearZ, hallwayWidth, hallwayLength, acidStartZ, acidEndZ } = BLACKOUT_BAY_LAYOUT;
     const halfWidth = chamberWidth / 2;

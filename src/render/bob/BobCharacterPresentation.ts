@@ -225,6 +225,7 @@ export class BobCharacterPresentation {
   private wallReversing = false;
   private wallReversalHoldRemaining = 0;
   private wallChargeFacingLocked = false;
+  private spawnYaw = 0;
   private currentFacingYawRadians = 0;
   private targetFacingYawRadians = 0;
   private hasTravelHeading = false;
@@ -350,6 +351,12 @@ export class BobCharacterPresentation {
   setPosition(position: Vector3State): void {
     this.gameplayPositionWorld.set(position.x, position.y, position.z);
     this.mesh.position.copy(this.gameplayPositionWorld);
+  }
+
+  /** Level heading restored on recovery, independent of temporary cinematic turns. */
+  setSpawnYaw(yawRadians: number): void {
+    this.spawnYaw = yawRadians;
+    this.setYaw(yawRadians);
   }
 
   setYaw(yawRadians: number): void {
@@ -875,6 +882,7 @@ export class BobCharacterPresentation {
     for (const name of BOB_EXPRESSIONS) this.requestedExpressions[name] = 0;
     this.clearMorphWeights();
     this.applyMorphs();
+    this.setYaw(this.spawnYaw);
     this.present();
   }
 

@@ -9,6 +9,7 @@ import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/
 import * as THREE from 'three';
 import { GoopCharacterPresentation, type GoopCharacterPresentationState } from '../render/goop/GoopCharacterPresentation.ts';
 import { GelReflectionLighting } from '../render/slime/GelReflectionLighting.ts';
+import {BlackoutLightingPass} from '../render/environment/blackout/BlackoutLightingPass.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from '../render/IsolatedResourcePrewarm.ts';
 import { BlackoutPresentationPreparation } from '../render/BlackoutPresentationPreparation.ts';
@@ -152,7 +153,7 @@ import {
 
 const OUT_OF_BOUNDS_Y = -5;
 const BLACKOUT_BOB_REFLECTION = { body: 0.12, eyes: 0.28 } as const;
-const BLACKOUT_VOLT_LIGHT_INTENSITY = { authored: 16, foundation: 2.2 } as const;
+const BLACKOUT_VOLT_LIGHT_INTENSITY = { authored: 18, foundation: 2.2 } as const;
 const BLACKOUT_MAINTENANCE_VOLT_RANGES = Object.freeze({
   acquisitionRangeMetres: 11,
   instabilityWarningRangeMetres: 12,
@@ -189,6 +190,7 @@ interface BlackoutRuntimeResources {
   readonly transit?: BlackoutTransitController;
   readonly unregisterTransitCheckpointParticipant?: () => void;
   readonly dronePresentation?: MaintenanceDronePresentation;
+  readonly lighting?:BlackoutLightingPass;
   readonly hallwayShadows?: SpatialShadowCache;
   readonly hallwayShadowParticipants: readonly ShadowParticipantPosition[];
   readonly scene: BlackoutLevelScene;
@@ -483,10 +485,17 @@ export class BlackoutLevelRuntime {
           if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material, true);
         }
       });
+      if(resources.lighting){
+        await resources.lighting.prepare(this.renderLayer.renderer,[resources.scene.maintenanceBay!.root,resources.scene.transitRoom!.root,
+          resources.scene.bossStaging!.root,resources.bobPresentation.root,resources.goopPresentation.root,resources.voltPresentation.root,
+          resources.maintenanceDroneFixture.droneRoot],this.renderLayer.graphicsConfiguration);
+        if(this.resources!==resources)return;
+      }
       const preparation = new BlackoutPresentationPreparation();
       this.programPreparation = preparation;
-      await preparation.prepare(this.renderLayer, this.preparationCamera.copy(this.renderLayer.cameraRig.camera));
+      await preparation.prepare(this.renderLayer, this.preparationCamera.copy(this.renderLayer.cameraRig.camera),resources.lighting?.lightLayout);
       if (this.resources !== resources) return;
+      const primeDeaths=()=>{
       resources.goopPresentation.primeDeathResources(resources.group.goopBody.position, root => {
         withIsolatedPrewarmState(this.renderLayer.renderer, () => this.renderLayer.withShadowPreparation(true, () =>
           renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.cameraRig.camera, [root])));
@@ -499,6 +508,9 @@ export class BlackoutLevelRuntime {
         withIsolatedPrewarmState(this.renderLayer.renderer, () => this.renderLayer.withShadowPreparation(true, () =>
           renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.cameraRig.camera, [root])));
       });
+      };
+      if(resources.lighting?.lightLayout)resources.lighting.lightLayout.withLayout(this.renderLayer.cameraRig.camera,resources.group.activeBody.position,primeDeaths);
+      else primeDeaths();
     }).catch(error => {
       if (this.resources === resources) this.unload();
       throw error;
@@ -812,7 +824,7 @@ export class BlackoutLevelRuntime {
     resources.voltPresentation.setPosition(resources.group.voltBody.position);
     resources.voltPresentation.reset(); resources.voltDeathActive = false;
     resources.specimenCharacter.reset();
-    this.renderLayer.cameraRig.reset();
+    this.resetForwardCamera();
     this.retargetCamera(resources);
     this.syncVisuals(resources);
     this.notifyHUD(undefined, true);
@@ -1001,7 +1013,7 @@ export class BlackoutLevelRuntime {
           roomId: 'room-3',
           phase: 'three-slime',
         };
-        this.renderLayer.cameraRig.reset();
+        this.resetForwardCamera();
         this.retargetCamera(resources);
         this.notifyHUD(undefined, true);
         this.events.emit('objectiveChanged', {
@@ -1020,7 +1032,7 @@ export class BlackoutLevelRuntime {
           phase: 'specimen',
           local: { ...this.currentRoom.local, merged: true },
         };
-        this.renderLayer.cameraRig.reset();
+        this.resetForwardCamera();
         this.retargetCamera(resources);
         this.notifyHUD(undefined, true);
         if(resources.finalBoss) {
@@ -1600,6 +1612,11 @@ export class BlackoutLevelRuntime {
       this.renderLayer.cameraRig.setContextualCamera?.(resources.connectorCamera.resolve(resources.group.activeSlimeId==='volt'));
     }
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
+    if(resources?.lighting){
+      resources.lighting.setQuality(this.renderLayer.graphicsConfiguration,this.renderLayer.renderer.shadowMap.type);
+      resources.lighting.update(stats.frameDeltaSeconds,{position:resources.specimenForm.readModel.controlledForm==='specimen'?resources.specimenBody.position:resources.group.activeBody.position,participants:resources.hallwayShadowParticipants,
+        running:this.lifecycle.state==='running',cinematic:!!resources.elevatorAscent?.active||!!resources.ventArrival?.active||!!resources.finalBoss?.cinematic});
+    }
     resources?.scene.finalArena?.presentPlatforms(interpolationAlpha);
     resources?.finalBoss?.present(interpolationAlpha);
     resources?.ventArrival?.present(this.renderLayer.cameraRig.camera,interpolationAlpha);
@@ -1644,7 +1661,8 @@ export class BlackoutLevelRuntime {
     resources?.transit?.updatePresentation(stats.frameDeltaSeconds, this.renderLayer.cameraRig.camera);
     resources?.hallwayShadows?.prepareFrame(resources.hallwayShadowParticipants);
     if (resources) resources.scene.finalArena?.lighting.prepareFrame(resources.renderedSpecimenPosition, this.lifecycle.state === 'running');
-    this.renderLayer.render();
+    resources?.lighting?.prepareCamera(this.renderLayer.cameraRig.camera,resources.specimenForm.readModel.controlledForm==='specimen'?resources.specimenBody.position:resources.group.activeBody.position);
+    try{this.renderLayer.render();}finally{resources?.lighting?.restoreCamera();}
   }
 
   getSpeedEffectStrength(): number {
@@ -1894,7 +1912,7 @@ export class BlackoutLevelRuntime {
         ? new MaintenanceDronePresentation(maintenanceDroneFixture.droneRoot, this.host, collisionWorld, maintenanceDroneFixture.collider, () => maintenanceDrone.markTutorialCompleted(), scene.maintenanceBay?.surfaceMaterials, () => this.renderLayer.keyBindings) : undefined;
       if (dronePresentation) {
         if(this.renderLayer.renderer) {
-          this.shadowRequest = this.renderLayer.requestShadowConfiguration('blackout', { enabled: true });
+          this.shadowRequest = this.renderLayer.requestShadowConfiguration('blackout', { enabled: true,contactHardening:true });
           rollback(() => { this.shadowRequest?.dispose(); this.shadowRequest = undefined; });
         }
         const material = maintenanceDroneFixture.collider.material;
@@ -1911,6 +1929,7 @@ export class BlackoutLevelRuntime {
       rollback(() => deathScreen.dispose());
       this.host.append(deathScreen.element);
       const voltPresentation = new VoltCharacterPresentation(group.voltBody.radiusMetres, this.renderLayer.gelRendering);
+      voltPresentation.setSpawnYaw(Math.PI);
       voltPresentation.setCameraView(this.renderLayer.cameraRig, group.voltBody);
       rollback(() => voltPresentation.dispose());
       voltPresentation.setCollisionWorld(collisionWorld);
@@ -1920,6 +1939,7 @@ export class BlackoutLevelRuntime {
       rollback(voltMovementEvents.on('jumped', event => voltPresentation.onLaunch(event)));
       const voltPresentationState = createBobPresentationState(group.voltBody);
       const goopPresentation = new GoopCharacterPresentation(group.goopBody.radiusMetres, this.renderLayer.gelRendering);
+      goopPresentation.setSpawnYaw(Math.PI);
       goopPresentation.setCameraView(this.renderLayer.cameraRig, group.goopBody);
       rollback(() => goopPresentation.dispose());
       goopPresentation.setPosition(group.goopBody.position);
@@ -1929,6 +1949,7 @@ export class BlackoutLevelRuntime {
       const goopPresentationState = createBobPresentationState(group.goopBody);
       const bobPresentation = new BobCharacterPresentation(
         group.bobBody.radiusMetres, this.renderLayer.gelRendering);
+      bobPresentation.setSpawnYaw(Math.PI);
       bobPresentation.setCameraView(this.renderLayer.cameraRig, group.bobBody);
       bobPresentation.setPosition(group.bobBody.position);
       rollback(() => bobPresentation.dispose());
@@ -1947,13 +1968,14 @@ export class BlackoutLevelRuntime {
           chargeFraction: event.chargeFraction,
         });
       }));
-      const voltLight = new THREE.PointLight(0xffdf75,
+      const voltLight = new THREE.PointLight(this.authoredRoomOne?0xffedb2:0xffdf75,
         this.authoredRoomOne ? BLACKOUT_VOLT_LIGHT_INTENSITY.authored : BLACKOUT_VOLT_LIGHT_INTENSITY.foundation, 8, 2);
       voltLight.name = 'blackout-volt-foundation-light';
       voltLight.castShadow = false;
       voltPresentation.placement.add(voltLight);
 
       const specimenCharacter = new SpecimenCharacterPresentation(specimenBody.radiusMetres, this.renderLayer.gelRendering);
+      specimenCharacter.setSpawnYaw(Math.PI);
       specimenCharacter.setCameraView(this.renderLayer.cameraRig, specimenBody);
       rollback(() => specimenCharacter.dispose());
       rollback(specimenBody.events.on('jumped', event => specimenCharacter.onLaunch(event)));
@@ -2157,7 +2179,11 @@ export class BlackoutLevelRuntime {
         presentations: { bob: bobPresentation, goop: goopPresentation, volt: voltPresentation } }) : undefined;
       if (elevatorAscent) rollback(() => elevatorAscent.dispose());
 
+      const lighting=scene.maintenanceBay&&transit?new BlackoutLightingPass(scene,transit):undefined;
+      if(lighting){lighting.attachLights(this.renderLayer.scene);rollback(()=>lighting.dispose());}
+
       this.resources = {
+        lighting,
         finalBoss,
         ventArrival,
         elevatorAscent,
@@ -2251,6 +2277,7 @@ export class BlackoutLevelRuntime {
       this.resources.electricalPresentation.update(
         this.resources.electricalSystem.readModel,
       );
+      this.resetForwardCamera();
       this.retargetCamera(this.resources);
       this.host.dataset.gameState = 'playing';
       this.notifyHUD(undefined, true);
@@ -2324,7 +2351,7 @@ export class BlackoutLevelRuntime {
     resources.deathScreen.hide();
     resources.maintenanceBay?.reset();
     resources.dronePresentation?.resetTutorial();
-    resources.hallwayShadows?.invalidate();
+    resources.hallwayShadows?.invalidate();resources.lighting?.reset();
     this.bayComplete = false;
     this.roomTwoInitialized = false;
     this.bayExitHintShown = false;
@@ -2373,7 +2400,7 @@ export class BlackoutLevelRuntime {
     resources.specimenCharacter.reset();
     clearJump(resources.jump, false);
     this.completionEmitted = false;
-    this.renderLayer.cameraRig.reset();
+    this.resetForwardCamera();
     this.retargetCamera(resources);
     this.syncVisuals(resources);
     this.host.dataset.gameState = 'playing';
@@ -2392,6 +2419,7 @@ export class BlackoutLevelRuntime {
     resources.finalBoss?.restoreCamera(this.renderLayer.cameraRig.camera);resources.finalBoss?.dispose();
     resources.ventArrival?.dispose();this.clearArrivalUi();
     resources.elevatorAscent?.dispose();
+    resources.lighting?.dispose();
     this.programPreparation?.dispose(); this.programPreparation = undefined;
     this.input.setEnabled(false);
     this.input.resetState();
@@ -2545,7 +2573,7 @@ export class BlackoutLevelRuntime {
     this.input.resetState();
     resources.maintenanceBay?.reset();
     resources.dronePresentation?.resetTutorial();
-    resources.hallwayShadows?.invalidate();
+    resources.hallwayShadows?.invalidate();resources.lighting?.reset();
     this.bayExitHintShown = false;
     this.transitObjective = '';
     resources.electricalSystem.reset('reset');
@@ -2605,10 +2633,7 @@ export class BlackoutLevelRuntime {
       if (snapshot.room.local.finalBoss) resources.specimenCharacter.setYaw(Math.PI);
     }
     clearJump(resources.jump, true);
-    this.renderLayer.cameraRig.reset();
-    if (snapshot.room.roomId === 'room-2' || snapshot.room.local.bossStaging || snapshot.room.local.finalBoss) {
-      this.renderLayer.cameraRig.setGroundOrbitYawRadians?.(Math.PI);
-    }
+    this.resetForwardCamera();
     if(snapshot.room.local.finalBoss)this.renderLayer.cameraRig.setGroundOrbitPitchRadians?.(FINAL_SPECIMEN_START_PITCH);
     this.retargetCamera(resources);
     this.syncVisuals(resources);
@@ -2716,6 +2741,11 @@ export class BlackoutLevelRuntime {
       ? this.renderLayer.cameraRig.camera.getWorldDirection(this.voltAimDirection) : undefined);
     resources.voltPresentation.setPosition(resources.group.voltBody.position);
     resources.voltPresentation.update(deltaSeconds, resources.voltPresentationState);
+  }
+
+  private resetForwardCamera(): void {
+    this.renderLayer.cameraRig.reset();
+    this.renderLayer.cameraRig.setGroundOrbitYawRadians?.(Math.PI);
   }
 
   private retargetCamera(resources: BlackoutRuntimeResources): void {

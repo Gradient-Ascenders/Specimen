@@ -24,6 +24,8 @@ async function createFixture(activeSlimeId: 'bob' | 'goop' = 'goop') {
     ) as ArrayBuffer, '')).scene;
   });
   const goop = new GoopCharacterPresentation(); await goop.prepare(loadGoop);
+  bob.setSpawnYaw(Math.PI); goop.setSpawnYaw(Math.PI);
+  let recoveryCameraYaw: number | undefined;
   const pairPresentation = new SlimePairPresentation(0.45);
   const bobPosition = new THREE.Vector3(0, 0.45, 0);
   const goopPosition = new THREE.Vector3(2, 0.45, 0);
@@ -53,7 +55,9 @@ async function createFixture(activeSlimeId: 'bob' | 'goop' = 'goop') {
   const runtime = new GreyboxLevelRuntime({
     host: { dataset: {} } as HTMLElement,
     input: { setEnabled() {}, releasePointerLock() {}, requestPointerLock() {}, endFixedUpdate() {} } as unknown as Input,
-    renderLayer: { cameraRig: { setFollowTarget() {}, setContextualCamera() {} } } as unknown as RenderLayer,
+    renderLayer: { cameraRig: { setFollowTarget() {}, setContextualCamera() {},
+      setGroundOrbitYawRadians(yaw: number) { recoveryCameraYaw = yaw; },
+    } } as unknown as RenderLayer,
     window: new EventTarget() as unknown as Window,
     debugAvailable: false,
   });
@@ -78,7 +82,9 @@ async function createFixture(activeSlimeId: 'bob' | 'goop' = 'goop') {
     return names;
   };
   const dispose = () => { bob.dispose(); goop.dispose(); pairPresentation.dispose(); collisionWorld.clear(); };
-  return { probe, resources, bob, goop, pair, deathSequence, characterCasters, updatePair, dispose };
+  return { probe, resources, bob, goop, pair, deathSequence, characterCasters, updatePair, dispose,
+    get recoveryCameraYaw() { return recoveryCameraYaw; },
+  };
 }
 
 test('Level 1 Goop death preserves Bob position and casting through rupture, locator updates and retry', async () => {
@@ -102,6 +108,9 @@ test('Level 1 Goop death preserves Bob position and casting through rupture, loc
     assert.deepEqual(f.characterCasters(), ['Bob-Body', 'Bob-Eye-Left', 'Bob-Eye-Right']);
     assert.deepEqual(f.goop.diagnostics.deathBurst.origin.toArray(), goopPosition);
     f.probe.updateDeathState(1.2, f.resources); f.probe.retryAfterDeath(); f.updatePair();
+    assert.equal(f.recoveryCameraYaw, Math.PI);
+    assert.equal(f.bob.diagnostics.facingYawRadians, Math.PI);
+    assert.equal(f.goop.diagnostics.facingYawRadians, Math.PI);
     assert.equal(recoveryCalls, 1); assert.equal(f.pair.activeSlimeId, 'bob');
     assert.equal(f.goop.diagnostics.visible, true); assert.equal(f.characterCasters().length, 6);
     assert.deepEqual(f.bob.mesh.position.toArray(), bobPosition);

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import * as THREE from 'three';
+import { GRAPHICS_PROFILES } from '../src/render/GraphicsProfiles.ts';
 import type { Input, InputAction } from '../src/core/Input.ts';
 import { DEFAULT_USER_KEY_BINDINGS } from '../src/core/KeyBindings.ts';
 import type { LoopStats } from '../src/core/Loop.ts';
@@ -164,7 +165,11 @@ function createFixture(debugAvailable = true,playArrival=false,cameraRig=new Tes
   const runtime = new BlackoutLevelRuntime({
     host: host as unknown as HTMLElement,
     input: input as unknown as Input,
-    renderLayer: { scene, canvas: document.createElement(), cameraRig, keyBindings: DEFAULT_USER_KEY_BINDINGS, render: () => {} } as unknown as RenderLayer,
+    renderLayer: { scene, canvas: document.createElement(), cameraRig, keyBindings: DEFAULT_USER_KEY_BINDINGS,
+      renderer: { shadowMap: { type: THREE.PCFShadowMap } },
+      requestShadowConfiguration: () => ({ dispose() {} }),
+      graphicsConfiguration: GRAPHICS_PROFILES.standard.settings, render: () => {},
+    } as unknown as RenderLayer,
     progression: { unlockedSlimeIds: ['bob', 'goop', 'volt'], activeSlimeId: 'volt' },
     authoredRoomOne: true,
     playArrival,
@@ -509,6 +514,9 @@ test('recovering or restarting during the arrival cancels camera/model ownership
       const r=(f.runtime as unknown as {resources:{ventArrival:{active:boolean};bobPresentation:BobCharacterPresentation;goopPresentation:GoopCharacterPresentation;voltPresentation:VoltCharacterPresentation}}).resources;
       assert.equal(r.ventArrival.active,false);assert.equal(f.input.enabled,true);
       assert.ok([r.bobPresentation,r.goopPresentation,r.voltPresentation].every(p=>p.root.parent===f.scene));
+      assert.equal(f.cameraRig.groundYaw,Math.PI);
+      for(const p of [r.bobPresentation,r.goopPresentation,r.voltPresentation])
+        assert.equal(p.diagnostics.facingYawRadians,Math.PI,'recovery faces the route after cancelling the arrival');
       assert.deepEqual(Object.values(f.runtime.getSlimePositions()!).map(p=>p.toArray()),[[-2,.46,2],[0,.46,2],[2,.46,2]]);
     }finally{f.cleanup();}
   }

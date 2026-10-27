@@ -1863,6 +1863,7 @@ export class GreyboxLevelRuntime {
     this.retargetCameraToActiveSlime(resources);
     this.syncContextualCamera(resources);
     resources.goopAcidPresentation.resume();
+    this.renderLayer.cameraRig.setGroundOrbitYawRadians(ROOM_ONE_INITIAL_CAMERA_YAW_RADIANS);
     this.notifySlimeHUD(undefined, true);
 
     // Restore both characters from authority after the retained recovery action.
