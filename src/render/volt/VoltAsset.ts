@@ -10,7 +10,7 @@ export interface VoltAsset {
   readonly root: THREE.Group;
   readonly body: THREE.Mesh;
   readonly eyes: readonly [THREE.Mesh, THREE.Mesh];
-  readonly maps: readonly [THREE.Texture, THREE.Texture];
+  readonly maps: readonly [THREE.Texture, THREE.Texture, THREE.Texture];
 }
 function fail(detail: string): never { throw new Error(`Volt asset contract: ${detail}`); }
 
@@ -67,30 +67,30 @@ export function validateVoltAsset(root: THREE.Group): VoltAsset {
   });
   const material = meshes[0]!.material as THREE.MeshPhysicalMaterial;
   const close = (value: number, expected: number) => Number.isFinite(value) && Math.abs(value - expected) < 1e-5;
-  if (!close(material.color.r, 1) || !close(material.color.g, 0.72) || !close(material.color.b, 0.003) ||
-      !close(material.ior, 1.38) || !close(material.transmission, 0.55) || !close(material.clearcoat, 0.32) ||
-      !close(material.clearcoatRoughness, 0.12) || !close(material.emissive.r, 0.95) ||
+  if (!close(material.color.r, 1) || !close(material.color.g, 1) || !close(material.color.b, 1) ||
+      !close(material.ior, 1.38) || !close(material.transmission, 0.55) || !close(material.clearcoat, 0.26) ||
+      !close(material.clearcoatRoughness, 0.20) || !close(material.emissive.r, 0.95) ||
       !close(material.emissive.g, 0.95) || !close(material.emissive.b, 0.95)) fail('golden gel material values');
   for (const eye of meshes.slice(1)) {
     const eyes = eye.material as THREE.MeshPhysicalMaterial;
     if (!close(eyes.color.r, 0.004) || !close(eyes.color.g, 0.0025) || !close(eyes.color.b, 0.001) ||
-        !close(eyes.roughness, 0.16) || !close(eyes.clearcoat, 0.35) || eyes.transmission || eyes.metalness) fail('obsidian eye material values');
+        !close(eyes.roughness, 0.23) || !close(eyes.clearcoat, 0.22) || !close(eyes.clearcoatRoughness, 0.18) || eyes.transmission || eyes.metalness) fail('obsidian eye material values');
   }
-  const emission = material.emissiveMap, roughness = material.roughnessMap;
-  if (!emission || !roughness || emission === roughness || material.metalnessMap !== roughness ||
-      emission.colorSpace !== THREE.SRGBColorSpace || roughness.colorSpace !== THREE.NoColorSpace ||
+  const emission = material.emissiveMap, roughness = material.roughnessMap, colour=material.map;
+  if (!emission || !roughness || !colour || new Set([emission,roughness,colour]).size!==3 || material.metalnessMap !== roughness ||
+      emission.colorSpace !== THREE.SRGBColorSpace || colour.colorSpace!==THREE.SRGBColorSpace || roughness.colorSpace !== THREE.NoColorSpace ||
       Math.abs(material.roughness - 1) > 1e-6 || material.metalness !== 0) fail('continuous material ramps');
   const textures = new Set<THREE.Texture>();
   for (const mesh of meshes) for (const value of Object.values(mesh.material)) if (value instanceof THREE.Texture) textures.add(value);
-  if (textures.size !== 2 || !textures.has(emission) || !textures.has(roughness)) fail('unexpected texture maps');
-  for (const map of [emission, roughness]) {
+  if (textures.size !== 3 || !textures.has(emission) || !textures.has(roughness) || !textures.has(colour)) fail('unexpected texture maps');
+  for (const map of [emission, roughness, colour]) {
     const image = map.image as { width?: number; height?: number } | undefined;
-    if (image?.width !== 2 || image?.height !== 512 || map.wrapS !== THREE.ClampToEdgeWrapping ||
+    if (image?.width !== (map===roughness?64:2) || image?.height !== 512 || map.wrapS !== THREE.ClampToEdgeWrapping ||
         map.wrapT !== THREE.ClampToEdgeWrapping || map.channel !== 0 || map.flipY ||
         map.magFilter !== THREE.LinearFilter || map.minFilter !== THREE.LinearMipmapLinearFilter ||
         map.offset.lengthSq() || map.repeat.distanceTo(new THREE.Vector2(1, 1)) > 1e-6 || map.rotation) fail('texture dimensions/sampling');
   }
-  return { root, body: meshes[0]!, eyes: [meshes[1]!, meshes[2]!], maps: [emission, roughness] };
+  return { root, body: meshes[0]!, eyes: [meshes[1]!, meshes[2]!], maps: [emission, roughness, colour] };
 }
 
 function assertClosedConnected(mesh: THREE.Mesh): void {

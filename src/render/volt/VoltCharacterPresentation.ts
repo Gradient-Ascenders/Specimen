@@ -76,8 +76,9 @@ export class VoltCharacterPresentation {
   private reversalRemaining = 0;
   private lean = 0;
   private previousLean = 0;
-  private crestLag = 0;
-  private previousCrestLag = 0;
+  private readonly crestLag = new THREE.Vector2();
+  private readonly previousCrestLag = new THREE.Vector2();
+  private readonly presentedCrestLag = new THREE.Vector2();
   private crestLandingRemaining = 0;
   private rippleStrength = 0;
   private rippleAge = GEL_LANDING_RIPPLE_SECONDS;
@@ -93,6 +94,8 @@ export class VoltCharacterPresentation {
   private blinkClock = 0;
   private blinkCount = 0;
   private nextBlink = 3.7;
+  private squintRemaining = 0;
+  private squintStrength = 0;
   private launchRemaining = 0;
   private launchStrength = 0;
   private landingRemaining = 0;
@@ -126,7 +129,7 @@ export class VoltCharacterPresentation {
       baseMotionStrength: Math.hypot(this.baseOffsetWorld.x, this.baseOffsetWorld.z) / GEL_MAXIMUM_BASE_OFFSET_METRES,
       jumpBaseOffsetMetres: this.baseOffsetWorld.y,
       baseOffsetWorld: { x: this.baseOffsetWorld.x, y: this.baseOffsetWorld.y, z: this.baseOffsetWorld.z },
-      polish: { crestLagMetres: Math.abs(this.crestLag), landingRippleStrength: this.rippleStrength,
+      polish: { crestLagMetres: this.crestLag.length(), eyeClosure: this.blink, landingRippleStrength: this.rippleStrength,
         landingRippleAgeSeconds: this.rippleAge },
       headroom: this.headroom.diagnostics,
       meshes: this.asset ? [this.asset.body, ...this.asset.eyes].map(mesh => ({ name: mesh.name,
@@ -233,7 +236,7 @@ export class VoltCharacterPresentation {
     const dt = deltaSeconds;
     this.headroom.update(dt);
     this.previousYaw = this.yaw; this.previousBodyWeight = this.bodyWeight; this.previousFlex = this.flex; this.previousBlink = this.blink;
-    this.previousLean = this.lean; this.previousCrestLag = this.crestLag;
+    this.previousLean = this.lean; this.previousCrestLag.copy(this.crestLag);
     this.previousBaseOffsetWorld.copy(this.baseOffsetWorld); this.previousRippleAge = this.rippleAge;
     this.travel.set(state.locomotionPositionWorld.x, state.locomotionPositionWorld.y, state.locomotionPositionWorld.z).sub(this.previousTravel);
     this.previousTravel.set(state.locomotionPositionWorld.x, state.locomotionPositionWorld.y, state.locomotionPositionWorld.z);
@@ -284,14 +287,19 @@ export class VoltCharacterPresentation {
     const acceleration = activeTravel ? (forward - this.previousForwardSpeed) / dt : 0;
     const targetCrest = THREE.MathUtils.clamp(-acceleration * 0.002 +
       0.014 * this.landingStrength * this.crestLandingRemaining / 0.3, -GEL_CREST_LAG_METRES, GEL_CREST_LAG_METRES);
+    const turn = THREE.MathUtils.clamp(-shortestAngleDelta(this.previousYaw, this.yaw) / (dt * Math.PI * 3), -1, 1);
     this.previousForwardSpeed = forward;
-    this.crestLag += (targetCrest - this.crestLag) * (1 - Math.exp(-9 * dt));
-    if (Math.abs(this.crestLag) < 1e-6) this.crestLag = 0;
+    const crestResponse = 1 - Math.exp(-9 * dt);
+    this.crestLag.x += (GEL_CREST_LAG_METRES * turn - this.crestLag.x) * crestResponse;
+    this.crestLag.y += (targetCrest - this.crestLag.y) * crestResponse;
+    this.crestLag.clampLength(0, GEL_CREST_LAG_METRES);
+    if (this.crestLag.lengthSq() < 1e-12) this.crestLag.set(0, 0);
     this.grounded = state.grounded;
     const wasLanding = this.landingRemaining > 0;
     this.launchRemaining = Math.max(0, this.launchRemaining - dt);
     this.landingRemaining = Math.max(0, this.landingRemaining - dt);
     this.damageRemaining = Math.max(0, this.damageRemaining - dt);
+    this.squintRemaining = Math.max(0, this.squintRemaining - dt);
     if (state.grounded) {
       this.launchRemaining = 0;
       this.bodyWeight = this.landingRemaining > 0
@@ -306,11 +314,16 @@ export class VoltCharacterPresentation {
     if (this.damageRemaining > 0) this.bodyWeight = Math.max(this.bodyWeight, 0.08 * this.damageStrength * this.damageRemaining / 0.22);
     this.rippleAge = Math.min(GEL_LANDING_RIPPLE_SECONDS, this.rippleAge + dt);
     if (!state.grounded || this.rippleAge === GEL_LANDING_RIPPLE_SECONDS) this.rippleStrength = 0;
-    this.blinkClock += dt;
+    // Finish an ongoing blink, but save idle blinks for a visible, grounded
+    // character. Launch/impact effort and electrical focus use the same seated
+    // eye morph, so they stay attached through the body deformation.
+    if (this.blinkClock >= this.nextBlink ||
+        (this.requestedVisible && state.grounded && this.squintRemaining === 0 && this.aimYaw === undefined)) this.blinkClock += dt;
     if (this.blinkClock >= this.nextBlink + 0.18) {
       this.blinkClock = 0; this.nextBlink = 3.7 + (++this.blinkCount % 3) * 0.61;
     }
-    this.blink = this.blinkClock >= this.nextBlink ? Math.sin(Math.PI * (this.blinkClock - this.nextBlink) / 0.18) : 0;
+    const idleBlink = this.blinkClock >= this.nextBlink ? Math.sin(Math.PI * (this.blinkClock - this.nextBlink) / 0.18) : 0;
+    this.blink = Math.max(idleBlink, this.squintStrength * this.squintRemaining / 0.22, this.aimYaw === undefined ? 0 : 0.1);
     this.materials?.update(dt); this.present(1);
   }
   present(alpha = 1): void {
@@ -348,7 +361,7 @@ export class VoltCharacterPresentation {
     }
     this.presentedBaseOffsetWorld.lerpVectors(this.previousBaseOffsetWorld, this.baseOffsetWorld, blend);
     this.materials?.setMotion(this.presentedBaseOffsetWorld, this.character.rotation.y,
-      THREE.MathUtils.lerp(this.previousCrestLag, this.crestLag, blend), this.rippleStrength,
+      this.presentedCrestLag.lerpVectors(this.previousCrestLag, this.crestLag, blend), this.rippleStrength,
       THREE.MathUtils.lerp(this.previousRippleAge, this.rippleAge, blend));
     if (this.impactPending && this.asset && this.materials) {
       this.impactPoint.copy(this.impactNormal).multiplyScalar(-this.radiusMetres).add(this.placement.position);
@@ -360,12 +373,14 @@ export class VoltCharacterPresentation {
     if (this.disposed || this.deathActive) return;
     this.launchRemaining = GEL_LAUNCH_SECONDS; this.landingRemaining = 0;
     this.launchStrength = THREE.MathUtils.clamp(launch.speedMetresPerSecond / 6, 0, 1);
+    this.reactEyes(0.12 * this.launchStrength);
     this.rippleStrength = 0; this.crestLandingRemaining = 0;
   }
   onLanding(normal: Vector3State, impactSpeed: number): void {
     if (this.disposed || this.deathActive) return;
     this.landingRemaining = GEL_LANDING_SECONDS; this.launchRemaining = 0;
     this.landingStrength = THREE.MathUtils.clamp((impactSpeed - 1.5) / 7, 0, 1);
+    this.reactEyes(0.18 * this.landingStrength);
     this.crestLandingRemaining = 0.3;
     this.rippleStrength = THREE.MathUtils.clamp((impactSpeed - 4.5) / 4, 0, 1);
     this.rippleAge = this.previousRippleAge = 0;
@@ -374,6 +389,7 @@ export class VoltCharacterPresentation {
   onDamage(strength: number): void {
     if (this.disposed || this.deathActive) return;
     this.damageRemaining = 0.22; this.damageStrength = THREE.MathUtils.clamp(strength, 0, 1);
+    this.reactEyes(0.28 * this.damageStrength);
   }
   primeDeathResources(position: Vector3State, render: (root: THREE.Object3D) => void): boolean { return this.burst.primeResources(position, render); }
   startDeath(position: Vector3State): boolean {
@@ -397,7 +413,8 @@ export class VoltCharacterPresentation {
     this.blink = this.previousBlink = this.blinkClock = this.blinkCount = this.speed = this.previousLateralSpeed = 0;
     this.nextBlink = 3.7; this.launchRemaining = this.landingRemaining = this.damageRemaining = this.damageStrength = this.landingStrength = 0;
     this.launchStrength = this.lean = this.previousLean = this.previousForwardSpeed = this.reversalRemaining = 0;
-    this.crestLag = this.previousCrestLag = this.crestLandingRemaining = this.rippleStrength = 0;
+    this.crestLag.set(0, 0); this.previousCrestLag.set(0, 0); this.presentedCrestLag.set(0, 0);
+    this.crestLandingRemaining = this.rippleStrength = this.squintRemaining = this.squintStrength = 0;
     this.rippleAge = this.previousRippleAge = GEL_LANDING_RIPPLE_SECONDS;
     this.moving = this.hasTravelHeading = this.reversing = this.impactPending = false;
     this.baseOffsetWorld.set(0, 0, 0); this.previousBaseOffsetWorld.set(0, 0, 0);
@@ -418,5 +435,9 @@ export class VoltCharacterPresentation {
   private applyVisibility(): void {
     this.character.visible = this.ready && this.requestedVisible && this.opacity > 0 && (!this.deathActive || this.deathElapsed < 0.075);
     if (this.asset) for (const mesh of [this.asset.body, ...this.asset.eyes]) { mesh.castShadow = this.shadows && this.character.visible; mesh.userData.characterShadowCaster = this.shadows; }
+  }
+  private reactEyes(strength: number): void {
+    this.squintStrength = Math.max(this.squintStrength * this.squintRemaining / 0.22, strength);
+    this.squintRemaining = this.squintStrength > 0 ? 0.22 : 0;
   }
 }

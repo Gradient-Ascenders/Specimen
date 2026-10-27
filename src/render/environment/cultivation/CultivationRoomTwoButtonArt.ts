@@ -29,7 +29,7 @@ export class CultivationRoomTwoButtonArt {
       ]),
     ]);
     hardware('cultivation-room-2-wall-button-captive-fasteners',resources.materials.serviceMetal,
-      [-1,1].flatMap(y=>[-1,1].map(z=>({size:[.025,.07,.07] as const,at:[.1,y*.96,z*.96] as const}))));
+      [-1,1].flatMap(y=>[-1,1].map(z=>({size:[.05,.07,.07] as const,at:[.13,y*.96,z*.96] as const}))));
     hardware('cultivation-room-2-wall-button-status-bars',pad.material as THREE.Material,
       [-1,1].map(side=>({size:[.025,1.25,.055] as const,at:[.1,0,side*1.145] as const})));
     this.root.traverse(node=>{node.userData.visualOnly=true;node.updateMatrix();node.matrixAutoUpdate=false;});

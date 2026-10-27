@@ -187,6 +187,12 @@ export class DissolveMaterialBundle {
       presentationUniforms: this.presentationUniforms });
   }
 
+  /** Caller-owned authored skin sharing this target's complete dissolve mask. */
+  createPresentationMaterial(sourceMaterial: THREE.MeshStandardMaterial): DissolveMaterial {
+    return new DissolveMaterial({sourceMaterial,maskUniforms:this.maskUniforms,
+      presentationUniforms:this.presentationUniforms});
+  }
+
   get dissolveAmount(): number {
     return this.maskUniforms.uDissolveAmount.value;
   }

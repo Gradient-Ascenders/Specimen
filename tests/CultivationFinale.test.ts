@@ -20,14 +20,15 @@ import {gameplayAudioEvents} from '../src/audio/GameplayAudioEvents.ts';
 import {loadVolt} from './fixtures/VoltAssetFixture.ts';
 import {VOLT_RESCUE_DISSOLVE_KEYS} from '../src/audio/CultivationFinaleAudio.ts';
 
-function setup(){
+function setup(authoredModels=false){
   const preview=new LevelTwoPreviewScene(()=>{},cultivationAssets),scene=new THREE.Scene();scene.add(preview.root);
   const world=new CollisionWorld(),surfaces=new SurfaceRegistry();world.registerAll(preview.collisionMeshes);surfaces.registerAll(preview.collisionMeshes);
   const body=()=>new KinematicBody({world,surfaces,initialPosition:new THREE.Vector3(0,30,270)});
   const bob=body(),goop=body(),volt=body();
   const bobPresentation=new BobCharacterPresentation(),goopPresentation=new GoopCharacterPresentation(),voltPresentation=new VoltCharacterPresentation();
   scene.add(bobPresentation.root,goopPresentation.root,voltPresentation.root);
-  const encounter=new RoomFiveDroneEncounter(preview.roomFive,world,surfaces,bob,goop,()=>true);
+  const encounter=new RoomFiveDroneEncounter(preview.roomFive,world,surfaces,bob,goop,()=>true,
+    preview.coverArt.droneSurfaceMaps,undefined,authoredModels?preview.securityDroneModels:undefined);
   const movie=new CultivationFinale({room:preview.roomFive,encounter,bob,goop,volt,bobPresentation,goopPresentation,voltPresentation,
     set:preview.voltFinaleSet,acid:preview.labArt.acid,scene,host:{} as HTMLElement});
   const camera=new THREE.PerspectiveCamera(55,16/9,.1,100);
@@ -499,5 +500,27 @@ test('escape craft faces its travel, settles upright near Goop, and breakaway ro
     assert.ok(set.ductGrates.every(hinge=>hinge.matrixAutoUpdate),'hinges are excluded from static transform freezing');
     assert.ok(set.ductGrates[0].rotation.z<-.7&&set.ductGrates[1].rotation.z>.7);
     set.reset();assert.ok(set.ductGrates.every(hinge=>hinge.rotation.z===0));
+  }finally{s.dispose();}
+});
+
+test('Blender Room 5 patrols retain the finale tracking shell and live eye through alert, hijack and reset',()=>{
+  const s=setup(true);
+  try{
+    for(const drone of s.encounter.drones){
+      const shell=drone.root.getObjectByName(`${drone.id}-flying-shell`)!;
+      assert.equal(shell.parent,drone.presentation.root);
+      assert.equal(shell.getObjectById(drone.frontIndicator.id),drone.frontIndicator);
+    }
+    s.movie.begin(s.camera,true);
+    for(const t of [T.alerted+.1,T.hijack+.1,T.ventCamera+.1]){
+      s.movie.update(t-s.movie.seconds);s.movie.present(s.camera,1);
+      for(const drone of s.encounter.drones){
+        const shell=drone.root.getObjectByName(`${drone.id}-flying-shell`)!;
+        assert.ok(shell.quaternion.toArray().every(Number.isFinite));
+        assert.equal(shell.getObjectById(drone.frontIndicator.id),drone.frontIndicator);
+      }
+    }
+    s.movie.reset();s.preview.roomFive.reset();s.encounter.reset();
+    assert.ok(s.encounter.drones.every(d=>d.presentation.root.visible));
   }finally{s.dispose();}
 });

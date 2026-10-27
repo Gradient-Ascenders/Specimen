@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { SecurityDroneConfig } from '../hazards/SecurityDrone.ts';
 import { SecurityDronePresentation, SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
-import { prepareIndustrialDroneGeometry } from '../render/hazards/IndustrialDroneGeometry.ts';
+import {EscapeDroneModel} from '../render/hazards/EscapeDroneModel.ts';
 import type { CinematicPreparationJob } from './IdleCinematicPreparation.ts';
 import { FINALE_VENT, finaleEase, finaleMix, sampleContainmentFinale, type ContainmentFinaleFrame, type FinalePoint } from './ContainmentFinaleTimeline.ts';
 import { FINALE_DRONE_HOVER } from './ContainmentFinaleBobMotion.ts';
@@ -32,13 +32,13 @@ export class ContainmentFinaleVisuals {
   readonly annex = new THREE.Group();
   readonly drones: Craft[] = [];
   readonly shots: FinaleShot[] = [];
-  private readonly resources = new SecurityDronePresentationResources(undefined, true);
+  private readonly model=new EscapeDroneModel();
+  private readonly resources = new SecurityDronePresentationResources(undefined, true, false, this.model);
   private readonly ownedGeometry: THREE.BufferGeometry[] = [];
   private readonly ownedMaterials: THREE.Material[] = [];
   private readonly instances: THREE.InstancedMesh[] = [];
   private box!: THREE.BoxGeometry;
   private sphere!: THREE.SphereGeometry;
-  private fan!: THREE.CylinderGeometry;
   private red!: THREE.InstancedMesh;
   private green!: THREE.InstancedMesh;
   private acidImpacts!: THREE.InstancedMesh;
@@ -56,10 +56,12 @@ export class ContainmentFinaleVisuals {
   private readonly impactU = new THREE.Vector3();
   private readonly impactV = new THREE.Vector3();
   private readonly impactTargets: readonly THREE.Object3D[];
+  private readonly authoredEscapeDuct: boolean;
   private disposed = false;
 
-  constructor(impactTargets: readonly THREE.Object3D[] = []) {
+  constructor(impactTargets: readonly THREE.Object3D[] = [], authoredEscapeDuct = false) {
     this.impactTargets=impactTargets;
+    this.authoredEscapeDuct=authoredEscapeDuct;
     this.root.name = 'containment-finale-pooled-visuals'; this.root.visible = false;
     this.annex.name = 'containment-finale-escape-annex'; this.root.add(this.annex);
   }
@@ -67,18 +69,9 @@ export class ContainmentFinaleVisuals {
   *preparationJobs(): Generator<CinematicPreparationJob> {
     yield { label: 'finale shared primitives', run: () => {
       this.box = new THREE.BoxGeometry(1, 1, 1); this.sphere = new THREE.SphereGeometry(1, 10, 7);
-      this.fan = new THREE.CylinderGeometry(.37, .37, .12, 12, 1, true);
-      this.ownedGeometry.push(this.box, this.sphere, this.fan);
+      this.ownedGeometry.push(this.box, this.sphere);
     } };
-    for (const role of ['armour', 'armourShadow', 'mechanism', 'barrel', 'mount', 'linkage'] as const) {
-      const preparation = prepareIndustrialDroneGeometry(DRONE_CONFIG, role);
-      try {
-        for (let i = 0; i < preparation.steps.length; i++) yield { label: `finale drone ${role} part ${i + 1}`, run: preparation.steps[i] };
-        yield { label: `finale merge drone ${role}`, run: () => {
-          this.resources.geometry(`industrial-${role}:ceiling:1.6:0.8:1.4`, () => preparation.finish());
-        } };
-      } finally { preparation.dispose(); }
-    }
+    yield* this.model.preparationJobs();
     for (let i = 0; i < 4; i++) yield { label: `finale pooled drone ${i + 1}`, run: () => this.createCraft(i) };
     yield { label: 'finale straight escape airduct', run: () => this.buildAnnex() };
     yield { label: 'finale pooled projectiles and wreck', run: () => this.buildEffects() };
@@ -125,7 +118,7 @@ export class ContainmentFinaleVisuals {
       for (let j = 0; j < 4; j++) {
         this.position.set(j % 2 ? .95 : -.95, .38, j < 2 ? -.65 : .65);
         this.quaternion.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, t * 42 * (j % 2 ? 1 : -1));
-        this.scale.set(.62, .025, .075);
+        this.scale.set(1,1,1);
         this.matrix.compose(this.position, this.quaternion, this.scale); craft.rotors.setMatrixAt(j, this.matrix);
       }
       craft.rotors.instanceMatrix.needsUpdate = true;
@@ -142,6 +135,7 @@ export class ContainmentFinaleVisuals {
     this.drones.forEach(craft => craft.head.dispose());
     this.instances.forEach(mesh => mesh.dispose());
     this.resources.dispose();
+    this.model.dispose();
     this.ownedGeometry.forEach(geometry => geometry.dispose());
     this.ownedMaterials.forEach(material => material.dispose());
     this.root.clear();
@@ -151,13 +145,13 @@ export class ContainmentFinaleVisuals {
     const head = new SecurityDronePresentation({ ...DRONE_CONFIG, id: `finale-drone-${index}` }, this.resources);
     for (const child of [...head.root.children]) if (child !== head.aimHead) child.removeFromParent();
     const root = new THREE.Group(); root.name = `finale-flying-drone-${index}`; root.visible = false; root.add(head.root);
-    const fans = this.instance(this.fan, this.resources.material('mechanism'), 4);
-    const arms = this.instance(this.box, this.resources.material('armourShadow'), 3);
-    for (let j = 0; j < 4; j++) this.place(fans, j, [j % 2 ? .95 : -.95, .38, j < 2 ? -.65 : .65], [1, 1, 1]);
-    for (let j = 0; j < 2; j++) this.place(arms, j, [0, .3, j ? .65 : -.65], [2.1, .1, .14]);
-    this.place(arms, 2, [0, .47, 0], [.85, .08, .8]);
-    const rotors = this.instance(this.box, this.resources.material('barrel'), 4);
-    root.add(fans, arms, rotors); this.root.add(root); this.drones.push({ root, head, rotors });
+    for(const role of ['armour','armourShadow','mechanism'] as const){
+      const airframe=new THREE.Mesh(this.model.part('ED_Airframe_'+role),this.resources.material(role));
+      airframe.name=`finale-drone-${index}-airframe-${role}`;root.add(airframe);
+    }
+    const rotors = this.instance(this.model.part('ED_Rotor_barrel'), this.resources.material('barrel'), 4);
+    rotors.name=`finale-drone-${index}-lift-rotors`;
+    root.add(rotors); this.root.add(root); this.drones.push({ root, head, rotors });
     root.traverse(object => { if (object instanceof THREE.Mesh) object.castShadow = object.receiveShadow = false; });
   }
 
@@ -172,8 +166,15 @@ export class ContainmentFinaleVisuals {
     add([9,74.65,88.55],[3,.2,5.7],0x34484e);
     add([9,78.65,88.55],[3,.2,5.7],0x213238);
     add([9,76.65,85.6],[3.4,4.2,.2],0x030809);
-    // RoomFiveArt owns the narrow neck (125.5..128). The straight duct starts
-    // at its real back edge and ends at an open drop, not another large room.
+    const installShell=()=>{
+      const material=new THREE.MeshBasicMaterial({color:0xffffff});this.ownedMaterials.push(material);
+      const shell=this.instance(this.box,material,parts.length);shell.name='finale-escape-annex-shell';
+      parts.forEach((part,i)=>{this.place(shell,i,part.at,part.size);shell.setColorAt(i,new THREE.Color(part.color));});
+      this.annex.add(shell);
+    };
+    // The complete authored Escape assembly owns the vent, fittings and shaft.
+    // This cinematic retains only the distant Room 4 entrance continuation.
+    if(this.authoredEscapeDuct){installShell();return;}
     add([-1.45,y-.1,135],[.3,.2,14],0x43545a);
     add([1.45,y-.1,135],[.3,.2,14],0x43545a);
     add([0,y-.1,132.6],[2.6,.2,9.2],0x526369);
@@ -185,21 +186,18 @@ export class ContainmentFinaleVisuals {
     add([0,76.75,128.06],[1.8,.7,.12],0x25383f);
     for(let z=129;z<142;z+=2){
       for(const x of [-1.57,1.57])add([x,75.9,z],[.08,2.28,.08],0x152a31);
-      add([0,77,z],[3.14,.08,.08],0x152a31);
-      if(z<137)add([0,74.77,z],[3.1,.015,.035],0x293b41);
+      // Both returns stop at the legs' inner faces; crossing their end caps
+      // submits duplicate faces inside this same instance batch.
+      add([0,77,z],[3.06,.08,.08],0x152a31);
+      if(z<137)add([0,74.77,z],[3.06,.015,.035],0x293b41);
       for(const x of [-1.585,1.585])add([x,75.9,z+.55],[.025,.22,.65],0x263b43);
     }
-    // Butt-jointed shaft walls finish below the floor top. Neither their top
-    // faces nor the four rim corners overlap a coplanar neighbour.
     for(const x of [-1.39,1.39])add([x,71.295,138.5],[.18,6.5,2.6],0x172a31);
     for(const z of [137.11,139.89])add([0,71.295,z],[2.96,6.5,.18],0x172a31);
     add([0,67.9,138.5],[2.96,.2,2.96],0x020609);
     for(const x of [-1.39,1.39])add([x,y+.035,138.5],[.18,.07,2.6],0x71898d);
     for(const z of [137.11,139.89])add([0,y+.035,z],[2.96,.07,.18],0x71898d);
-    const material = new THREE.MeshBasicMaterial({ color: 0xffffff }); this.ownedMaterials.push(material);
-    const shell = this.instance(this.box, material, parts.length); shell.name = 'finale-escape-annex-shell';
-    parts.forEach((part, i) => { this.place(shell, i, part.at, part.size); shell.setColorAt(i, new THREE.Color(part.color)); });
-    this.annex.add(shell);
+    installShell();
     const trimMaterial = new THREE.MeshBasicMaterial({ color: 0x8fd8c2 }); this.ownedMaterials.push(trimMaterial);
     const trim = this.instance(this.box, trimMaterial, 16);
     let index = 0;

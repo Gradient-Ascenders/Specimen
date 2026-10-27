@@ -68,15 +68,16 @@ const pointStart=shadowChunk.indexOf('\n\t#if NUM_POINT_LIGHT_SHADOWS',start);
 const end=shadowChunk.lastIndexOf('\n\t#endif',pointStart);
 if(start<0||end<0)throw new Error('Unsupported Three.js shadow shader.');
 const softShadowChunk=shadowChunk.slice(0,start)+rawShadowGLSL+shadowChunk.slice(end);
-const installed=new WeakSet<THREE.Material>();
+const installed=new WeakMap<THREE.Material,THREE.Material['onBeforeCompile']>();
 
 export function installContainmentSoftShadows(material:THREE.Material):void{
-  if(installed.has(material))return;installed.add(material);
+  if(installed.get(material)===material.onBeforeCompile)return;
   const compile=material.onBeforeCompile,key=material.customProgramCacheKey();
   material.onBeforeCompile=function(shader,renderer){
     compile.call(this,shader,renderer);
     shader.fragmentShader=shader.fragmentShader.replace('#include <shadowmap_pars_fragment>',softShadowChunk);
   };
+  installed.set(material,material.onBeforeCompile);
   material.customProgramCacheKey=()=>`${key}:containment-pcss-v1`;
   material.needsUpdate=true;
 }

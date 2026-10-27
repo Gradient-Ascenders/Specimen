@@ -10,7 +10,7 @@ import { requiresTransmissionPreparation } from './TransmissionPreparation.ts';
 type Drawable = THREE.Mesh | THREE.Points | THREE.Line | THREE.Sprite;
 interface Configuration { key: string; visible: boolean[]; dark: boolean; z: number; ready: boolean; lightingKey?: string; }
 interface Step { label?: string; run: () => void | Promise<unknown>; }
-const ROOT_ROOMS: readonly LevelTwoAuthoredRoomId[] = [1, 1, 2, 2, 2, 3, 4, 5];
+const ROOT_ROOMS: readonly LevelTwoAuthoredRoomId[] = [1, 1, 2, 2, 2, 3, 4, 5, 4];
 const DIAGNOSTIC_HISTORY_LIMIT = 128;
 
 /** A single bounded GPU preparation queue. It never changes the live room hierarchy. */
@@ -57,10 +57,11 @@ export class CultivationPreparationQueue {
     this.backgroundSupported = layer.renderer.extensions.has('KHR_parallel_shader_compile');
     this.roots = [preview.roomOne.root, preview.roomOneToTwoPassage.root, preview.roomTwo.root,
       preview.roomTwoToThreeGoopPassage.root, preview.roomTwoToThreeBobAirDuct.root,
-      preview.roomThree.root, preview.roomFour.root, preview.roomFive.root];
+      preview.roomThree.root, preview.roomFour.root, preview.roomFive.root, preview.roomFourLighting];
     this.camera = layer.cameraRig.camera.clone();
     const saved = this.roots.map(root => root.visible);
     const savedLiftGeometry = preview.roomFourGeometry.visible;
+    const savedLiftEntrance = preview.roomFourEntranceGeometry.visible;
     const add = (z: number, dark: boolean) => {
       const visible = this.roots.map(root => root.visible), key = this.key(visible, dark);
       if (!this.configurations.some(c => c.key === key)) this.configurations.push({key, visible, dark, z, ready: false});
@@ -76,6 +77,7 @@ export class CultivationPreparationQueue {
     }
     this.roots.forEach((root, i) => root.visible = saved[i]);
     preview.roomFourGeometry.visible = savedLiftGeometry;
+    preview.roomFourEntranceGeometry.visible = savedLiftEntrance;
     this.diagnostics.total = this.configurations.length;
     preview.root.userData.preparation = this.diagnostics;
     if (host && typeof document !== 'undefined') {
@@ -114,12 +116,12 @@ export class CultivationPreparationQueue {
     // Room 5's searchlights enter its render scope. Prepare that smaller layout
     // first rather than leaving it behind unrelated earlier-room work.
     this.upcoming = this.configurations.find(config => !config.ready && !config.dark &&
-      config.visible.every((visible, i) => visible === (i === 6))) ?? this.liftExitConfiguration();
+      config.visible[8] && config.visible.slice(0, 8).every((visible, i) => visible === (i === 6))) ?? this.liftExitConfiguration();
   }
 
   private liftExitConfiguration(): Configuration | undefined {
     return this.configurations.find(config => config.dark &&
-      config.visible.every((visible, i) => visible === (i === 6 || i === 7)));
+      config.visible[8] && config.visible.slice(0, 8).every((visible, i) => visible === (i === 6 || i === 7)));
   }
 
   /** Called after visibility selection, before any unprepared scene can be rendered. */
@@ -305,7 +307,7 @@ export class CultivationPreparationQueue {
       if (++visited % 32 === 0) yield {label:'collect-scene', run: () => {}};
     }
     const padding = new CultivationLightLayout(scene);
-    // Only the bounded layout needs comparison samplers, including dormant
+    // Only the bounded layout needs shadow samplers, including dormant
     // filler slots. Do not allocate nine unused searchlight maps for a primer.
     scene.traverseVisible(light => {
       if (!(light instanceof THREE.SpotLight || light instanceof THREE.PointLight || light instanceof THREE.DirectionalLight) ||
@@ -313,8 +315,9 @@ export class CultivationPreparationQueue {
       const depth = light instanceof THREE.PointLight
         ? new THREE.CubeDepthTexture(1, THREE.UnsignedIntType)
         : new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
-      depth.compareFunction = THREE.LessEqualCompare;
-      depth.minFilter = depth.magFilter = THREE.LinearFilter;
+      const compare = this.layer.renderer.shadowMap.type === THREE.PCFShadowMap;
+      depth.compareFunction = compare ? THREE.LessEqualCompare : null;
+      depth.minFilter = depth.magFilter = compare ? THREE.LinearFilter : THREE.NearestFilter;
       const target = light instanceof THREE.PointLight
         ? new THREE.WebGLCubeRenderTarget(1)
         : new THREE.WebGLRenderTarget(1, 1);

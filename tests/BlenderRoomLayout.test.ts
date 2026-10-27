@@ -74,22 +74,21 @@ test('Room 3 wooden latches release independently and remain down until reset', 
 
 test('Blender parkour gaps can be landed with the real charged-jump controller', () => {
   const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
-  // Evaluate Room 2's solved pose: the release/reset behaviour is covered by
-  // LevelTwoPreview.test.ts; here the actual revised landing geometry matters.
-  for (const drop of scene.roomTwo.blockDrops) {
-    const position = drop.mesh.userData.landingPosition as number[];
-    drop.mesh.position.set(position[0], position[1], position[2]);
-  }
   scene.root.updateWorldMatrix(true, true);
   const world = new CollisionWorld();
   const surfaces = new SurfaceRegistry();
   world.registerAll(scene.collisionMeshes, undefined, ColliderTransformMode.Static);
   for (const mesh of scene.dynamicCollisionMeshes) world.setTransformMode(mesh, ColliderTransformMode.Dynamic);
   surfaces.registerAll(scene.collisionMeshes);
-  const targets = scene.roomThree.solubleTargetMeshes.map(mesh => createAuthoredDissolveTarget(mesh, world, surfaces)!);
+  const targets = [...scene.roomTwo.solubleTargetMeshes,...scene.roomThree.solubleTargetMeshes]
+    .map(mesh => createAuthoredDissolveTarget(mesh, world, surfaces)!);
+  scene.roomTwo.bindDissolveTargets(targets);
+  for(const target of targets)if(target.mesh.userData.roomId===2)target.advance(target.dissolveDurationSeconds);
+  scene.roomTwo.update(2,[]);
   scene.roomThree.bindDissolveTargets(targets);
   for (const drop of scene.roomThree.wallDrops.slice(0, 3)) targets.find(target => target.id === drop.solubleTargetId)!.advance(1);
   scene.roomThree.update(1, []);
+  scene.root.updateWorldMatrix(true,true);
   const routes: [2 | 3, string[]][] = [
     [2, ['button-rest-ledge', 'block-1-block', 'block-2-block', 'block-3-block']],
     [3, ['bob-entry', 'bob-launch-island', 'bob-cross-beam']],

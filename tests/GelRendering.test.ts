@@ -28,9 +28,9 @@ test('preset transmission cap composes with gel mode in either setting order', (
 test('minimum gel removes transmission from every identity while preserving surface and fade state', () => {
   const renderer = { transmissionResolutionScale: 1 };
   const rendering = new GelRendering(renderer);
-  const emission = new THREE.Texture(), roughness = new THREE.Texture();
+  const emission = new THREE.Texture(), roughness = new THREE.Texture(), colour = new THREE.Texture();
   const sets = [new GelMaterialSet(undefined, rendering), new GoopMaterialSet(rendering),
-    new VoltMaterialSet(emission, roughness, rendering)];
+    new VoltMaterialSet(emission, roughness, colour, rendering)];
   const surfaces = sets.map(({ body }) => ({ color: body.color.getHex(), clearcoat: body.clearcoat,
     roughness: body.roughness, emissive: body.emissiveIntensity, hook: body.onBeforeCompile }));
   const environment = new THREE.Texture();
@@ -57,6 +57,7 @@ test('minimum gel removes transmission from every identity while preserving surf
     assert.equal(set.body.envMapIntensity, 0.7);
     assert.equal(set.body.roughnessMap, index === 2 ? roughness : null);
     assert.equal(set.body.emissiveMap, index === 2 ? emission : null);
+    assert.equal(set.body.map, index === 2 ? colour : null);
   }
   rendering.setMode('reduced-transmission');
   assert.equal(renderer.transmissionResolutionScale, 0.75);
@@ -66,7 +67,7 @@ test('minimum gel removes transmission from every identity while preserving surf
   assert.deepEqual(sets.map(set => set.body.transmission), [0.28, 0.28, 0.55]);
   for (const set of sets) for (const material of [set.body, set.eyes, set.bodyDepth, set.bodyDistance, set.eyeDepth, set.eyeDistance]) material.dispose();
   assert.equal(rendering.materialCount, 0);
-  for (const texture of [emission, roughness, environment]) texture.dispose();
+  for (const texture of [emission, roughness, colour, environment]) texture.dispose();
 });
 
 test('late loads inherit the current mode, disposal releases registrations, sessions are isolated', () => {

@@ -39,10 +39,7 @@ export class ContainmentLightShafts {
   setQuality(settings:GraphicsSettings,type:THREE.ShadowMapType):void{
     this.density=settings.effectsDensity;
     for(const {beam} of this.entries){
-      const material=beam.mesh.material,compare=type===THREE.PCFShadowMap;
-      if(Boolean(material.defines.SHADOW_COMPARE)!==compare){
-        material.defines=compare?{SHADOW_COMPARE:1}:{};material.needsUpdate=true;
-      }
+      beam.setShadowType(type);
       // Low retains one shell, higher settings use the same prepared geometry.
       const count=beam.mesh.geometry.index!.count;
       beam.mesh.geometry.setDrawRange(0,settings.effectsDensity<=.5?count/3:count);

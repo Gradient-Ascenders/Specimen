@@ -114,6 +114,57 @@ test('workload scopes suspend dormant updates, preserve hidden occupants and fin
   assert.deepEqual(scene.workload.snapshot().prepared, []);
 });
 
+test('the Room 3 exit retains its opaque lift door across distant views, opening and reset without activating lift lights', () => {
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
+  try {
+    const door = scene.roomFour.entrance, collider = door.collisionMesh, geometry = collider.geometry;
+    const closed = collider.position.clone(), metadata = JSON.stringify(collider.userData);
+    const skin = new Set(collider.children.filter((object): object is THREE.Mesh => object instanceof THREE.Mesh));
+    const rendered = () => {
+      const meshes: THREE.Mesh[] = [];
+      scene.root.traverseVisible(object => {
+        if (object instanceof THREE.Mesh && (Array.isArray(object.material) ? object.material : [object.material]).some(material => material.visible && !material.transparent)) meshes.push(object);
+      });
+      return meshes;
+    };
+    const scope = (z: number) => {
+      const worldZ = scene.roomThree.root.getWorldPosition(new THREE.Vector3()).z + z;
+      scene.updatePresentationVisibility({z: worldZ - 6}, {z: worldZ});
+      scene.root.updateWorldMatrix(true, true);
+    };
+    const checkClosed = () => {
+      const meshes = rendered();
+      for (const side of [-1, 1]) for (const x of [-1.7, 0, 1.7]) for (const y of [.4, 2.3, 4.2]) {
+        const from = door.root.localToWorld(new THREE.Vector3(x, y, side));
+        const hits = new THREE.Raycaster(from, new THREE.Vector3(0, 0, -side), 0, 2).intersectObjects(meshes, false);
+        assert.ok(hits.length && skin.has(hits[0].object as THREE.Mesh), 'The actual submitted door seals both faces of the closed opening.');
+      }
+    };
+    for (const z of [35, 55, 63]) {
+      scope(z);checkClosed();
+      assert.equal(scene.roomFourEntranceGeometry.visible, true);
+      assert.equal(scene.roomFourGeometry.visible, false, 'The closed door still culls the lift shaft.');
+      const lights: THREE.Light[] = [];
+      scene.roomFour.root.traverseVisible(object => {if (object instanceof THREE.Light) lights.push(object);});
+      assert.equal(lights.length, 0, 'Keep the original effective lift-light activation.');
+    }
+    const inactiveBob = {id: 'bob', position: door.root.localToWorld(new THREE.Vector3(0, 1, -1)), radiusMetres: .45};
+    door.update(.24, [inactiveBob]);scope(35);
+    assert.equal(door.state, 'opening');
+    assert.equal(scene.roomFourGeometry.visible, true, 'An inactive body holding the door open reveals the existing shaft.');
+    assert.equal(scene.roomFourLighting.visible, false);
+    for (const mesh of skin) assert.equal(mesh.parent, collider, 'The original door controller still owns its presentation.');
+    door.update(1, [inactiveBob]);scope(35);
+    const from = door.root.localToWorld(new THREE.Vector3(0, 2.3, -1));
+    assert.equal(new THREE.Raycaster(from, new THREE.Vector3(0, 0, 1), 0, 2).intersectObjects(rendered(), false).length, 0, 'The original upward slide leaves the passage open.');
+    scene.reset();scope(35);checkClosed();
+    assert.equal(door.state, 'closed');assert.equal(scene.roomFourGeometry.visible, false);
+    assert.equal(collider.geometry, geometry);assert.deepEqual(collider.position, closed);
+    assert.equal(JSON.stringify(collider.userData), metadata);
+    scope(70);assert.equal(scene.roomFourLighting.visible, true, 'Normal approach retains the existing lighting boundary.');
+  } finally {scene.dispose();}
+});
+
 test('immutable local transforms freeze while lift, fan, controls and rescue assemblies remain live', () => {
   const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
   try {

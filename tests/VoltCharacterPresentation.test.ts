@@ -54,6 +54,7 @@ test('real GLB validates sparse morphs, connected manifold geometry and exact Vo
   assert.equal(asset.body.geometry.index!.count, 96192);
   assert.equal(asset.maps[0].colorSpace, THREE.SRGBColorSpace);
   assert.equal(asset.maps[1].colorSpace, THREE.NoColorSpace);
+  assert.equal(asset.maps[2].colorSpace, THREE.SRGBColorSpace);
   disposeVoltAsset(root);
   for (const mutate of [
     (r: THREE.Group) => { r.getObjectByName('Volt')!.userData.asset = 'goop-concept-sculpt-v1'; },
@@ -86,12 +87,14 @@ test('preparation deduplicates, retains requests/maps, owns resources once and b
   assert.equal(p.diagnostics.materials!.bodyReflectionIntensity, 0.2);
   const body = original.body.material as THREE.MeshPhysicalMaterial;
   assert.equal(body.emissiveMap, original.maps[0]); assert.equal(body.roughnessMap, original.maps[1]);
+  assert.equal(body.map,original.maps[2]);
   assert.equal(body.roughness, 1); assert.equal(body.side, THREE.FrontSide); assert.equal(body.transmission, 0.55);
   const roughnessPixels = (original.maps[1] as THREE.DataTexture).image.data;
   const green: number[] = [];
   for (let i = 1; i < roughnessPixels.length; i += 4) green.push(roughnessPixels[i]! / 255);
-  assert.ok(Math.abs(Math.min(...green) - 0.18) < 0.005);
-  assert.ok(Math.abs(Math.max(...green) - 0.28) < 0.005);
+  assert.ok(Math.abs(Math.min(...green) - 0.244) < 0.005);
+  assert.ok(Math.abs(Math.max(...green) - 0.349) < 0.005);
+  assert.equal((original.maps[1].image as {width:number}).width,64);
   assert.ok(new Set(green).size > 20, 'retain the continuous green-channel roughness ramp');
   for (const m of imported) assert.equal(disposed.get(m), 1);
   for (const map of original.maps) assert.equal(disposed.get(map), undefined);
@@ -175,6 +178,9 @@ test('legal combined morphs preserve sole, volume, finite normals and outward no
   ];
   const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
   const original = new THREE.Vector3(), deformed = new THREE.Vector3(), edge = new THREE.Vector3();
+  const restBounds = new THREE.Box3().setFromBufferAttribute(asset.body.geometry.getAttribute('position') as THREE.BufferAttribute);
+  const restHeight = restBounds.max.y-restBounds.min.y;
+  let restVolume = 0;
   for (const weights of poses) for (const mesh of [asset.body, ...asset.eyes]) {
     for (const [i, name] of VOLT_MORPHS.entries()) mesh.morphTargetInfluences![mesh.morphTargetDictionary![name]] = weights[i]!;
     const positions = mesh.geometry.getAttribute('position'), normals = mesh.geometry.getAttribute('normal'), index = mesh.geometry.index!;
@@ -192,8 +198,23 @@ test('legal combined morphs preserve sole, volume, finite normals and outward no
     if (mesh === asset.body) {
       assert.ok(Math.abs(minimum + 0.45) < 1e-6);
       if (weights[3] === 0 && weights[4] === 0) {
-        const height = 1.79 * (1 - 0.1 * weights[0]! + 0.09 * weights[1]!);
+        const height = restHeight * (1 - 0.1 * weights[0]! + 0.09 * weights[1]!);
         assert.ok(Math.abs(maximum - (-0.45 + height)) < 1e-6);
+      }
+    } else {
+      // Front and rear lens samples share their X/Y projection. They must
+      // retain positive depth even when a full blink and squash combine.
+      const pairs=new Map<string,number[]>();
+      for(let i=0;i<positions.count;i++){
+        const key=`${positions.getX(i)},${positions.getY(i)}`,pair=pairs.get(key)??[];
+        pair.push(i);pairs.set(key,pair);
+      }
+      for(const pair of pairs.values()){
+        assert.equal(pair.length,2,'paired front/rear lens samples');
+        pair.sort((i,j)=>positions.getZ(i)-positions.getZ(j));
+        mesh.getVertexPosition(pair[0]!,a);mesh.getVertexPosition(pair[1]!,b);
+        assert.ok(Math.abs(a.x-b.x)<1e-6&&Math.abs(a.y-b.y)<1e-6,'paired lens samples');
+        assert.ok(b.z-a.z>.012,'eye shell retains positive thickness');
       }
     }
     for (let i = 0; i < index.count; i += 3) {
@@ -204,10 +225,16 @@ test('legal combined morphs preserve sole, volume, finite normals and outward no
       volume += a.dot(deformed.crossVectors(b, c)) / 6;
       deformed.subVectors(b, a).cross(edge.subVectors(c, a));
       assert.ok(deformed.lengthSq() > 1e-20, `${mesh.name} collapsed face`);
-      assert.ok(deformed.dot(original) > 0, `${mesh.name} inverted face`);
+      // A curved lens can rotate over 90 degrees relative to its open pose.
+      // Its front/rear winding is defined by its X/Y projection, while the
+      // connecting rim retains its outward direction within that plane.
+      if(mesh!==asset.body&&Math.abs(original.z)>1e-18)
+        assert.ok(deformed.z*original.z>0,`${mesh.name} inverted lens face`);
+      else assert.ok(deformed.dot(original)>0,`${mesh.name} inverted face`);
     }
     assert.ok(volume > 0);
-    if (mesh === asset.body && weights[3] === 0 && weights[4] === 0) assert.ok(Math.abs(volume - 0.7985415) < 1e-5, 'body-only morphs preserve horizontal volume');
+    if (mesh === asset.body && weights.every(weight=>weight===0)) restVolume=volume;
+    if (mesh === asset.body && weights[3] === 0 && weights[4] === 0) assert.ok(Math.abs(volume - restVolume) < 1e-5, 'body-only morphs preserve horizontal volume');
   }
   disposeVoltAsset(root);
 });
@@ -220,8 +247,8 @@ test('authored blink/body motion keeps the complete eye outline seated', async (
     const basis = eye.geometry.getAttribute('position'), normals = eye.geometry.getAttribute('normal');
     const sign = eyeIndex === 0 ? -1 : 1, outline: number[] = [];
     for (let i = 0; i < basis.count; i++) {
-      const vertical = (basis.getY(i) + 0.097) / 0.219;
-      const horizontal = (basis.getX(i) - sign * 0.261 - sign * 0.014 * vertical) / (0.124 * (1 - 0.12 * vertical));
+      const vertical = (basis.getY(i) + 0.100) / 0.210;
+      const horizontal = (basis.getX(i) - sign * 0.250 - sign * 0.014 * vertical) / (0.140 * (1 - 0.12 * vertical));
       if (Math.abs(horizontal * horizontal + vertical * vertical - 1) < 1e-5 && normals.getZ(i) < 0) outline.push(i);
     }
     assert.equal(outline.length, 64, 'sample the whole authored perimeter');

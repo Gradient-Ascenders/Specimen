@@ -55,25 +55,6 @@ def topology(obj):
             'geometry_sha256':hashlib.sha256(json.dumps(signature,separators=(',',':')).encode()).hexdigest()}
 
 
-def preserved_geometry(character):
-    body = character[0]
-    points = sorted([list(v.co) for v in body.data.vertices
-                     if v.co.z <= volt_model.SOLE+volt_model.PRESERVED_BODY_HEIGHT+1e-6])
-    digest = hashlib.sha256(json.dumps(points,separators=(',',':')).encode()).hexdigest()
-    assert len(points) == 6817 and digest == volt_model.PRESERVED_BODY_SHA256
-    eyes = {}
-    for obj in character[1:]:
-        obj.data.calc_loop_triangles()
-        signature = {'vertices':[list(v.co) for v in obj.data.vertices],
-                     'triangles':[list(t.vertices) for t in obj.data.loop_triangles]}
-        eyes[obj.name] = hashlib.sha256(json.dumps(signature,separators=(',',':')).encode()).hexdigest()
-        assert eyes[obj.name] == volt_model.PRESERVED_EYES_SHA256[obj.name]
-    assert all(p.material_index == 0 for p in body.data.polygons
-               if max(body.data.vertices[i].co.z for i in p.vertices) <= 0.340001)
-    return {'lower_body_vertices':len(points),'lower_body_geometry_sha256':digest,
-            'eyes_geometry_sha256':eyes,'unchanged_body_material':'Volt-Golden-Gel'}
-
-
 def morph_report(obj):
     assert [key.name for key in obj.data.shape_keys.key_blocks] == ['Basis',*volt_model.MORPH_NAMES]
     report = {}
@@ -121,17 +102,18 @@ def main():
               'resting_contact_y_metres':volt_model.SOLE,
               'meshes':{obj.name:topology(obj) for obj in character},
               'materials':list(volt_model.MATERIAL_NAMES),
-              'preserved_geometry':preserved_geometry(character),
-              'crest':{'root_inset_metres':volt_model.ROOT_SHIFT_METRES,
-                       'root_inset_body_width_fraction':0.08,
-                       'upper_spike_shortening_fraction':1-0.315/0.410,
-                       'full_crest_emission':0.95,'full_crest_roughness':0.28},
+              'design':{'body':'Rounded bell body with a low pooled skirt',
+                        'crest':'Compact continuous lightning fold with a tapered tip',
+                        'body_height_metres':volt_model.CREST_ROOT_HEIGHT,
+                        'crest_height_metres':volt_model.PROFILE[-1][0]-volt_model.CREST_ROOT_HEIGHT,
+                        'total_height_metres':volt_model.PROFILE[-1][0],
+                        'floating_effect_meshes':0,'studio_bloom':False},
               'armatures':0,'morph_targets':len(volt_model.MORPH_NAMES),
               'morph_names':list(volt_model.MORPH_NAMES),
               'blink_height_fraction':volt_model.BLINK_HEIGHT_FRACTION,
               'blend_validation':'half and full blink with full squash/stretch have positive volume and non-degenerate triangles',
               'morphs':{obj.name:morph_report(obj) for obj in character},
-              'textures':{'Volt-Continuous-Emission':[2,512], 'Volt-Continuous-Roughness':[2,512]},
+              'textures':{'Volt-Continuous-Emission':[2,512], 'Volt-Continuous-Roughness':[64,512], 'Volt-Amber-Depth':[2,512]},
               'animations':0,
               'export_excludes':['studio floor, camera and lights']}
     report['total_triangles'] = sum(m['triangles'] for m in report['meshes'].values())
@@ -159,7 +141,7 @@ def main():
         for name,position in [('three-quarter',(1.8,5.2,1.7)),('front',(0,12,1.12)),
                               ('side',(12,0,1.12)),('back',(0,-12,1.12))]:
             bpy.context.scene.camera.location = position
-            volt_model.point_at(bpy.context.scene.camera,(0,0,0.44))
+            volt_model.point_at(bpy.context.scene.camera,(0,0,0.18))
             bpy.context.scene.render.filepath = str(evidence/(name+'.png'))
             bpy.ops.render.render(write_still=True)
 

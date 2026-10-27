@@ -61,7 +61,7 @@ export class LevelTwoRoomFiveGreybox {
   private appliedContactOrder = 0;
   readonly sewer: RoomFiveSewer;
   private readonly requestFailure: (failure: { roomId: 5; slimeId: 'bob' | 'goop'; reason: 'radiation' }) => void;
-  constructor(requestFailure: (failure: { roomId: 5; slimeId: 'bob' | 'goop'; reason: 'radiation' }) => void, gelRendering?: GelRendering) {
+  constructor(requestFailure: (failure: { roomId: 5; slimeId: 'bob' | 'goop'; reason: 'radiation' }) => void, gelRendering?: GelRendering, authoredReplacement=false) {
     this.captiveVoltPresentation = new VoltCharacterPresentation(undefined, gelRendering);
     this.requestFailure = requestFailure;
     const b = this.builder, m = b.materials;
@@ -112,7 +112,7 @@ export class LevelTwoRoomFiveGreybox {
     this.acidVentPatches.push(new RoomFiveVentWaste(35, 9.1, 12.2, 2.2, 6, true),
       new RoomFiveVentWaste(40, 14.55, 2.2, 8.7, 7, true));
     for (const [i, patch] of this.acidVentPatches.entries()) b.root.add(patch.createMesh(m.acid, i));
-    this.sewer = new RoomFiveSewer(b);
+    this.sewer = new RoomFiveSewer(b,authoredReplacement);
     this.brokenCore = this.sewer.drone;
     this.reunionDoor = this.sewer.door;
     for (const [network, mesh] of this.sewer.controls) this.controls.set(network, mesh);

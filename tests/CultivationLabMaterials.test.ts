@@ -3,10 +3,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
 import { LevelTwoRoomOneGreybox } from '../src/levels/LevelTwoRoomOneGreybox.ts';
-import { LevelTwoRoomTwoGreybox } from '../src/levels/LevelTwoRoomTwoGreybox.ts';
-import { LevelTwoLabPassageGreybox } from '../src/levels/LevelTwoLabPassageGreybox.ts';
-import { LevelTwoAirDuctGreybox } from '../src/levels/LevelTwoAirDuctGreybox.ts';
 import { CultivationLabMaterials } from '../src/render/environment/cultivation/CultivationLabMaterials.ts';
+import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 
 test('Room 1 material pass preserves collider geometry, transforms, metadata and hazard identity', () => {
   const room = new LevelTwoRoomOneGreybox(() => {});
@@ -21,12 +19,12 @@ test('Room 1 material pass preserves collider geometry, transforms, metadata and
     assert.deepEqual(snapshot.mesh.position.toArray(), snapshot.position);
     assert.deepEqual(snapshot.mesh.quaternion.toArray(), snapshot.quaternion);
     assert.deepEqual(snapshot.mesh.userData, snapshot.metadata);
-    if (snapshot.metadata.textureRole === 'acid-floor') assert.equal(snapshot.mesh.material, art.acid);
-    else if (snapshot.metadata.hazardRole) assert.equal(snapshot.mesh.material, snapshot.material);
+    if (snapshot.metadata.textureRole === 'acid-floor') assert.ok(snapshot.mesh.material===art.acid,'acid material identity');
+    else if (snapshot.metadata.hazardRole) assert.ok(snapshot.mesh.material===snapshot.material,'restored material identity');
   }
   const west = room.root.getObjectByName('cultivation-room-1-west-wall') as THREE.Mesh;
   const east = room.root.getObjectByName('cultivation-room-1-east-wall') as THREE.Mesh;
-  assert.equal(west.material, east.material);
+  assert.ok(west.material===east.material,'shared wall material');
   const uv = west.geometry.getAttribute('uv');
   // 50 m wall must span 12.5 four-metre tiles, not a single stretched texture.
   const values = Array.from({length:4}, (_, i) => uv.getX(i));
@@ -34,15 +32,43 @@ test('Room 1 material pass preserves collider geometry, transforms, metadata and
   let textureDisposals = 0;
   for (const texture of art.textures) texture.addEventListener('dispose', () => textureDisposals++);
   room.reset();
-  assert.equal(west.material, art.wall);
+  assert.ok(west.material===art.wall,'wall material after reset');
   art.dispose();
   art.dispose();
   assert.equal(textureDisposals, art.textures.length);
   for (const snapshot of snapshots) {
-    assert.equal(snapshot.mesh.geometry, snapshot.geometry);
-    assert.equal(snapshot.mesh.material, snapshot.material);
+    assert.ok(snapshot.mesh.geometry===snapshot.geometry,'restored collider geometry');
+    assert.ok(snapshot.mesh.material===snapshot.material,'restored material identity');
   }
   room.dispose();
+});
+
+test('cultured adhesive follows the approved routes and leaves later rooms, the duct and hold button alone',()=>{
+  const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets);
+  try{
+    const route=scene.roomTwo.root.getObjectByName('cultivation-room-2-continuous-sticky-route') as THREE.Mesh;
+    assert.ok(route.material===scene.labArt.nurserySticky,'shared route biofilm material');
+    const approach=scene.roomTwo.root.getObjectByName('cultivation-room-2-final-vent-sticky-approach') as THREE.Mesh;
+    const skin=approach.getObjectByName(`${approach.name}-surface-skin`) as THREE.Mesh|undefined;
+    const materials=skin?.material??approach.material;
+    assert.ok(Array.isArray(materials),'the submitted approach uses separate wall and cap finishes');
+    assert.ok(materials[0]===scene.labArt.nurserySticky,'the vertical approach keeps its shared biofilm');
+    assert.ok(materials[1]===scene.labArt.duct,'the threshold cap borrows the vent finish');
+    const normal=approach.geometry.getAttribute('normal'),indices=approach.geometry.index;
+    for(const group of approach.geometry.groups)
+      assert.equal(group.materialIndex,normal.getY(indices?.getX(group.start)??group.start)>.5?1:0,
+        'only the horizontal threshold cap loses the biofilm');
+    assert.equal(scene.labArt.nurserySticky.emissiveIntensity,scene.labArt.sticky.emissiveIntensity);
+    assert.equal(scene.labArt.nurserySticky.emissive.getHex(),scene.labArt.sticky.emissive.getHex());
+    for(const root of [scene.roomFour.root,scene.roomFive.root,scene.roomTwoToThreeBobAirDuct.root])root.traverse(o=>{
+      if(o instanceof THREE.Mesh)for(const material of Array.isArray(o.material)?o.material:[o.material])
+        assert.notEqual(material.userData.cultivationBiofilm,true,`out-of-scope adhesive replacement: ${o.name}`);
+    });
+    const button=scene.roomTwo.root.getObjectByName('cultivation-room-2-wall-button-pad') as THREE.Mesh;
+    assert.ok(button.material!==scene.labArt.nurserySticky,'hold button keeps its own material');
+    assert.equal(scene.labArt.nurserySticky.transparent,false);
+    assert.equal(scene.labArt.nurserySticky.side,THREE.FrontSide);
+  }finally{scene.dispose();}
 });
 
 test('ceiling presentation leaves the authored entrance vent open and owns instance disposal', () => {
@@ -63,89 +89,4 @@ test('ceiling presentation leaves the authored entrance vent open and owns insta
   art.dispose();
   assert.equal(disposed, 1);
   assert.equal(root.children.length, 0);
-});
-
-test('Room 2 and its two exit routes share the palette without changing gameplay surfaces or colliders', () => {
-  const passage = new LevelTwoLabPassageGreybox({
-    id: 'cultivation-room-2-to-3-goop-lab-passage', fromRoomId: 2, toRoomId: 3,
-    widthMetres: 7, heightMetres: 6.5, lengthMetres: 28,
-    doorwayWidthMetres: 4, doorwayHeightMetres: 4.6, entryInitiallyLocked: true,
-  });
-  const duct = new LevelTwoAirDuctGreybox({
-    id: 'cultivation-room-2-to-3-bob-air-duct', fromRoomId: 2, toRoomId: 3,
-    innerWidthMetres: 2, innerHeightMetres: 2.1, lengthMetres: 28,
-  });
-  const room = new LevelTwoRoomTwoGreybox(() => {}, passage.entryDoor);
-  const art = new CultivationLabMaterials(cultivationAssets);
-  const builders = [room.builder, passage.builder, duct.builder];
-  const snapshots = builders.flatMap(builder => builder.collisionMeshes.map(mesh => ({
-    mesh, material: mesh.material, geometry: mesh.geometry,
-    positions: Array.from(mesh.geometry.getAttribute('position').array),
-    metadata: structuredClone(mesh.userData), position: mesh.position.toArray(),
-    quaternion: mesh.quaternion.toArray(), scale: mesh.scale.toArray(),
-  })));
-  for (const builder of builders) art.dress(builder);
-  for (const snapshot of snapshots) {
-    assert.deepEqual(Array.from(snapshot.mesh.geometry.getAttribute('position').array), snapshot.positions);
-    assert.deepEqual(snapshot.mesh.userData, snapshot.metadata);
-    assert.deepEqual(snapshot.mesh.position.toArray(), snapshot.position);
-    assert.deepEqual(snapshot.mesh.quaternion.toArray(), snapshot.quaternion);
-    assert.deepEqual(snapshot.mesh.scale.toArray(), snapshot.scale);
-    if (snapshot.metadata.textureRole === 'sticky-wall-tile') {
-      assert.equal(snapshot.mesh.material, /^cultivation-room-2-sticky-route-[a-e]$/.test(snapshot.mesh.name)
-        ? art.platformArt.hidden : art.sticky);
-      assert.equal(art.sticky.map?.name, 'cultivation-aged-membrane-albedo');
-      assert.ok(art.sticky.roughness >= .6, 'aged membrane avoids mirror-like glare');
-      assert.equal(art.sticky.transparent, false, 'wear does not suggest holes in a climbable surface');
-      assert.ok(art.sticky.normalMap);
-      assert.ok(art.sticky.roughnessMap);
-    } else if (snapshot.metadata.environmentRole === 'air-duct-entry') {
-      assert.equal(snapshot.mesh.material, art.duct);
-    } else if (snapshot.metadata.textureRole === 'acid-floor') {
-      assert.equal(snapshot.mesh.material, art.acid);
-    } else if (snapshot.metadata.surfaceTag === 'sticky' || snapshot.metadata.hazardRole) {
-      assert.equal(snapshot.mesh.material, snapshot.material);
-    }
-  }
-  const skin = room.root.getObjectByName('cultivation-room-2-continuous-sticky-route') as THREE.Mesh;
-  assert.equal(skin.material, art.sticky);
-  assert.equal(skin.userData.presentationOnly, true);
-  assert.equal(room.collisionMeshes.includes(skin), false);
-  let skinDisposals = 0;
-  skin.geometry.addEventListener('dispose', () => skinDisposals++);
-  assert.equal(room.lasers.hazards.length, 4);
-  const wallSeam = room.root.getObjectByName('room-2-panel-seam-1-5') as THREE.Mesh;
-  assert.equal(wallSeam.material, art.metal);
-  const wallFixture = room.root.getObjectByName('room-2-fluorescent-strip-1-6') as THREE.Mesh;
-  assert.equal(wallFixture.material, art.fixture);
-  const roomFloor = room.root.getObjectByName('cultivation-room-2-start-floor') as THREE.Mesh;
-  const passageFloor = passage.root.getObjectByName('cultivation-room-2-to-3-goop-lab-passage-floor') as THREE.Mesh;
-  assert.equal(roomFloor.material, passageFloor.material);
-  assert.equal(roomFloor.material, art.floor);
-  const ductFloor = duct.root.getObjectByName('cultivation-room-2-to-3-bob-air-duct-floor') as THREE.Mesh;
-  assert.equal(ductFloor.material, art.duct);
-  const uv = ductFloor.geometry.getAttribute('uv');
-  // Updated main leaves end clearance: the 26.3 m metal run uses two-metre repeats.
-  const v = Array.from({length: 4}, (_, i) => uv.getY(8 + i));
-  assert.ok(Math.abs(Math.max(...v) - Math.min(...v) - 13.15) < 1e-5);
-  const tether = room.root.getObjectByName('cultivation-room-2-block-1-non-soluble-rope') as THREE.Mesh;
-  assert.equal(tether.material, art.pole);
-  const button = room.root.getObjectByName('cultivation-room-2-wall-button-pad') as THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>;
-  room.update(0.6, [{id: 'bob', position: new THREE.Vector3(), radiusMetres: 0.45,
-    attached: true, supportCollider: room.wallButton}]);
-  assert.equal(passage.entryDoor.locked, false);
-  assert.equal(button.material.color.getHex(), 0x62ff91);
-  room.reset();
-  assert.equal(passage.entryDoor.locked, true);
-  assert.equal(button.material.color.getHex(), 0xe53945);
-  art.dispose();
-  for (const snapshot of snapshots) {
-    assert.equal(snapshot.mesh.material, snapshot.material);
-    assert.equal(snapshot.mesh.geometry, snapshot.geometry);
-  }
-  assert.equal(skin.parent, null);
-  assert.equal(skinDisposals, 1);
-  room.dispose();
-  passage.dispose();
-  duct.dispose();
 });

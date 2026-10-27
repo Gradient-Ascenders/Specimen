@@ -38,6 +38,7 @@ export class ContainmentRadiance {
   private reflections:THREE.WebGLRenderTarget|undefined;
   private uniforms:ContainmentRadianceUniforms|undefined;
   private readonly materials=new Set<THREE.MeshStandardMaterial>();
+  private readonly originals=new Map<THREE.MeshStandardMaterial,{compile:THREE.Material['onBeforeCompile'];key:THREE.Material['customProgramCacheKey'];environment:THREE.Texture|null}>();
   private probes=0;
   private tileHeight=0;
   private directional=0;
@@ -53,6 +54,7 @@ export class ContainmentRadiance {
       if(!(object instanceof THREE.Mesh)||object.userData.lightingOnly)return;
       for(const material of Array.isArray(object.material)?object.material:[object.material]){
         if(!(material instanceof THREE.MeshStandardMaterial)||this.materials.has(material))continue;
+        this.originals.set(material,{compile:material.onBeforeCompile,key:material.customProgramCacheKey,environment:material.envMap});
         // Matte walls need the baked irradiance but gain little from an extra
         // specular environment lookup. Keep local reflections on gel, glass,
         // polished finishes and metals, avoiding CubeUV programs on every wall.
@@ -120,6 +122,10 @@ export class ContainmentRadiance {
 
   dispose():void{
     if(this.disposed)return;this.disposed=true;this.abort.abort();
+    for(const [material,original] of this.originals){
+      material.onBeforeCompile=original.compile;material.customProgramCacheKey=original.key;material.envMap=original.environment;material.needsUpdate=true;
+    }
+    this.originals.clear();
     this.volume?.dispose();this.reflections?.dispose();this.materials.clear();
     this.volume=undefined;this.reflections=undefined;this.uniforms=undefined;
   }

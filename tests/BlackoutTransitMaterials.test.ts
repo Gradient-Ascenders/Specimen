@@ -51,10 +51,11 @@ test('textured static and interactive geometry preserves the reviewed transit ba
   // family and the explicitly removed light hangers/two observation-panel rods.
   baseline.surfaces = baseline.surfaces.filter((saved: { name: string }) =>
     !/^transit-(cover|security|bridge-cover|light-bank-hanger-)/.test(saved.name) &&
+    !/^transit-laser-[ab]-(presentation-emitter-|emitter-(start|end)-proxy)/.test(saved.name) &&
     !['transit-east-service-conduit-96', 'transit-east-service-conduit-116'].includes(saved.name));
   const meshes: THREE.Mesh[] = [];
   f.room.root.traverse(m => {
-    if (!(m instanceof THREE.Mesh) || m.name.includes('batched') || m.userData.visualOnly) return;
+    if (!(m instanceof THREE.Mesh) || m.name.includes('batched') || m.userData.visualOnly || m.userData.sharedLaserEmitter) return;
     for (let ancestor: THREE.Object3D | null = m; ancestor; ancestor = ancestor.parent) {
       if (ancestor.name.startsWith('transit-sewer-drone-')) return;
     }

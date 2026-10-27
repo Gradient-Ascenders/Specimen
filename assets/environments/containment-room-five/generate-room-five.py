@@ -11,7 +11,7 @@ from mathutils import Vector
 HERE=__file__[:max(__file__.rfind('/'),__file__.rfind('\\'))]
 PREFIX='R5_'
 SCENE_NAME='Room 5 Containment Atrium'
-PARTS=('Architecture','Cell','Front','Rear','Left','Right','CarriageOne','CarriageTwo','Locks','Status','ButtonCap')
+PARTS=('Architecture','Escape','Cell','Front','Rear','Left','Right','CarriageOne','CarriageTwo','Locks','Status','ButtonCap')
 FINISHES={
     'Ivory':((.88,.86,.79),.5,0),'Cool':((.43,.53,.55),.5,0),
     'Island':((.57,.62,.61),.6,0),'Resin':((.43,.50,.51),.65,0),
@@ -20,6 +20,7 @@ FINISHES={
     'Amber':((.52,.28,.06),.5,.12),'Worn':((.47,.53,.54),.85,.15),
     'Glass':((.13,.24,.27),.17,.12),'Sticky':((.38,.55,.50),.6,.05),'Status':((.5,.85,.7),.4,0),
     'Security':((.92,.70,.27),.6,0),
+    'VentLight':((.274677,.686685,.539479),.5,0),
 }
 
 
@@ -57,7 +58,7 @@ def setup():
         p.inputs['Base Color'].default_value=(*colour,1)
         p.inputs['Roughness'].default_value=rough
         p.inputs['Metallic'].default_value=metal
-        if name in {'Light','Screen','Status'}:
+        if name in {'Light','Screen','Status','VentLight'}:
             p.inputs['Emission Color'].default_value=(*colour,1)
             p.inputs['Emission Strength'].default_value=1
         if name=='Glass':
@@ -493,38 +494,111 @@ def build_gallery():
     print('Glazed observation gallery, furnished operator station and wall-mounted release control built.')
 
 
+def vent_box(name,lo,hi,finish='Graphite'):
+    return box('Escape '+name,tuple(hi[i]-lo[i] for i in range(3)),
+               tuple((lo[i]+hi[i])/2 for i in range(3)),finish,0,region='Escape')
+
+
+def vent_prism(name,front,back,finish='Graphite'):
+    return mesh('Escape '+name,front+back,[(0,3,2,1),(4,5,6,7),(0,1,5,4),
+        (1,2,6,5),(2,3,7,6),(3,0,4,7)],finish,region='Escape')
+
+
+def vent_wall_panel(side,a,b,w,h):
+    low,high=74.91,h-.04
+    cut=.035
+    shape=[(low,a+cut),(low+cut,a),(high-cut,a),(high,a+cut),
+           (high,b-cut),(high-cut,b),(low+cut,b),(low,b-cut)]
+    vv=[(side*x,y,z) for x in [w,w+.02] for y,z in shape]
+    obj=mesh('Escape formed wall panel '+str(side)+' '+str(a),vv,
+        [tuple(reversed(range(8))),tuple(range(8,16))]+
+        [(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)],'Worn',region='Escape')
+    for vertex in obj.data.vertices:
+        x,z,y=vertex.co.x,-vertex.co.y,vertex.co.z
+        soil=.08+.11*(.5+.5*math.sin(z*2.71+y*1.4))+.12*max(0,1-(y-74.75)/.6)
+        obj.data.color_attributes['wear'].data[vertex.index].color=(.73*(1-soil),.72*(1-soil),.68*(1-soil),1)
+
+
+def vent_rib(z):
+    # One closed U-section; its header and legs share edges, never faces.
+    outline=[(-1.6,74.75),(-1.6,77.05),(1.6,77.05),(1.6,74.75),
+             (1.53,74.75),(1.53,76.99),(-1.53,76.99),(-1.53,74.75)]
+    vv=[(x,y,Z) for Z in [z-.05,z+.05] for x,y in outline]
+    mesh('Escape cast hoop '+str(z),vv,[tuple(reversed(range(8))),tuple(range(8,16))]+
+         [(i,(i+1)%8,(i+1)%8+8,i+8) for i in range(8)],'Alloy',region='Escape')
+
+
+def vent_lamp(side,z):
+    # Transfer the original 14 wall strips at their exact positions and colour.
+    # The surrounding body has a real opening and is fixed through one stud.
+    y=76.45
+    outer=[(y-.065,z-.23),(y+.065,z-.23),(y+.065,z+.23),(y-.065,z+.23)]
+    inner=[(y-.025,z-.16),(y+.025,z-.16),(y+.025,z+.16),(y-.025,z+.16)]
+    vv=[(side*x,Y,Z) for ring,x in [(outer,1.55),(inner,1.55),(inner,1.59),(outer,1.59)] for Y,Z in ring]
+    ff=[]
+    for k in range(4):
+        j=(k+1)%4
+        ff.extend([(k,j,j+4,k+4),(k+4,j+4,j+8,k+8),(k+8,j+8,j+12,k+12),(k+12,j+12,j,k)])
+    mesh('Escape recessed strip housing '+str(side)+' '+str(z),vv,ff,'Graphite',region='Escape')
+    a,b=sorted([side*1.575,side*1.595])
+    vent_box('original wall emitter '+str(side)+' '+str(z),[a,y-.025,z-.16],[b,y+.025,z+.16],'VentLight')
+    a,b=sorted([side*1.535,side*1.64])
+    vent_box('captive lamp stud '+str(side)+' '+str(z),[a,y-.025,z+.185],[b,y+.025,z+.21],'Alloy')
+
+
 def build_escape():
-    # The existing wooden cover retains dissolve ownership; this frame remains
-    # outside its clear aperture and never replaces its surface or collision.
-    for x in (-1.33,1.33):
-        box('Escape opening jamb '+str(x),(.20,1.78,.24),(x,75.65,124.20),'Graphite',.02)
-    box('Escape opening header',(2.86,.22,.24),(0,76.66,124.20),'Alloy',.018)
-    # A fixed metal sleeve explains the original cover's depth while the
-    # dissolvable wood itself reads as a thin, replaceable front insert.
-    for x in (-1.23,1.23):
-        quad('Service sleeve outer '+str(x),[(x,74.75,124.38),(x,76.55,124.38),(x,76.55,125.3),(x,74.75,125.3)],'Graphite',(-1 if x<0 else 1,0,0))
-    for x in (-.9,.9):
-        quad('Service sleeve inner '+str(x),[(x,74.75,124.38),(x,76.4,124.38),(x,76.4,125.3),(x,74.75,125.3)],'Alloy',(1 if x<0 else -1,0,0))
-    for a,b in ((-1.23,-.9),(.9,1.23)):
-        quad('Service sleeve front '+str(a),[(a,74.75,124.38),(b,74.75,124.38),(b,76.55,124.38),(a,76.55,124.38)],'Graphite',(0,0,-1))
-    quad('Service sleeve soffit',[(-.9,76.4,124.38),(.9,76.4,124.38),(.9,76.4,125.3),(-.9,76.4,125.3)],'Alloy',(0,-1,0))
-    quad('Service sleeve crown',[(-1.23,76.55,124.38),(1.23,76.55,124.38),(1.23,76.55,125.3),(-1.23,76.55,125.3)],'Graphite',(0,1,0))
-    quad('Service sleeve front header',[(-.9,76.4,124.38),(.9,76.4,124.38),(.9,76.55,124.38),(-.9,76.55,124.38)],'Graphite',(0,0,-1))
-    for z0,z1,w,h in ((125.3,128,.9,76.4),(128,142,1.6,77.05)):
-        for x in (-w,w):
-            quad('Escape side '+str(x)+' '+str(z0),[(x,74.75,z0),(x,h,z0),(x,h,z1),(x,74.75,z1)],'Cool',(1 if x<0 else -1,0,0))
-        quad('Escape roof '+str(z0),[(-w,h,z0),(-w,h,z1),(w,h,z1),(w,h,z0)],'Graphite',(0,-1,0))
-        sections=((z0,z1),) if z0<128 else ((128,137.2),(139.8,142))
-        for a,b in sections:
-            quad('Escape floor '+str(a),[(-w,74.75,a),(w,74.75,a),(w,74.75,b),(-w,74.75,b)],'Resin',(0,1,0))
-        if z0==128:
-            for a,b in ((-1.6,-1.3),(1.3,1.6)):
-                quad('Drop side lip '+str(a),[(a,74.75,137.2),(b,74.75,137.2),(b,74.75,139.8),(a,74.75,139.8)],'Alloy',(0,1,0))
-    for x in (-1.6,1.6):
-        quad('Escape neck shoulder '+str(x),[(x,74.75,128),(x,77.05,128),((.9 if x>0 else -.9),76.4,128),((.9 if x>0 else -.9),74.75,128)],'Graphite',(0,0,-1))
-    quad('Escape neck upper seal',[(-.9,76.4,128),(.9,76.4,128),(1.6,77.05,128),(-1.6,77.05,128)],'Graphite',(0,0,-1))
-    quad('Escape end',[(-1.6,74.75,142),(1.6,74.75,142),(1.6,77.05,142),(-1.6,77.05,142)],'Cool',(0,0,-1))
-    print('Sealed escape neck, dissolvable-cover surround and existing drop opening built.')
+    # Full closed volumes, in the original gameplay coordinates. Finish skins
+    # stand off continuous solid backs; the joints always stay enclosed.
+    stations=[(124.38,127.7,.9,.9,76.4,76.4),(127.7,128,.9,1.6,76.4,77.05),
+              (128,142,1.6,1.6,77.05,77.05)]
+    for a,b,w,W,h,H in stations:
+        for side in [-1,1]:
+            front=[(side*(w+.04),74.55,a),(side*(w+.20),74.55,a),
+                   (side*(w+.20),h+.20,a),(side*(w+.04),h+.20,a)]
+            back=[(side*(W+.04),74.55,b),(side*(W+.20),74.55,b),
+                  (side*(W+.20),H+.20,b),(side*(W+.04),H+.20,b)]
+            vent_prism('sealed side '+str(side)+' '+str(a),front,back)
+        vent_prism('sealed roof '+str(a),[(-w-.04,h+.04,a),(w+.04,h+.04,a),(w+.04,h+.20,a),(-w-.04,h+.20,a)],
+            [(-W-.04,H+.04,b),(W+.04,H+.04,b),(W+.04,H+.20,b),(-W-.04,H+.20,b)])
+    for a,b,w,W in [(125.3,127.7,.94,.94),(127.7,128,.94,1.64),(128,137.2,1.64,1.64),(139.8,142,1.64,1.64)]:
+        vent_prism('solid floor '+str(a),[(-w,74.55,a),(w,74.55,a),(w,74.75,a),(-w,74.75,a)],
+            [(-W,74.55,b),(W,74.55,b),(W,74.75,b),(-W,74.75,b)],'Resin')
+    for side in [-1,1]:
+        a,b=sorted([side*1.3,side*1.64])
+        vent_box('drop floor shoulder '+str(side),[a,74.55,137.2],[b,74.75,139.8],'Resin')
+        vent_wall_panel(side,124.38,127.675,.9,76.4)
+        for z in range(128,142,2):
+            vent_wall_panel(side,z+.025,z+1.975,1.6,77.05)
+            vent_lamp(side,z+1.55)
+    # Flush roof finish: it changes neither headroom nor camera clearance.
+    vent_box('neck roof finish',[-.9,76.4,124.38],[.9,76.42,127.7],'Cool')
+    vent_prism('taper roof finish',[(-.9,76.4,127.7),(.9,76.4,127.7),(.9,76.42,127.7),(-.9,76.42,127.7)],
+        [(-1.6,77.05,128),(1.6,77.05,128),(1.6,77.07,128),(-1.6,77.07,128)],'Alloy')
+    for z in range(128,142,2):vent_box('wide roof finish '+str(z),[-1.6,77.05,z+.025],[1.6,77.07,z+1.975],'Cool')
+    for z in range(129,142,2):vent_rib(z)
+    vent_box('closed far return',[-1.80,74.55,142],[1.80,77.25,142.20],'Cool')
+    # Keep the original 2.6 m drop and base at Y=68. Closed shaft walls meet the
+    # floor's underside, whose inner returns own the final 200 mm to the lip.
+    for side in [-1,1]:
+        a,b=sorted([side*1.3,side*1.48])
+        vent_box('drop shaft side '+str(side),[a,68,137.2],[b,74.55,139.8])
+    for a,b in [(137.02,137.2),(139.8,139.98)]:
+        vent_box('drop shaft end '+str(a),[-1.48,68,a],[1.48,74.55,b])
+    vent_box('drop shaft base',[-1.48,67.8,137.02],[1.48,68,139.98])
+    outer=[(-1.48,137.02),(1.48,137.02),(1.48,139.98),(-1.48,139.98)]
+    inner=[(-1.3,137.2),(1.3,137.2),(1.3,139.8),(-1.3,139.8)]
+    vv=[(x,y,z) for ring,y in [(outer,74.75),(outer,74.825),(inner,74.825),(inner,74.75)] for x,z in ring]
+    ff=[]
+    for k in range(4):
+        j=(k+1)%4
+        for start,end in [(0,4),(4,8),(8,12),(12,0)]:ff.append((start+k,start+j,end+j,end+k))
+    mesh('Escape fitted drop coaming',vv,ff,'Alloy',region='Escape')
+    for x in [-1.37,1.37]:vent_box('original rim emitter '+str(x),[x-.025,74.825,137.25],[x+.025,74.855,139.75],'VentLight')
+    # The wood remains the original separate dissolvable object. These fitted
+    # outer jambs stay outside its front footprint and interaction area.
+    for x in [-1.33,1.33]:box('Escape opening jamb '+str(x),(.20,1.78,.24),(x,75.65,124.20),'Graphite',.02,region='Escape')
+    box('Escape opening header',(2.86,.22,.24),(0,76.66,124.20),'Alloy',.018,region='Escape')
+    print('Solid escape duct, fitted transition, 16 original emitter models and open drop shaft built.')
 
 
 def build_portals():
@@ -554,12 +628,7 @@ def build_portals():
             box('Service hatch fastener '+str(x)+' '+str(y),(.055,.065,.03),(x,y,124.0125),'Graphite',.007)
         box('Service hatch caution tab '+str(x),(.075,.28,.035),(x,75.72,124.0125),'Amber',.008)
     box('Service hatch lintel cap',(2.86,.05,.26),(0,76.80,124.20),'Graphite',.018)
-    # Repeated shallow hoops belong outside the duct's usable cross-section.
-    for z in (128.25,134.0,140.8):
-        for x in (-1.60,1.60):
-            box('Escape portal side '+str(z)+' '+str(x),(.10,2.24,.12),(x,75.88,z),'Alloy',.012)
-        box('Escape portal top '+str(z),(3.30,.10,.12),(0,77.05,z),'Alloy',.012)
-    print('Deep lift portal, gallery entrance, reinforced service hatch and escape-duct hoops built.')
+    print('Deep lift portal, gallery entrance and reinforced service hatch built; Escape owns its duct hoops.')
 
 
 def preview():
@@ -652,7 +721,7 @@ def export_asset():
         for obj in selected:
             obj.select_set(True)
         bpy.context.view_layer.objects.active=active
-    print('Exported eleven independently owned assemblies in shared-finish batches; no lights, textures or animation tracks.')
+    print('Exported twelve independently owned assemblies in shared-finish batches; no lights, textures or animation tracks.')
 
 
 def save_source():

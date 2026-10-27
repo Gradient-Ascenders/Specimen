@@ -17,6 +17,11 @@ type SharedMaterialRole =
   | 'mechanism'
   | 'barrel';
 
+export type SecurityDroneGeometryRole=SharedMaterialRole|'mount'|'linkage';
+export interface SecurityDroneGeometrySource {
+  geometry(config:SecurityDroneConfig,role:SecurityDroneGeometryRole,distant:boolean):THREE.BufferGeometry;
+}
+
 export interface SecurityDronePresentationResourceDiagnostics {
   readonly geometryCount: number;
   readonly materialCount: number;
@@ -27,6 +32,8 @@ export class SecurityDronePresentationResources {
   readonly industrial: boolean;
   readonly distantDetail: boolean;
   private readonly geometries = new Map<string, THREE.BufferGeometry>();
+  private readonly ownedGeometries=new Set<THREE.BufferGeometry>();
+  private readonly authored:SecurityDroneGeometrySource|undefined;
   private readonly materials: Readonly<
     Record<SharedMaterialRole, THREE.MeshStandardMaterial>
   > = {
@@ -54,9 +61,11 @@ export class SecurityDronePresentationResources {
   private disposed = false;
 
   /** Borrow facility maps; the encounter owns these four materials, never the maps. */
-  constructor(surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture }, industrial = false, distantDetail = false) {
+  constructor(surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null; scuffMap?: THREE.Texture }, industrial = false, distantDetail = false,authored?:SecurityDroneGeometrySource) {
     this.industrial = industrial;
     this.distantDetail = industrial && distantDetail;
+    this.authored=authored;
+    if(authored)for(const material of Object.values(this.materials))material.vertexColors=true;
     if (!surfaceMaps) return;
     for (const [role, material] of Object.entries(this.materials)) {
       material.bumpMap = surfaceMaps.bumpMap;
@@ -92,12 +101,22 @@ export class SecurityDronePresentationResources {
     if (existing) return existing as Geometry;
     const geometry = create();
     this.geometries.set(key, geometry);
+    this.ownedGeometries.add(geometry);
+    return geometry;
+  }
+
+  industrialGeometry(config:SecurityDroneConfig,role:SecurityDroneGeometryRole,distant=false):THREE.BufferGeometry{
+    const key=`industrial-${distant?'distant-':''}${role}:${config.type}:${config.colliderSize.toArray().join(':')}`;
+    if(!this.authored)return this.geometry(key,()=>createIndustrialDroneGeometry(config,role,distant));
+    const old=this.geometries.get(key);if(old)return old;
+    const geometry=this.authored.geometry(config,role,distant);this.geometries.set(key,geometry);
     return geometry;
   }
 
   dispose(): void {
     if (this.disposed) return;
-    for (const geometry of this.geometries.values()) geometry.dispose();
+    for (const geometry of this.ownedGeometries) geometry.dispose();
+    this.ownedGeometries.clear();
     for (const material of Object.values(this.materials)) material.dispose();
     this.geometries.clear();
     this.disposed = true;
@@ -147,7 +166,7 @@ export class SecurityDronePresentation {
       const names = { armour: 'armoured-shell', armourShadow: 'gun-pods', mechanism: 'dark-face', barrel: 'barrels' } as const;
       for (const role of ['armour', 'armourShadow', 'mechanism', 'barrel'] as const) {
         const mesh = this.addMesh(this.aimHead, `${config.id}-${names[role]}`,
-          this.resources.geometry(`industrial-${role}:${dimensionsKey}`, () => createIndustrialDroneGeometry(config, role)),
+          this.resources.industrialGeometry(config,role),
           this.resources.material(role), [0, 0, 0], [1, 1, 1]);
         if (this.resources.distantDetail) this.addDetail(mesh, role, dimensionsKey, config);
       }
@@ -257,7 +276,7 @@ export class SecurityDronePresentation {
     if (this.resources.industrial) {
       for (const role of ['mount', 'linkage'] as const) {
         const mesh = this.addMesh(this.root, `${config.id}-${role}`,
-          this.resources.geometry(`industrial-${role}:${dimensionsKey}`, () => createIndustrialDroneGeometry(config, role)),
+          this.resources.industrialGeometry(config,role),
           this.resources.material(role === 'mount' ? 'armourShadow' : 'mechanism'), [0, 0, 0], [1, 1, 1]);
         if (this.resources.distantDetail) this.addDetail(mesh, role, dimensionsKey, config);
       }
@@ -306,9 +325,8 @@ export class SecurityDronePresentation {
   }
 
   private addDetail(mesh: THREE.Mesh, role: Parameters<typeof createIndustrialDroneGeometry>[1],
-    key: string, config: SecurityDroneConfig): void {
-    const distant = this.resources.geometry(`industrial-distant-${role}:${key}`,
-      () => createIndustrialDroneGeometry(config,role,true));
+    _key: string, config: SecurityDroneConfig): void {
+    const distant = this.resources.industrialGeometry(config,role,true);
     this.detailMeshes.push({mesh,full:mesh.geometry,distant});
     // The room's existing bounded preparation queue walks hidden drawables.
     // Prime this shared buffer there, so the first distant view uploads nothing.

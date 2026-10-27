@@ -136,6 +136,33 @@ test('pooled visual resources are prepared in separate jobs and stay fixed throu
   } finally { v.dispose(); v.dispose(); }
 });
 
+test('Blender escape craft share buffers, preserve Bob landing height and dispose each allocation once',async()=>{
+  const visuals=new ContainmentFinaleVisuals(),buffers=new Set<THREE.BufferGeometry>();
+  try{
+    for(const job of visuals.preparationJobs())await job.run();
+    for(const craft of visuals.drones)craft.root.traverse(object=>{
+      if(object instanceof THREE.Mesh)buffers.add(object.geometry);
+    });
+    assert.equal(buffers.size,9,'eight authored buffers and one shared live indicator geometry');
+    const first=visuals.drones[0],second=visuals.drones[1];
+    const armour=(craft:typeof first)=>(craft.head.aimHead.children.find(o=>o.name.endsWith('-armoured-shell')) as THREE.Mesh).geometry;
+    assert.ok(armour(first)===armour(second),'craft borrow the same prepared buffers');
+    const colour=armour(first).getAttribute('color');
+    assert.ok(colour.normalized&&colour.array instanceof Uint16Array,'retain the GLB normalized integer colour encoding');
+    assert.ok(Array.from({length:colour.count},(_,i)=>colour.getX(i)).every(v=>v>=0&&v<=1),
+      'shader colour inputs stay in 0..1, preventing white clipped materials');
+    first.root.visible=true;first.root.updateMatrixWorld(true);
+    const ray=new THREE.Raycaster(new THREE.Vector3(0,2,0),new THREE.Vector3(0,-1,0));
+    const hits=ray.intersectObject(first.root,true);
+    assert.ok(hits.length>0&&Math.abs(hits[0].point.y-.51)<1e-6,'the original mounted Bob sole stays on an opaque deck');
+    assert.ok(!first.head.root.children.some(o=>o.name.endsWith('-mount')||o.name.endsWith('-linkage')));
+    const disposals=new Map([...buffers].map(geometry=>[geometry,0]));
+    for(const geometry of buffers)geometry.addEventListener('dispose',()=>disposals.set(geometry,disposals.get(geometry)!+1));
+    visuals.dispose();visuals.dispose();
+    assert.ok([...disposals.values()].every(count=>count===1),'shared resources are released exactly once');
+  }finally{visuals.dispose();}
+});
+
 test('the button gates real beams, stops carrier motion, and skip emits the normal next-level handoff only once', () => {
   const scene = new ContainmentLevelScene(() => {}), collisionWorld = new CollisionWorld();
   const body = { position: new THREE.Vector3(-10, 97.95, 130.55), previousPosition: new THREE.Vector3(), velocity: new THREE.Vector3(),

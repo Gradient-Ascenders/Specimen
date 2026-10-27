@@ -19,7 +19,7 @@ export class RoomFiveSewer {
   readonly reunionBridge: THREE.Mesh;
   private readonly controlRamp: THREE.Mesh;
   private readonly handles: { network: SecurityNetwork; pivot: THREE.Group; online: THREE.MeshStandardMaterial; offline: THREE.MeshStandardMaterial }[] = [];
-  constructor(b: GreyboxRoomBuilder) {
+  constructor(b: GreyboxRoomBuilder, authoredReplacement = false) {
     const m = b.materials;
     const box = (name: string, size: readonly [number, number, number], position: readonly [number, number, number], material: THREE.Material = m.duct) =>
       b.addCollider({ name: `room-5-${name}`, size, position, material });
@@ -60,7 +60,7 @@ export class RoomFiveSewer {
     for (const x of [32, 48]) b.addVisualBox({ name: `room-5-sewer-pipe-${x}`, size: [.6, .6, 122], position: [x, -8.7, 78], material: m.cable });
     // No overhead wash: the distant drone and controls are the landmarks.
 
-    const rusted = createRustedSewerDrone();
+    const rusted = createRustedSewerDrone(true,authoredReplacement);
     this.drone = rusted.body; this.eye = rusted.eye;
     this.drone.name = 'room-5-broken-drone-exposed-core';
     this.drone.position.copy(SEWER_DRONE_POSITION); this.drone.rotation.set(.2, 0, 1.1);
