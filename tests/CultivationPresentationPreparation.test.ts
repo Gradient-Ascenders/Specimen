@@ -9,9 +9,9 @@ import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.
 import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
 
-for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 'startup-no-parallel', 'current-dark', 'current-dark-cancel']) test(`loading preparation preserves scene and renderer ownership (${variant})`, async context => {
+for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 'startup-no-parallel', 'startup-cancel', 'startup-failure', 'current-dark', 'current-dark-cancel']) test(`loading preparation preserves scene and renderer ownership (${variant})`, async context => {
   const mode = variant.startsWith('startup') || variant.startsWith('current-dark') ? 'startup' : variant;
-  const fail = mode === 'failure';
+  const fail = mode === 'failure' || variant === 'startup-failure';
   const preview = new LevelTwoPreviewScene(() => {}, cultivationAssets), scene = new THREE.Scene(); scene.add(preview.root);
   const volt = new VoltCharacterPresentation(); await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
   await preview.roomFive.captiveVoltPresentation.prepare(loadVolt);
@@ -77,13 +77,15 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 
   const shadowLayouts = new Set<string>();
   let holdNextCompile = false;
   let releaseCompile: (() => void) | undefined;
+  let activeTarget: THREE.WebGLRenderTarget | null = null;
+  let linearCompiles = 0;
   const priorRaf = globalThis.requestAnimationFrame;
   globalThis.requestAnimationFrame = callback => { setTimeout(() => callback(performance.now()), 0); return 0; };
   const renderer = {
     getPixelRatio: () => 1,
     extensions: {has: () => mode !== 'lift' && variant !== 'startup-no-parallel'},
     shadowMap: { enabled: false, autoUpdate: true, needsUpdate: false, type: THREE.BasicShadowMap as THREE.ShadowMapType },
-    getRenderTarget: () => null, setRenderTarget() {}, properties: {get: () => ({})},
+    getRenderTarget: () => activeTarget, setRenderTarget(target: THREE.WebGLRenderTarget | null) { activeTarget = target; }, properties: {get: () => ({})},
     getViewport: (out: THREE.Vector4) => out.copy(viewport), getScissor: (out: THREE.Vector4) => out.copy(scissor), getScissorTest: () => scissorTest,
     setViewport: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { viewport = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y!, w!, h!); },
     setScissor: (x: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { scissor = x instanceof THREE.Vector4 ? x.clone() : new THREE.Vector4(x, y!, w!, h!); },
@@ -123,6 +125,8 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 
     },
     async compileAsync(group: THREE.Group, _camera: THREE.Camera, targetScene: THREE.Scene) {
       group.traverse(o => {
+        if (activeTarget && o instanceof THREE.Mesh && [o.material].flat().some(material =>
+          !(material instanceof THREE.MeshDepthMaterial) && !(material instanceof THREE.MeshDistanceMaterial))) linearCompiles++;
         preparedOwners.add(o.name);
         if (o instanceof THREE.Mesh && o.name.startsWith('Volt-')) {
           assert.equal(o.geometry.morphTargetsRelative, true);
@@ -148,7 +152,7 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 
       }
       group.traverse(o => { if (o instanceof THREE.Mesh && !Array.isArray(o.material)) shadowVariants.add(o.material.customProgramCacheKey()); if (o instanceof THREE.Mesh && o.name === 'variant-regression') variants.add(o.material as THREE.Material); });
       compiles++;
-      if (fail) throw new Error('driver rejected preparation');
+      if (mode === 'failure' || variant === 'startup-failure' && compiles === 2) throw new Error('driver rejected preparation');
       if (holdNextCompile) {
         holdNextCompile = false;
         await new Promise<void>(resolve => { releaseCompile = resolve; });
@@ -166,8 +170,33 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 
   const queue = new CultivationPreparationQueue(layer, preview);
   assert.deepEqual(preview.workload.snapshot(), liveScopes, 'enumerating speculative layouts cannot change live scopes');
   try {
+    const heldStartup = variant === 'startup' || variant === 'startup-cancel' || variant === 'startup-failure';
+    if (heldStartup) holdNextCompile = true;
     const work = mode === 'startup' ? queue.prepareStartup() : queue.prepareInitial();
+    if (heldStartup) {
+      const deadline = performance.now()+5000;
+      while ((!releaseCompile || queue.diagnostics.maxCompilerJobs < 2) && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 0));
+      assert.ok(releaseCompile); assert.ok(queue.diagnostics.maxCompilerJobs >= 2 && queue.diagnostics.maxCompilerJobs <= 4);
+      assert.equal(linearCompiles, 0, 'the next output pass cannot overwrite material.currentProgram while a screen batch is pending');
+      assert.equal(queue.diagnostics.completed, 0, 'a pending startup compiler job cannot publish room readiness');
+      assert.deepEqual(viewport.toArray(), [0, 0, 1280, 720], 'async startup waits release the live viewport');
+      assert.equal(activeTarget, null, 'async startup waits release the live render target');
+      const retained = (queue as unknown as {retained: THREE.Material[]}).retained.slice(), released = new Map<THREE.Material, number>();
+      for (const material of retained) material.addEventListener('dispose', () => released.set(material, (released.get(material) ?? 0)+1));
+      if (variant === 'startup-cancel') {
+        queue.dispose(); assert.equal(released.size, 0, 'pending compiler material instances remain alive after cancellation');
+        releaseCompile!(); await work;
+        for (let i = 0; i < 30 && queue.diagnostics.outstandingBatches; i++) await new Promise(resolve => setTimeout(resolve, 0));
+        assert.equal(queue.diagnostics.outstandingBatches, 0); assert.equal(queue.diagnostics.compilerJobs, 0);
+        assert.equal(queue.diagnostics.completed, 0); assert.equal(destroyed, 0, 'cancellation never releases borrowed geometry');
+        for (const material of retained) assert.equal(released.get(material), 1, 'retained compiler copies release once after polls finish');
+        return;
+      }
+      releaseCompile!();
+    }
     if (fail) await assert.rejects(work, /driver rejected/); else await work;
+    assert.equal(queue.diagnostics.compilerJobs, 0);
+    if (variant === 'startup-no-parallel') assert.equal(queue.diagnostics.maxCompilerJobs, 0, 'unsupported drivers retain serial preparation');
     for (const expected of expectedMorphs.values()) assert.deepEqual(expected.mesh.morphTargetInfluences, expected.influences);
     assert.ok(compiles > 0);
     if (!fail) assert.ok(preparedOwners.has('Bob-Body'), 'transmissive body still enters shader preparation');
@@ -269,7 +298,7 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 
       assert.ok(shadowVariants.has('custom-distance-regression'), 'custom dissolve point-shadow shaders are prepared');
       assert.deepEqual(mapsInShadow, new Set([true, false]), 'mapped and unmapped shadows are both prepared');
     }
-    if (mode === 'startup') {
+    if (mode === 'startup' && !fail) {
       assert.equal(queue.diagnostics.batches.some(batch => batch.label === 'linear'), variant !== 'startup-minimum');
       if (variant === 'startup-minimum') assert.ok(queue.diagnostics.skippedTransmissionObjects > 0);
       assert.ok(queue.diagnostics.startupMs >= queue.diagnostics.initialMs, 'report entry and full startup separately');

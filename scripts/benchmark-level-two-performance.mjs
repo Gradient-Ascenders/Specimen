@@ -4,6 +4,8 @@ import {GRAPHICS_PROFILES} from '../src/render/GraphicsProfiles.ts';
 // Real hardware only: connect to Chrome started with --remote-debugging-port.
 const base=process.env.PERF_BASE??'http://127.0.0.1:4173/group-folder/';
 const label=process.env.PERF_LABEL??new Date().toISOString().replaceAll(':','-'),out=`artifacts/level-two-performance/${label}`;
+const shaderSalt=Number(process.env.PERF_SHADER_SALT??0);
+if(!Number.isInteger(shaderSalt)||shaderSalt<0||shaderSalt>1_000_000)throw Error('PERF_SHADER_SALT must be an integer from 0 to 1000000 (0 disables the diagnostic).');
 await mkdir(out,{recursive:true});
 const endpoint=process.env.SPECIMEN_CDP_URL;
 if(!endpoint)throw Error('Set SPECIMEN_CDP_URL to your hardware-accelerated Chrome debug endpoint (HTTP or WebSocket).');
@@ -13,14 +15,23 @@ if(!endpoint.startsWith('ws')){
  const target=new URL(version.webSocketDebuggerUrl);target.host=url.host;socket=target.href;
 }
 const browser=await chromium.connectOverCDP(socket);
-const report={label,build:JSON.parse(await readFile((process.env.PERF_DIST??'dist')+'/build-manifest.json','utf8')),protocol:'Medium 1920x1080 DPR1; fresh contexts and routed module disable HTTP cache; shared uncontrolled driver cache. Live initial gameplay plus separately labelled staged render-only views. Actual renderer is recorded; results qualify only the measured machine and route.',runs:[],errors:[]};
+const report={label,shaderSalt,build:JSON.parse(await readFile((process.env.PERF_DIST??'dist')+'/build-manifest.json','utf8')),protocol:'Medium 1920x1080 DPR1; fresh contexts and routed module disable HTTP cache; shared uncontrolled driver cache. Optional source-salted fragment shaders exercise uncached variants; they do not reset the driver. Live initial gameplay plus separately labelled staged render-only views. Actual renderer is recorded; results qualify only the measured machine and route.',runs:[],errors:[]};
 const summary=rows=>{const values=rows.filter(Number.isFinite).sort((a,b)=>a-b);return {n:values.length,mean:values.reduce((a,b)=>a+b,0)/values.length,p50:values[Math.floor(values.length*.5)],p95:values[Math.floor(values.length*.95)],p99:values[Math.floor(values.length*.99)],max:values.at(-1)};};
 try{
  for(let run=0;run<Number(process.env.PERF_REPEATS??2);run++){
   const context=await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1}),page=await context.newPage();page.setDefaultTimeout(240_000);
   page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(m.type()==='error'||/GL_INVALID_|CONTEXT_LOST_WEBGL/.test(m.text()))report.errors.push(m.text());});
   page.on('response',r=>{if(r.status()>=400)report.errors.push(`${r.status()} ${r.url()}`);});
-  await page.addInitScript(settings=>{
+  await page.addInitScript(({settings,shaderSalt})=>{
+   // Diagnostic contexts only: negligible output offset changes compiler input
+   // without deleting a user's browser/driver cache. Use a new salt per probe.
+   if(shaderSalt){
+    const source=WebGL2RenderingContext.prototype.shaderSource;
+    WebGL2RenderingContext.prototype.shaderSource=function(shader,text){
+     if(this.getShaderParameter(shader,this.SHADER_TYPE)===this.FRAGMENT_SHADER&&text.includes('gl_FragColor'))text=text.replace(/}\s*$/,'gl_FragColor.r += '+shaderSalt+'e-24;\n}');
+     return source.call(this,shader,text);
+    };
+   }
    localStorage.setItem('specimen.graphics-preferences.v1',JSON.stringify({mode:'manual',settings}));
    const p=window.__cvPerf={phases:[],longTasks:[],rows:[],firstControl:0,requestedAt:0,sample:false,queries:[],label:'live',queryEvery:4};
    new PerformanceObserver(list=>{for(const e of list.getEntries())if(p.longTasks.length<256)p.longTasks.push({at:e.startTime,ms:e.duration});}).observe({entryTypes:['longtask']});
@@ -54,7 +65,7 @@ try{
      }
     };
    }});
-  },GRAPHICS_PROFILES.standard.settings);
+  },{settings:GRAPHICS_PROFILES.standard.settings,shaderSalt:shaderSalt?shaderSalt+run:0});
   await page.route('**/assets/index-*.js',async route=>{const response=await route.fetch(),body=await response.text(),pattern=/return new ([\w$]+)\.CultivationLevelRuntime\(/;expect(body).toMatch(pattern);await route.fulfill({response,body:body.replace(pattern,'return globalThis.__cv=new $1.CultivationLevelRuntime(')});});
   await page.goto(base,{waitUntil:'domcontentloaded'});
   await page.locator('[data-action="level-select"]').click();
@@ -87,8 +98,10 @@ try{
      layer.cameraRig.update=()=>{camera.position.copy(position);camera.lookAt(look);camera.updateMatrixWorld(true);};
      const stats={rawFrameDeltaSeconds:1/60,frameDeltaSeconds:1/60,stepsThisFrame:0,interpolationAlpha:1,droppedSimulationTimeSeconds:0,renderFps:60};
      const draw=()=>r.render(1,stats);
+     window.__cvPerf.label=name+':arrival';window.__cvPerf.sample=true;
      const started=performance.now();for(let i=0;i<600;i++){await frame();draw();if(!r.preparationQueue.diagnostics.pending&&i>18)break;}
-     const variants=[];
+     window.__cvPerf.sample=false;
+     const variants=['arrival'];
      const cullPrepare=p.roomFiveCulling?.prepare,cullRestore=p.roomFiveCulling?.restore;
      const scale=layer.renderer.transmissionResolutionScale;
      for(const variant of referenceScale>0?['baseline','reference-capture','baseline']:['baseline','unculled','baseline']){
