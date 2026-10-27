@@ -11,7 +11,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Gradient-Ascenders/Specimen/actions/workflows/production-integration.yml"><img src="https://github.com/Gradient-Ascenders/Specimen/actions/workflows/production-integration.yml/badge.svg?branch=main" alt="Production integration status" /></a>
   <a href="https://github.com/Gradient-Ascenders/Specimen/actions/workflows/submission-build.yml"><img src="https://github.com/Gradient-Ascenders/Specimen/actions/workflows/submission-build.yml/badge.svg?branch=main" alt="Submission build status" /></a>
   <a href=".nvmrc"><img src="https://img.shields.io/badge/Node.js-24.x-74aca9?logo=nodedotjs&amp;logoColor=e0f3ea&amp;labelColor=101c23" alt="Node.js 24.x" /></a>
   <a href="package.json"><img src="https://img.shields.io/badge/TypeScript-bddbd5?logo=typescript&amp;logoColor=e0f3ea&amp;labelColor=101c23" alt="Built with TypeScript" /></a>
