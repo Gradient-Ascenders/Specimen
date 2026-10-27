@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { LARGE_STATIC_BATCH_CELL_SIZE, staticBatchKey } from '../../StaticBatchPolicy.ts';
 import type { CultivationAssetSource } from './CultivationBakedAssets.ts';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import {isCultivationBlenderShell} from './CultivationBlenderManifest.ts';
 
 export interface CultivationRoomThreeStaticBatchDiagnostics {
   readonly batchCount: number;
@@ -104,6 +105,7 @@ export function consolidateCultivationRoomThreeStaticColliders(
 }
 
 function isBatchCandidate(mesh: THREE.Mesh): boolean {
+  if(isCultivationBlenderShell(mesh.name))return false;
   for (let ancestor: THREE.Object3D | null = mesh; ancestor; ancestor = ancestor.parent) {
     if (ancestor.userData.dynamicAssembly === true) return false;
   }

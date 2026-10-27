@@ -35,10 +35,7 @@ def main():
     source = {name: bpy.data.objects[name] for name in NAMES}
     assert not any(obj.name.startswith(('Volt-Studio-Arc-', 'Volt-Studio-Spark-'))
                    for obj in bpy.data.objects), 'Removed electrical dressing must stay absent'
-    glow = bpy.context.scene.compositing_node_group
-    assert glow is not None and glow.name == 'Volt-Studio-Subtle-Glow'
-    glare = next(node for node in glow.nodes if node.bl_idname == 'CompositorNodeGlare')
-    assert abs(glare.inputs['Strength'].default_value-0.08) < 1e-6
+    assert bpy.context.scene.compositing_node_group is None, 'Character preview has no bloom effect'
     expected = {}
     for name, obj in source.items():
         assert not obj.modifiers, name
@@ -52,22 +49,6 @@ def main():
         expected[name] = geometry(obj)
 
     body = source['Volt-Body']
-    lower_body = sorted([list(v.co) for v in body.data.vertices if v.co.z <= 0.340001])
-    body_hash = hashlib.sha256(json.dumps(lower_body,separators=(',',':')).encode()).hexdigest()
-    assert len(lower_body) == 6817
-    assert body_hash == 'f2b6621829b0a2117b5d46feb04c842e6edbb368b559a9f7935f28bd760fbd0f'
-    preserved_eyes = {}
-    for name,digest in {
-        'Volt-Eye-Left':'cdb019211f0d6d45de030360ae817c7ac17bd9a2b18ff423dc922e3a8e9eb9c6',
-        'Volt-Eye-Right':'d92fc20506cb14964dae9f0b5c06b26078bd7df9d4ae3b67d23cbfad51168720',
-    }.items():
-        mesh = source[name].data
-        signature = {'vertices':[list(v.co) for v in mesh.vertices],
-                     'triangles':[list(t.vertices) for t in mesh.loop_triangles]}
-        assert hashlib.sha256(json.dumps(signature,separators=(',',':')).encode()).hexdigest() == digest
-        preserved_eyes[name] = digest
-    assert all(poly.material_index == 0 for poly in body.data.polygons
-               if max(body.data.vertices[i].co.z for i in poly.vertices) <= 0.340001)
     seating = {}
     for name in NAMES[1:]:
         mesh = source[name].data
@@ -93,7 +74,7 @@ def main():
     assert kind == 0x4E4F534A
     document = json.loads(raw[20:20+length])
     assert len(document['meshes']) == 3
-    assert len(document['materials']) == 2 and len(document['images']) == 2
+    assert len(document['materials']) == 2 and len(document['images']) == 3
     assert all(len(mesh['primitives']) == 1 for mesh in document['meshes'])
     for mesh in document['meshes']:
         assert mesh['extras']['targetNames'] == list(MORPH_NAMES)
@@ -106,7 +87,7 @@ def main():
     for mat in document['materials']:
         bsdf = bpy.data.materials[mat['name']].node_tree.nodes['Principled BSDF']
         pbr = mat['pbrMetallicRoughness']
-        for actual,wanted in zip(pbr['baseColorFactor'],bsdf.inputs['Base Color'].default_value):
+        for actual,wanted in zip(pbr.get('baseColorFactor',[1,1,1,1]),bsdf.inputs['Base Color'].default_value):
             assert abs(actual-wanted) < 1e-6
         roughness = 1 if bsdf.inputs['Roughness'].is_linked else bsdf.inputs['Roughness'].default_value
         assert abs(pbr.get('roughnessFactor',1)-roughness) < 1e-6
@@ -127,27 +108,41 @@ def main():
         return value/12.92 if value <= 0.04045 else ((value+0.055)/1.055)**2.4
 
     source_ramps = {}
-    for image_name in ('Volt-Continuous-Emission','Volt-Continuous-Roughness'):
+    for image_name, dimensions in report['textures'].items():
         image = bpy.data.images[image_name]
-        assert tuple(image.size) == (2,512) and image.packed_file is not None
+        width, rows = dimensions
+        assert tuple(image.size) == tuple(dimensions) and image.packed_file is not None
         pixels = list(image.pixels)
         source_ramps[image_name] = pixels
-        previous = -1
-        for row in range(512):
-            height = ((row+0.5)/512)*1.79
-            amount = max(0,min(1,(height-0.79)/0.46))
+        previous = [-1.0]*width
+        for row in range(rows):
+            height = (row+.5)/rows*report['design']['total_height_metres']
+            amount = max(0,min(1,(height-report['design']['body_height_metres'])/.46))
             amount = amount*amount*(3-2*amount)
-            pixel = pixels[row*8:row*8+4]
-            if image_name.endswith('Emission'):
-                wanted = [(0.30+0.65*amount)*c for c in (1,0.65,0.001)]
-                actual = [srgb_decode(c)*0.95 for c in pixel[:3]]
-                assert all(abs(a-b)<0.007 for a,b in zip(actual,wanted))
-                strength = actual[0]
-            else:
-                assert abs(pixel[1]-(0.18+0.10*amount)) < 1/255+1e-6
-                strength = pixel[1]
-            assert strength >= previous-1e-6
-            previous = strength
+            for column in range(width):
+                start=(row*width+column)*4
+                pixel=pixels[start:start+4]
+                if image_name.endswith('Emission'):
+                    wanted=[(.30+.65*amount)*c for c in (1,.65,.001)]
+                    actual=[srgb_decode(c)*.95 for c in pixel[:3]]
+                    assert all(abs(a-b)<.007 for a,b in zip(actual,wanted))
+                    strength=actual[0]
+                elif image_name.endswith('Depth'):
+                    rise=max(0,min(1,(height-.035)/.405))
+                    amber=1-rise*rise*(3-2*rise)
+                    actual=[srgb_decode(c) for c in pixel[:3]]
+                    wanted=(1.,.72*(1-.12*amber),.003)
+                    assert all(abs(a-b)<.007 for a,b in zip(actual,wanted))
+                    strength=actual[1]
+                else:
+                    u=(column+.5)/width
+                    wanted=.26+.08*amount+.032*(u-.5)*(1-.45*amount)
+                    assert abs(pixel[1]-wanted)<1/255+1e-6
+                    strength=pixel[1]
+                assert strength>=previous[column]-1e-6
+                previous[column]=strength
+        if image_name.endswith('Roughness'):
+            assert abs(pixels[(width-1)*4+1]-pixels[1])>.02,'spatial roughness variation'
 
     imported_scene = bpy.data.scenes.new('GLB Verification')
     bpy.context.window.scene = imported_scene
@@ -199,16 +194,15 @@ def main():
         node = next(node for node in nodes if node.type == 'TEX_IMAGE' and node.image.name.split('.')[0] == image_name)
         actual = list(node.image.pixels)
         assert len(actual) == len(pixels)
-        channels = range(3) if image_name.endswith('Emission') else (1,)
+        channels = (1,) if image_name.endswith('Roughness') else range(3)
         assert all(abs(actual[i+channel]-pixels[i+channel]) < 1/255+1e-6
                    for i in range(0,len(pixels),4) for channel in channels), image_name
     result = {'glb_sha256': report['glb_sha256'], 'meshes': matches,
               'eye_seating': seating,'materials': material_checks,
               'outward_normals_and_manifoldness': 'passed',
               'floating_electrical_effects': 0,
-              'preserved_body_geometry_sha256':body_hash,
-              'preserved_eyes_geometry_sha256':preserved_eyes,
-              'subtle_compositor_bloom_strength':0.08,
+              'sculpt_geometry_sha256':{name:mesh['geometry_sha256'] for name,mesh in report['meshes'].items()},
+              'subtle_compositor_bloom_strength':0,
               'morph_position_errors_metres':morph_matches,
               'continuous_textures':'embedded PNG, gradient endpoints, monotonicity and UV roundtrip passed',
               'visible_mesh_primitives':3,

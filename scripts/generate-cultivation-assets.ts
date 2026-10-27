@@ -14,7 +14,7 @@ try {
   } else {
     await mkdir(new URL('../src/assets/cultivation/', import.meta.url), { recursive: true });
     await writeFile(output, bundle);
-    console.log(`Wrote lossless Cultivation assets (${bundle.length} bytes; ${scene.surfaceCleanup.repairedMeshes} repair steps).`);
+    console.log(`Wrote Cultivation assets (${bundle.length} bytes; ${scene.surfaceCleanup.repairedMeshes} repair steps).`);
   }
 } finally {
   scene.dispose(); generator.dispose();

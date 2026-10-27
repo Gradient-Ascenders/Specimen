@@ -191,6 +191,26 @@ original mixed transmission/VAO pass. Steps yield for 33ms after cheap jobs and
 backup can still contend with decoding/playback; it is not the default. Both
 paths use real isolated framebuffers without clearing a visible cinematic.
 
+Level 1 submits its five room and four doorway shader configurations before
+waiting for driver completion. Both canvas and linear offscreen variants include
+glass, particles, gel, shadow casters and camera fades, including opaque Low-mode
+bodies. Restricting the linear subset to opaque transmission receivers leaves
+expensive programs to compile synchronously during the primers. The binding
+prewarmer checks every submitted program's parallel-link readiness before
+requesting uniforms or diagnostics; material-level `compileAsync` alone can miss
+earlier variants of a shared material. Jobs still yield individually and restore
+renderer state synchronously. Real shadow allocation, buffer/VAO uploads,
+mixed-resource draws and the final retained-camera/GPU readiness checks follow.
+
+Containment shares three light signatures: seven points with three or six
+shadowed spots, and the existing six-point/ten-spot duct layout. Padding sources
+have zero radiance and use the finite-light early-out. This retains the authored
+sources while avoiding separate six/seven-point shader families in the smaller
+layouts. Leaf upload slices may be reused only within the same preparation run
+and complete light/shadow/map signature; mixed-resource, fade and alternate-view
+draws still run. Once Room 2's authored shell is ready, its retired construction
+storyboard is excluded from shader and buffer preparation.
+
 Both paths keep gameplay simulation, input, HUD and debug controls disabled.
 Skip (button, Escape or controller B) skips the film, not readiness. A slow load
 holds at the faded ending; failed preparation exposes Retry. Gameplay cannot
@@ -523,6 +543,23 @@ loop. A dead zone, bounded directional repeat and release-to-arm prevent drift a
 held buttons activating the next screen. Gameplay controls are unchanged.
 
 ## Materials, lighting, and shadows
+
+Containment's five authored rooms share offline-baked L1 irradiance volumes and
+five local reflection captures. `ContainmentRadiance` owns the packed 3D volume
+and CubeUV atlas; world-space shader hooks preserve existing gel deformation,
+dissolve, finite-light evaluation and depth ownership. Indirect light and
+box-projected reflections interpolate through doorways without runtime captures.
+Low samples the constant irradiance band; Medium/High retain its directional
+terms. The bank adds about 307 KiB to loading and 3.46 MiB of retained GPU data.
+See [bake provenance and reproduction](../../assets/environments/containment-lighting/README.md).
+
+Selected atmospheric shafts reuse cached fixture depth with bounded scattering
+shells. High additionally enables contact-hardening PCSS on one key spotlight
+per room. Renderer-global sampler policy remains in `RenderLayer`; only opted-in
+Containment requests raw depth, while other levels and lower quality settings
+retain native PCF. A sampler-type change invalidates all catalogued shadow
+targets, including dormant padding slots. Full loading preparation covers the
+new shader paths before gameplay resumes.
 
 Shared presentation helpers may reuse geometry, materials, and procedural
 textures, but ownership must be explicit. The creator disposes a resource once;

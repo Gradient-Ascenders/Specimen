@@ -1,0 +1,532 @@
+{
+  "version": "SPCL0001",
+  "sources": [
+    {
+      "file": "containment-room-one/room-one-shell.glb",
+      "anchors": [
+        "R1_Architecture"
+      ],
+      "sha256": "21bbc4b79dfc2feceefc862f8971bad25d79c365f1c317b685deeb19943d47ea"
+    },
+    {
+      "file": "containment-room-two/room-two-hall.glb",
+      "anchors": [
+        "R2_Architecture"
+      ],
+      "sha256": "ea8874e100143a53888ab0e47550442c92ac95ab544c235e98fb907438724167"
+    },
+    {
+      "file": "containment-room-three/room-three-laboratory.glb",
+      "anchors": [
+        "R3_Architecture"
+      ],
+      "sha256": "06c6435c6a907db8f9fe7080243b285817ce009eff69d0f1753aece990c00293"
+    },
+    {
+      "file": "containment-room-four/room-four-lift.glb",
+      "anchors": [
+        "R4_Architecture"
+      ],
+      "sha256": "9cab25baa31afe58f19e35a0a254d14b383b2799c8757501ab5fa6870fb4d440"
+    },
+    {
+      "file": "containment-room-five/room-five-atrium.glb",
+      "anchors": [
+        "R5_Architecture",
+        "R5_Cell"
+      ],
+      "sha256": "83c631c66308cf3bef0da7ed395f4fb8918d1fcf08a0e2f2646b6e584a56510c"
+    }
+  ],
+  "lights": [
+    {
+      "room": 1,
+      "name": "room-1-fluorescent-a-received-light",
+      "position": [
+        -3.8,
+        7.45,
+        -1.5
+      ],
+      "colour": [
+        0.7681511472425809,
+        0.8468732315065057,
+        0.8879231178794776
+      ],
+      "intensity": 68,
+      "range": 13,
+      "target": [
+        -4.8,
+        3,
+        3
+      ],
+      "angle": 1,
+      "penumbra": 0.48
+    },
+    {
+      "room": 1,
+      "name": "room-1-fluorescent-b-received-light",
+      "position": [
+        3.8,
+        7.45,
+        -1.5
+      ],
+      "colour": [
+        0.6583748172725346,
+        0.7991027380100881,
+        0.85499260812105
+      ],
+      "intensity": 64,
+      "range": 13,
+      "target": [
+        3.8,
+        6.45,
+        -1.5
+      ],
+      "angle": 1,
+      "penumbra": 0.48
+    },
+    {
+      "room": 1,
+      "name": "room-1-to-2-duct-reflected-cue",
+      "position": [
+        -8.4,
+        12.25,
+        26.5
+      ],
+      "colour": [
+        0.23839757380151394,
+        0.4019777798219466,
+        0.508881320845802
+      ],
+      "intensity": 24,
+      "range": 11,
+      "target": [
+        -8.4,
+        11.25,
+        26.5
+      ],
+      "angle": 1,
+      "penumbra": 0.48
+    },
+    {
+      "room": 1,
+      "name": "room-1-to-2-duct-low-run-key",
+      "position": [
+        -4.8,
+        7.12,
+        10.5
+      ],
+      "colour": [
+        0.23839757380151394,
+        0.4019777798219466,
+        0.508881320845802
+      ],
+      "intensity": 3,
+      "range": 6.5,
+      "target": [
+        -4.8,
+        5.2,
+        10.5
+      ],
+      "angle": 1.25,
+      "penumbra": 0.3
+    },
+    {
+      "room": 1,
+      "name": "room-1-to-2-duct-ramp-key",
+      "position": [
+        -4.8,
+        11.7,
+        22
+      ],
+      "colour": [
+        0.23839757380151394,
+        0.4019777798219466,
+        0.508881320845802
+      ],
+      "intensity": 3,
+      "range": 12,
+      "target": [
+        -4.8,
+        6.2,
+        14
+      ],
+      "angle": 0.65,
+      "penumbra": 0.3
+    },
+    {
+      "room": 1,
+      "name": "room-1-to-2-duct-turn-key",
+      "position": [
+        -4.8,
+        12.4,
+        24
+      ],
+      "colour": [
+        0.23839757380151394,
+        0.4019777798219466,
+        0.508881320845802
+      ],
+      "intensity": 3,
+      "range": 6,
+      "target": [
+        -6.5,
+        10.5,
+        24
+      ],
+      "angle": 1,
+      "penumbra": 0.3
+    },
+    {
+      "room": 2,
+      "name": "room-2-drop-zone-light",
+      "position": [
+        -8,
+        16.55,
+        35
+      ],
+      "colour": [
+        0.775822218312646,
+        0.8631572134510892,
+        0.8879231178794776
+      ],
+      "intensity": 300,
+      "range": 25,
+      "target": [
+        -8,
+        15.55,
+        35
+      ],
+      "angle": 0.88,
+      "penumbra": 0.48
+    },
+    {
+      "room": 2,
+      "name": "room-2-lower-route-light",
+      "position": [
+        0,
+        16.55,
+        39
+      ],
+      "colour": [
+        0.5840784178830671,
+        0.7835377915215659,
+        0.85499260812105
+      ],
+      "intensity": 285,
+      "range": 25,
+      "target": [
+        0,
+        7,
+        43
+      ],
+      "angle": 0.88,
+      "penumbra": 0.48
+    },
+    {
+      "room": 2,
+      "name": "room-2-sticky-and-exit-route-light",
+      "position": [
+        8,
+        16.55,
+        43
+      ],
+      "colour": [
+        0.5271151256969157,
+        0.775822218312646,
+        0.7304607400847158
+      ],
+      "intensity": 305,
+      "range": 25,
+      "target": [
+        14,
+        7,
+        43
+      ],
+      "angle": 0.88,
+      "penumbra": 0.48
+    },
+    {
+      "room": 3,
+      "name": "room-3-clinical-entry-received-light",
+      "position": [
+        -6.5,
+        30,
+        54
+      ],
+      "colour": [
+        0.6938717612856897,
+        0.8631572134510892,
+        1
+      ],
+      "intensity": 305,
+      "range": 30,
+      "target": [
+        -6.5,
+        29,
+        54
+      ],
+      "angle": 1,
+      "penumbra": 0.48
+    },
+    {
+      "room": 3,
+      "name": "room-3-industrial-route-received-light",
+      "position": [
+        8,
+        29,
+        64
+      ],
+      "colour": [
+        0.508881320845802,
+        0.6653872982754769,
+        0.7379104087672317
+      ],
+      "intensity": 270,
+      "range": 28,
+      "target": [
+        16,
+        18,
+        63
+      ],
+      "angle": 1,
+      "penumbra": 0.48
+    },
+    {
+      "room": 3,
+      "name": "room-3-acid-reflected-light",
+      "position": [
+        0,
+        7.2,
+        64
+      ],
+      "colour": [
+        0.24228112245478564,
+        0.6724431569510133,
+        0.02732089163382382
+      ],
+      "intensity": 52,
+      "range": 18
+    },
+    {
+      "room": 3,
+      "name": "room-3-high-exit-vent-cue",
+      "position": [
+        9,
+        32.5,
+        74.3
+      ],
+      "colour": [
+        0.5271151256969157,
+        0.8069522576650873,
+        0.7379104087672317
+      ],
+      "intensity": 110,
+      "range": 16,
+      "target": [
+        9,
+        31.2,
+        79
+      ],
+      "angle": 1,
+      "penumbra": 0.48
+    },
+    {
+      "room": 5,
+      "name": "room-5-safe-entry-received-light",
+      "position": [
+        5,
+        99.82,
+        95
+      ],
+      "colour": [
+        0.7454042095350284,
+        0.8387990117372213,
+        0.8387990117372213
+      ],
+      "intensity": 470,
+      "range": 32,
+      "target": [
+        7,
+        78,
+        101
+      ],
+      "angle": 1,
+      "penumbra": 0.48
+    },
+    {
+      "room": 5,
+      "name": "room-5-upper-traversal-received-light",
+      "position": [
+        14,
+        99.82,
+        122.9
+      ],
+      "colour": [
+        0.5775804404214573,
+        0.7379104087672317,
+        0.8069522576650873
+      ],
+      "intensity": 360,
+      "range": 32,
+      "target": [
+        16,
+        87,
+        116
+      ],
+      "angle": 1,
+      "penumbra": 0.48
+    },
+    {
+      "room": 5,
+      "name": "room-5-observation-button-key",
+      "position": [
+        -10,
+        103.5,
+        128
+      ],
+      "colour": [
+        0.6795424696265424,
+        0.8631572134510892,
+        1
+      ],
+      "intensity": 92,
+      "range": 14,
+      "target": [
+        -10,
+        99,
+        131.25
+      ],
+      "angle": 0.62,
+      "penumbra": 0.7
+    }
+  ],
+  "layout": [
+    {
+      "room": 1,
+      "min": [
+        -10,
+        0,
+        -6
+      ],
+      "max": [
+        10,
+        14,
+        27
+      ],
+      "grid": [
+        7,
+        5,
+        9
+      ],
+      "capture": [
+        0,
+        3,
+        -0.5
+      ]
+    },
+    {
+      "room": 2,
+      "min": [
+        -19,
+        0,
+        27
+      ],
+      "max": [
+        19,
+        17,
+        49
+      ],
+      "grid": [
+        9,
+        5,
+        7
+      ],
+      "capture": [
+        0,
+        8,
+        39
+      ]
+    },
+    {
+      "room": 3,
+      "min": [
+        -20,
+        6.8,
+        49
+      ],
+      "max": [
+        20,
+        33,
+        79.5
+      ],
+      "grid": [
+        9,
+        7,
+        9
+      ],
+      "capture": [
+        0,
+        18,
+        63
+      ]
+    },
+    {
+      "room": 4,
+      "min": [
+        2.7,
+        26,
+        79.5
+      ],
+      "max": [
+        15.3,
+        79,
+        91.5
+      ],
+      "grid": [
+        5,
+        13,
+        5
+      ],
+      "capture": [
+        9,
+        52,
+        85.5
+      ]
+    },
+    {
+      "room": 5,
+      "min": [
+        -20,
+        74.75,
+        91.5
+      ],
+      "max": [
+        20,
+        104,
+        133
+      ],
+      "grid": [
+        9,
+        9,
+        9
+      ],
+      "capture": [
+        0,
+        83,
+        110
+      ]
+    }
+  ],
+  "rays": 96,
+  "captureSize": [
+    256,
+    128
+  ],
+  "atlas": [
+    9,
+    13,
+    196
+  ],
+  "generatorSha256": "7465d15d7343eb3114de9da0eaa4cbf7457350be316cfd7b732e786d1709bdb8"
+}

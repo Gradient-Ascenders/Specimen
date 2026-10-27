@@ -1,22 +1,10 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { LaserEmitterModel } from './LaserEmitterModel.ts';
 
 import type { LaserHazard } from '../../hazards/LaserHazard.ts';
 
 const SEGMENT_EPSILON_SQ = 1e-12;
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
-const COLLAR_QUATERNION = new THREE.Quaternion().setFromAxisAngle(
-  new THREE.Vector3(1, 0, 0),
-  Math.PI / 2,
-);
-const SHUTTER_A_QUATERNION = new THREE.Quaternion().setFromAxisAngle(
-  UP_AXIS,
-  Math.PI / 4,
-);
-const SHUTTER_B_QUATERNION = new THREE.Quaternion().setFromAxisAngle(
-  UP_AXIS,
-  -Math.PI / 4,
-);
 
 interface ProxyVisibility {
   readonly object: THREE.Object3D;
@@ -34,15 +22,16 @@ interface LaserVisual {
   readonly proxyVisibility: readonly ProxyVisibility[];
 }
 
-interface EmitterVisual {
-  readonly root: THREE.Group;
-  readonly activeIndicator: THREE.Mesh;
-  readonly inactiveIndicators: readonly THREE.Mesh[];
-}
-
 export interface LaserHazardPresentationOptions {
   /** Scanner beams may terminate in open space without a second emitter. */
   readonly showEndEmitters?: boolean;
+}
+
+export interface AuthoredLaserEmitter {
+  /** Geometry faces along local +Y, behind the authoritative beam origin. */
+  readonly housing: THREE.Object3D;
+  readonly aperture: THREE.BufferGeometry;
+  readonly shutter: THREE.BufferGeometry;
 }
 
 /**
@@ -72,24 +61,7 @@ export class LaserHazardPresentation {
     1,
     false,
   );
-  private readonly housingGeometry = new THREE.CylinderGeometry(
-    1,
-    1,
-    1,
-    16,
-    1,
-    false,
-  );
-  private readonly collarGeometry = new THREE.TorusGeometry(1, 0.15, 8, 20);
-  private readonly shutterGeometry = new THREE.BoxGeometry(1, 1, 1);
-  private readonly emitterBodyGeometries = new Map<
-    number,
-    THREE.BufferGeometry
-  >();
-  private readonly inactiveShutterGeometries = new Map<
-    number,
-    THREE.BufferGeometry
-  >();
+  private readonly emitterModel = new LaserEmitterModel();
 
   private readonly coreMaterial = new THREE.MeshBasicMaterial({
     color: 0xff1838,
@@ -102,27 +74,6 @@ export class LaserHazardPresentation {
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     toneMapped: false,
-  });
-  private readonly emitterBodyMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    vertexColors: true,
-    roughness: 0.45,
-    metalness: 0.75,
-  });
-  private readonly activeMaterial = new THREE.MeshStandardMaterial({
-    color: 0xff2842,
-    emissive: 0xff1028,
-    emissiveIntensity: 3.2,
-    roughness: 0.32,
-    metalness: 0.08,
-    toneMapped: false,
-  });
-  private readonly inactiveMaterial = new THREE.MeshStandardMaterial({
-    color: 0x26323a,
-    emissive: 0x10191d,
-    emissiveIntensity: 0.25,
-    roughness: 0.78,
-    metalness: 0.28,
   });
 
   constructor(
@@ -143,6 +94,38 @@ export class LaserHazardPresentation {
     }
   }
 
+  /** Borrow a rigid model while preserving the live endpoint/status owners.
+   * The asset owner detaches it before releasing its shared geometry. */
+  attachEmitterModel(model:AuthoredLaserEmitter):()=>void{
+    const replacements:{mesh:THREE.Mesh;geometry:THREE.BufferGeometry;position:THREE.Vector3;scale:THREE.Vector3}[]=[];
+    const housings:{body:THREE.Object3D;visible:boolean;model:THREE.Object3D}[]=[];
+    for(const visual of this.visuals){
+      for(const emitter of [visual.startEmitter,visual.endEmitter]){
+        const body=emitter.getObjectByName(`${emitter.name}-housing-collar`)!;
+        const housing=model.housing.clone(true);
+        housing.name=`${emitter.name}-authored-housing`;
+        housings.push({body,visible:body.visible,model:housing});
+        body.visible=false;emitter.add(housing);
+        for(const [suffix,geometry] of [['active-aperture',model.aperture],['inactive-aperture',model.aperture],
+          ['inactive-shutters',model.shutter]] as const){
+          const mesh=emitter.getObjectByName(`${emitter.name}-${suffix}`) as THREE.Mesh;
+          replacements.push({mesh,geometry:mesh.geometry,position:mesh.position.clone(),scale:mesh.scale.clone()});
+          mesh.geometry=geometry;mesh.position.set(0,0,0);mesh.scale.set(1,1,1);
+        }
+      }
+    }
+    this.sync();
+    let detached=false;
+    return ()=>{
+      if(detached)return;detached=true;
+      for(const replacement of replacements){
+        replacement.mesh.geometry=replacement.geometry;
+        replacement.mesh.position.copy(replacement.position);replacement.mesh.scale.copy(replacement.scale);
+      }
+      for(const housing of housings){housing.model.removeFromParent();housing.body.visible=housing.visible;}
+    };
+  }
+
   dispose(): void {
     this.root.removeFromParent();
     this.root.clear();
@@ -154,22 +137,9 @@ export class LaserHazardPresentation {
     }
 
     this.beamGeometry.dispose();
-    this.housingGeometry.dispose();
-    this.collarGeometry.dispose();
-    this.shutterGeometry.dispose();
-    for (const geometry of this.emitterBodyGeometries.values()) {
-      geometry.dispose();
-    }
-    for (const geometry of this.inactiveShutterGeometries.values()) {
-      geometry.dispose();
-    }
-    this.emitterBodyGeometries.clear();
-    this.inactiveShutterGeometries.clear();
+    this.emitterModel.dispose();
     this.coreMaterial.dispose();
     this.haloMaterial.dispose();
-    this.emitterBodyMaterial.dispose();
-    this.activeMaterial.dispose();
-    this.inactiveMaterial.dispose();
   }
 
   private createVisual(source: LaserHazard): LaserVisual {
@@ -184,21 +154,18 @@ export class LaserHazardPresentation {
     beamHalo.userData.presentationOnly = true;
     beamHalo.renderOrder = 1;
 
-    const emitterRadius = Math.max(source.beamRadiusMetres * 3.2, 0.18);
-    const startEmitter = this.createEmitter(
+    const startEmitter = this.emitterModel.create(
       `${source.id}-presentation-emitter-start`,
       source.id,
-      emitterRadius,
     );
-    const endEmitter = this.createEmitter(
+    const endEmitter = this.emitterModel.create(
       `${source.id}-presentation-emitter-end`,
       source.id,
-      emitterRadius,
     );
 
     const proxyVisibility: ProxyVisibility[] = [];
     source.root.traverse((object) => {
-      if (!(object instanceof THREE.Mesh) || !object.userData.runtimeProxy) {
+      if (object === source.root || !object.userData.runtimeProxy) {
         return;
       }
       proxyVisibility.push({ object, visible: object.visible });
@@ -222,58 +189,6 @@ export class LaserHazardPresentation {
         ...endEmitter.inactiveIndicators,
       ],
       proxyVisibility,
-    };
-  }
-
-  private createEmitter(
-    name: string,
-    hazardId: string,
-    radius: number,
-  ): EmitterVisual {
-    const root = new THREE.Group();
-    root.name = name;
-    root.userData.laserHazardId = hazardId;
-    root.userData.presentationOnly = true;
-
-    const body = new THREE.Mesh(
-      this.getEmitterBodyGeometry(radius),
-      this.emitterBodyMaterial,
-    );
-    body.name = `${name}-housing-collar`;
-
-    const activeIndicator = new THREE.Mesh(
-      this.housingGeometry,
-      this.activeMaterial,
-    );
-    activeIndicator.name = `${name}-active-aperture`;
-    activeIndicator.scale.set(radius * 0.56, 0.045, radius * 0.56);
-    activeIndicator.position.y = 0.19;
-
-    const inactiveAperture = new THREE.Mesh(
-      this.housingGeometry,
-      this.inactiveMaterial,
-    );
-    inactiveAperture.name = `${name}-inactive-aperture`;
-    inactiveAperture.scale.copy(activeIndicator.scale);
-    inactiveAperture.position.copy(activeIndicator.position);
-
-    const inactiveShutters = new THREE.Mesh(
-      this.getInactiveShutterGeometry(radius),
-      this.inactiveMaterial,
-    );
-    inactiveShutters.name = `${name}-inactive-shutters`;
-
-    root.add(
-      body,
-      activeIndicator,
-      inactiveAperture,
-      inactiveShutters,
-    );
-
-    return {
-      root,
-      activeIndicator,
-      inactiveIndicators: [inactiveAperture, inactiveShutters],
     };
   }
 
@@ -337,84 +252,4 @@ export class LaserHazardPresentation {
     visual.endEmitter.quaternion.copy(this.reverseQuaternion);
   }
 
-  private getEmitterBodyGeometry(radius: number): THREE.BufferGeometry {
-    const cached = this.emitterBodyGeometries.get(radius);
-    if (cached) return cached;
-
-    const housing = this.housingGeometry.clone();
-    housing.applyMatrix4(
-      new THREE.Matrix4().makeScale(radius, 0.34, radius),
-    );
-    this.setGeometryColour(housing, 0x252a2f);
-
-    const collar = this.collarGeometry.clone();
-    collar.applyMatrix4(
-      new THREE.Matrix4().compose(
-        new THREE.Vector3(0, 0.13, 0),
-        COLLAR_QUATERNION,
-        new THREE.Vector3().setScalar(radius * 0.94),
-      ),
-    );
-    this.setGeometryColour(collar, 0x79838b);
-
-    const merged = mergeGeometries([housing, collar], false);
-    housing.dispose();
-    collar.dispose();
-    if (!merged) throw new Error('Failed to merge laser emitter body.');
-    merged.computeBoundingSphere();
-    this.emitterBodyGeometries.set(radius, merged);
-    return merged;
-  }
-
-  private getInactiveShutterGeometry(radius: number): THREE.BufferGeometry {
-    const cached = this.inactiveShutterGeometries.get(radius);
-    if (cached) return cached;
-
-    const position = new THREE.Vector3(0, 0.235, 0);
-    const scale = new THREE.Vector3(
-      radius * 1.05,
-      0.035,
-      radius * 0.13,
-    );
-    const shutterA = this.shutterGeometry.clone();
-    shutterA.applyMatrix4(
-      new THREE.Matrix4().compose(
-        position,
-        SHUTTER_A_QUATERNION,
-        scale,
-      ),
-    );
-    const shutterB = this.shutterGeometry.clone();
-    shutterB.applyMatrix4(
-      new THREE.Matrix4().compose(
-        position,
-        SHUTTER_B_QUATERNION,
-        scale,
-      ),
-    );
-
-    const merged = mergeGeometries([shutterA, shutterB], false);
-    shutterA.dispose();
-    shutterB.dispose();
-    if (!merged) throw new Error('Failed to merge inactive laser shutters.');
-    merged.computeBoundingSphere();
-    this.inactiveShutterGeometries.set(radius, merged);
-    return merged;
-  }
-
-  private setGeometryColour(
-    geometry: THREE.BufferGeometry,
-    colourHex: number,
-  ): void {
-    const colour = new THREE.Color(colourHex);
-    const colours = new Float32Array(
-      geometry.getAttribute('position').count * 3,
-    );
-    for (let offset = 0; offset < colours.length; offset += 3) {
-      colours[offset] = colour.r;
-      colours[offset + 1] = colour.g;
-      colours[offset + 2] = colour.b;
-    }
-    geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
-  }
 }

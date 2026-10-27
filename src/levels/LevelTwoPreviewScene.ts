@@ -3,6 +3,9 @@ import { CultivationFinaleSet } from '../cinematics/CultivationFinaleSet.ts';
 import { CultivationRoomWorkload, CULTIVATION_ROOM_IDS } from './CultivationRoomWorkload.ts';
 import { freezeStaticTransforms } from '../render/StaticTransforms.ts';
 import { CultivationSurfaceCleanup } from '../render/environment/cultivation/CultivationSurfaceCleanup.ts';
+import { CultivationBlenderArt } from '../render/environment/cultivation/CultivationBlenderArt.ts';
+import { CultivationRoomFiveCulling } from '../render/environment/cultivation/CultivationRoomFiveCulling.ts';
+import { CultivationSurveillanceArt } from '../render/environment/cultivation/CultivationSurveillanceArt.ts';
 import { CultivationAssetOwner, type CultivationAssetSource } from '../render/environment/cultivation/CultivationBakedAssets.ts';
 import { applyCultivationShadowRoles } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
 import { CultivationContaminationArt } from '../render/environment/cultivation/CultivationContaminationArt.ts';
@@ -13,7 +16,9 @@ import { CultivationElevatorArt } from '../render/environment/cultivation/Cultiv
 import { AcidLiquidInteractions, type AcidContactBody } from '../render/environment/containment/AcidLiquidInteractions.ts';
 import { CultivationCoverEquipmentArt } from '../render/environment/cultivation/CultivationCoverEquipmentArt.ts';
 import { CultivationChamberMaterials } from '../render/environment/cultivation/CultivationChamberMaterials.ts';
+import {CultivationSecurityDroneModels} from '../render/environment/cultivation/CultivationSecurityDroneModels.ts';
 import * as THREE from 'three';
+import { CultivationDarkAreaLighting } from '../render/environment/cultivation/CultivationDarkAreaLighting.ts';
 import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import { CultivationRoomOneObservation } from '../render/environment/cultivation/CultivationRoomOneObservation.ts';
 import { CultivationRoomTwoObservation } from '../render/environment/cultivation/CultivationRoomTwoObservation.ts';
@@ -121,19 +126,26 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
   readonly acidInteractions: readonly AcidLiquidInteractions[];
   readonly labArt = new CultivationLabMaterials(this.assets);
   readonly contaminationArt = new CultivationContaminationArt(this.labArt);
-  readonly coverArt = new CultivationCoverEquipmentArt(this.assets, this.labArt.platform);
+  readonly coverArt = new CultivationCoverEquipmentArt(this.assets, this.labArt.platform,{authoredReplacement:true});
   readonly chamberArt = new CultivationChamberMaterials(this.assets);
+  readonly securityDroneModels=new CultivationSecurityDroneModels(this.assets);
   readonly roomOne: LevelTwoRoomOneGreybox;
   readonly roomTwo: LevelTwoRoomTwoGreybox;
   readonly roomThree: LevelTwoRoomThreeGreybox;
   readonly roomFour = new LevelTwoRoomFourGreybox();
   readonly roomFourGeometry = new THREE.Group();
+  readonly roomFourEntranceGeometry = new THREE.Group();
+  readonly roomFourLighting = new THREE.Group();
   readonly roomFive: LevelTwoRoomFiveGreybox;
+  readonly darkAreaLighting: CultivationDarkAreaLighting;
   readonly maintenanceArt: CultivationMaintenanceArt;
   readonly passageArt: CultivationPassageArt;
   readonly filtrationArt: CultivationFiltrationPassageArt;
   readonly elevatorArt: CultivationElevatorArt;
   readonly surfaceCleanup: CultivationSurfaceCleanup;
+  readonly blenderArt: CultivationBlenderArt;
+  readonly roomFiveCulling:CultivationRoomFiveCulling;
+  readonly surveillanceArt: CultivationSurveillanceArt;
   readonly roomOneObservation: CultivationRoomOneObservation;
   readonly roomTwoObservation: CultivationRoomTwoObservation;
   readonly roomThreeObservation: CultivationRoomThreeObservation;
@@ -194,18 +206,22 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
         'cultivation-room-3-bob-vent-west-jamb',
         'cultivation-room-3-bob-vent-east-jamb',
       ], new Map([...this.contaminationArt.overrides(builder), ...this.chamberArt.overrides(builder, this.labArt), ...this.coverArt.overrides()]));
-      this.coverArt.build(builder);
+      this.coverArt.build(builder,{authoredReplacement:true});
     }, this.assets);
     this.labArt.addFixtures(this.roomThree.root, 48, 30, 72, {
+      authoredReplacement:true,
       fillHeightMetres: 16, fillPositionsZ: [18, 54],
       shadowTargets: [[-4, 23, 25.5], [0, 23, 53]],
     });
     this.chamberArt.addBoundary(this.roomThree.root);
     this.labArt.dress(this.roomOne.builder, [], this.contaminationArt.overrides(this.roomOne.builder));
     this.labArt.dress(this.roomOneToTwoPassage.builder, [], this.contaminationArt.overrides(this.roomOneToTwoPassage.builder));
-    this.labArt.addFixtures(this.roomOne.root, 36, 20, 50, { ceilingOpening: [-12, -8, 2, 6] });
+    this.labArt.addFixtures(this.roomOne.root, 36, 20, 50, {
+      ceilingOpening: [-12, -8, 2, 6],wallSides:[],
+      practicalPositions:[[-9,17.85,15.5],[9,17.85,35]],
+    });
     this.labArt.addFixtures(this.roomOneToTwoPassage.root, 8, 6.5, 28, { wallSides: [-1] });
-    this.passageArt = new CultivationPassageArt(this.roomOneToTwoPassage, this.labArt, this.contaminationArt);
+    this.passageArt = new CultivationPassageArt(this.roomOneToTwoPassage, this.labArt, this.contaminationArt,{authoredReplacement:true});
     this.labArt.dress(this.roomTwo.builder, [
       'cultivation-room-2-above-bob-vent',
       'cultivation-room-2-bob-vent-west-jamb',
@@ -217,20 +233,21 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
         .map(mesh => [mesh.name, this.contaminationArt.finishes.metal]),
     ));
     this.labArt.addFixtures(this.roomTwo.root, 38, 24, 45, {
+      authoredReplacement: true,
       wallSides: [1],
       fillHeightMetres: 14,
       fillPositionsZ: [12, 34],
       shadowTargets: [[-17, 17, 27], [0, 0, 34]],
     });
-    this.labArt.addFixtures(this.roomTwoToThreeGoopPassage.root, 7, 6.5, 28, { wallSides: [] });
+    this.labArt.addFixtures(this.roomTwoToThreeGoopPassage.root, 7, 6.5, 28, { wallSides: [], authoredReplacement: true });
     this.filtrationArt = new CultivationFiltrationPassageArt(this.roomTwoToThreeGoopPassage,
-      this.roomTwoToThreeBobAirDuct, this.labArt, this.contaminationArt);
+      this.roomTwoToThreeBobAirDuct, this.labArt, this.contaminationArt, {authoredReplacement:true});
     this.contaminationArt.addRoom(this.roomOne.root, 1, this.chamberArt.warning);
-    this.contaminationArt.addRoom(this.roomTwo.root, 2, this.chamberArt.warning);
-    this.contaminationArt.addRoom(this.roomThree.root, 3, this.chamberArt.warning);
-    this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure, gelRendering);
-    this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt, this.contaminationArt);
-    this.elevatorArt = new CultivationElevatorArt(this.roomFour, this.labArt, this.chamberArt, this.contaminationArt);
+    this.contaminationArt.addRoom(this.roomTwo.root, 2, this.chamberArt.warning, {authoredReplacement:true});
+    this.contaminationArt.addRoom(this.roomThree.root, 3, this.chamberArt.warning,{authoredReplacement:true});
+    this.roomFive = new LevelTwoRoomFiveGreybox(requestFailure, gelRendering, true);
+    this.maintenanceArt = new CultivationMaintenanceArt(this.roomFive, this.labArt, this.contaminationArt,{authoredReplacement:true});
+    this.elevatorArt = new CultivationElevatorArt(this.roomFour, this.labArt, this.chamberArt, this.contaminationArt, {authoredReplacement:true});
     this.roomOneToTwoPassage.root.position.z =
       LEVEL_TWO_ROOM_ONE_TO_TWO_PASSAGE_START_Z;
     this.roomTwo.root.position.z = LEVEL_TWO_ROOM_TWO_OFFSET_Z;
@@ -258,6 +275,10 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     // vent and leaving the lift's render range use the same shader layout.
     // Geometry still has its own culling root; collider visibility is untouched.
     this.roomFourGeometry.name = 'cultivation-room-4-render-geometry';
+    this.roomFourEntranceGeometry.name = 'cultivation-room-4-entrance-geometry';
+    this.roomFourLighting.name = 'cultivation-room-4-lighting';
+    const entranceNodes = new Set<THREE.Object3D>([this.roomFour.entrance.root,
+      ...this.roomFour.movingEntranceMeshes.filter(mesh => mesh !== this.roomFour.boardingGuard)]);
     const lightNodes = new Set<THREE.Object3D>();
     for (const child of this.roomFour.root.children) {
       if (child instanceof THREE.Light) lightNodes.add(child);
@@ -269,6 +290,16 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomFour.root.add(this.roomFourGeometry);
     this.voltFinaleSet = new CultivationFinaleSet(this.roomFive.root, this.labArt);
     this.surfaceCleanup = new CultivationSurfaceCleanup(this, this.assets);
+    this.elevatorArt.installDepthPointer(this.roomFour);
+    this.blenderArt = new CultivationBlenderArt(this);
+    this.roomFiveCulling=new CultivationRoomFiveCulling(this.roomFive.root);
+    // Apply the offline bank's index paths before splitting render scope.
+    // These identity groups retain the existing world transforms and owners.
+    for (const node of lightNodes) this.roomFourLighting.add(node);
+    for (const node of entranceNodes) this.roomFourEntranceGeometry.add(node);
+    this.roomFour.root.add(this.roomFourEntranceGeometry, this.roomFourLighting);
+    this.roomOneToTwoPassage.entryDoor.statusLight.visible=false;
+    this.roomOneToTwoPassage.entryDoor.root.getObjectByName('cultivation-room-1-to-2-lab-passage-entry-status-housing')!.visible=false;
     applyCultivationShadowRoles(this.root, new Set([this.labArt.acid]));
     // Add diegetic observation after shadow authoring: the small camera and
     // terminal need no extra shadow casters or another set of room textures.
@@ -281,6 +312,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomTwo.root.add(this.roomTwoObservation.root);
     this.roomThreeObservation=new CultivationRoomThreeObservation(observationResources);
     this.roomThree.root.add(this.roomThreeObservation.root);
+    this.surveillanceArt=new CultivationSurveillanceArt(this);
     // The boarding scenery scrolls upward once the lift descends; the terminal
     // belongs to that alcove, never to the moving elevator deck.
     const boardingFloor=this.roomFour.root.getObjectByName('room-4-boarding-floor')!;
@@ -294,6 +326,12 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.goopSpeech=new CultivationGoopSpeech();this.root.add(this.goopSpeech.root);
     this.platformSplashes=new CultivationPlatformSplashes(this.roomOne.platformDrops,this.labArt.acid,this.roomOne.radiationHazard.mesh);
     this.roomOne.root.add(this.platformSplashes.root);
+    this.darkAreaLighting = new CultivationDarkAreaLighting(this.roomFive.root);
+    // Match Level 1 Room 3's green acid bounce without extra shadow maps.
+    // Append after authored bank paths have been resolved. These natural
+    // reflections stay lit independently of the security circuits.
+    this.roomFive.builder.addLight('room-5-acid-reflected-light-entry', [-7, 5.5, 34], 0x87d62e, 42, 30);
+    this.roomFive.builder.addLight('room-5-acid-reflected-light-rear', [6, 5.5, 64], 0x87d62e, 42, 30);
     // Cache world-space bounds only after all authored room offsets are applied.
     this.acidInteractions = [this.roomOne.radiationHazard.mesh, this.roomTwo.radiationHazard.mesh, this.roomThree.radiationHazard.mesh, ...this.maintenanceArt.acidSurfaces].map(
       surface => new AcidLiquidInteractions(this.labArt.acid, surface),
@@ -305,6 +343,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
       ...this.roomOneToTwoPassage.doors.map(door => door.root),
       ...this.roomTwoToThreeGoopPassage.doors.map(door => door.root), this.filtrationArt.fan,
       ...this.roomFour.dynamicTransformRoots, ...this.roomFive.dynamicTransformRoots,
+      this.elevatorArt.depthPointer,
       ...this.voltFinaleSet.dynamicTransformRoots,
     ]);
     this.frozenTransformCount = [this.roomOne.root, this.roomOneToTwoPassage.root, this.roomTwo.root,
@@ -340,7 +379,8 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
       ...this.roomOne.platformDrops.map((drop) => drop.mesh),
       this.roomFour.entrance.collisionMesh, this.roomFour.boardingWall, this.roomFour.arrivalWall, this.roomFour.shield,
       ...this.roomFour.movingEntranceMeshes,
-      ...this.roomTwo.blockDrops.map((drop) => drop.mesh),
+      ...this.roomTwo.blockDrops.flatMap(drop => drop.dynamicTransformRoots)
+        .filter((root): root is THREE.Mesh => root instanceof THREE.Mesh),
       ...movingWallColliders,
       ...this.roomOneToTwoPassage.doors.map((door) => door.collisionMesh),
       ...this.roomTwoToThreeGoopPassage.doors.map(
@@ -360,6 +400,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
   }
 
   bindDissolveTargets(targets: readonly DissolveTarget[]): void {
+    this.blenderArt.bindDissolveTargets(targets);
     this.roomOne.bindDissolveTargets(targets);
     this.roomTwo.bindDissolveTargets(targets);
     this.roomThree.bindDissolveTargets(targets);
@@ -435,6 +476,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomTwoToThreeGoopPassage.update(deltaSeconds, occupants);
     if (simulated.has(4)) this.roomFour.update(deltaSeconds, occupants);
     else this.roomFour.entrance.update(deltaSeconds, occupants);
+    this.elevatorArt.update(this.roomFour.controller.progress);
     if (simulated.has(5)) this.roomFive.update(deltaSeconds, occupants, false);
     this.workload.cosmeticUpdates = 0;
     if(this.workload.rendered.has(1)){
@@ -484,15 +526,22 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomTwoToThreeGoopPassage.root.visible = secondPassage;
     this.roomTwoToThreeBobAirDuct.root.visible = secondPassage;
     this.roomThree.root.visible = !departed && farZ >= LEVEL_TWO_ROOM_TWO_TO_THREE_PASSAGE_START_Z - 12 && nearZ <= LEVEL_TWO_ROOM_FOUR_OFFSET_Z + 12;
-    this.roomFourGeometry.visible = farZ >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z - 12 && nearZ <= LEVEL_TWO_ROOM_FIVE_OFFSET_Z + 12;
+    const liftInRange = farZ >= LEVEL_TWO_ROOM_FOUR_OFFSET_Z - 12 && nearZ <= LEVEL_TWO_ROOM_FIVE_OFFSET_Z + 12;
+    // The entrance closes Room 3's view even when the shaft is out of range.
+    // An inactive body can hold it open while the active body is still far away.
+    this.roomFourEntranceGeometry.visible = this.roomThree.root.visible || liftInRange;
+    this.roomFourGeometry.visible = liftInRange || (this.roomThree.root.visible && this.roomFour.entrance.openProgress > 0);
     // The closed lift vent occludes the entire lower sector during descent.
     this.roomFive.root.visible = bodyZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z || cameraZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z ||
       (this.roomFour.controller.readModel.state === 'complete' && farZ >= LEVEL_TWO_ROOM_FIVE_OFFSET_Z - 12);
-    this.roomFour.root.visible = this.roomFourGeometry.visible || this.roomFive.root.visible;
+    // Keep the original effective light activation, independently of the newly
+    // visible entrance; no light properties or shadow roles change.
+    this.roomFourLighting.visible = liftInRange || this.roomFive.root.visible;
+    this.roomFour.root.visible = this.roomFourGeometry.visible || this.roomFourEntranceGeometry.visible || this.roomFourLighting.visible;
     if (recordScope) {
       this.workload.rendered.clear();
       const roots = [this.roomOne.root, this.roomTwo.root, this.roomThree.root, this.roomFourGeometry, this.roomFive.root];
-      for (const id of CULTIVATION_ROOM_IDS) if (roots[id - 1].visible) this.workload.rendered.add(id);
+      for (const id of CULTIVATION_ROOM_IDS) if (roots[id - 1].visible || (id === 4 && this.roomFourEntranceGeometry.visible)) this.workload.rendered.add(id);
     }
   }
 
@@ -506,7 +555,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
       if (!(object instanceof THREE.Mesh)) return;
       const list = Array.isArray(object.material) ? object.material : [object.material];
       for (const material of list) if (material.visible) materials.add(material);
-      if (object.userData.staticBatchSourceNames || object.userData.staticBatchCell) batches++;
+      if (object.userData.staticBatchSourceNames || object.userData.staticBatchCell || object.userData.blenderBatch) batches++;
     });
     return { ...this.workload.snapshot(), objects, automaticMatrices, frozenTransforms: this.frozenTransformCount,
       renderedObjects, batches, materials: materials.size };
@@ -531,19 +580,25 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.filtrationArt.reset();
     this.roomThree.reset();
     this.roomFour.reset();
+    this.elevatorArt.update(0);
     this.roomFive.reset();
     this.voltFinaleSet.reset();
     this.updatePresentationVisibility({ z: 4 }, { z: 8 });
   }
 
   dispose(): void {
+    this.roomFiveCulling.restore();
     this.workload.dispose();
+    this.surveillanceArt.dispose();
     this.roomOneObservation.dispose();
     this.roomTwoObservation.dispose();
     this.roomThreeObservation.dispose();
     this.roomTwoButtonArt.dispose();
     this.goopSpeech.dispose();
     this.platformSplashes.dispose();
+    this.darkAreaLighting.dispose();
+    this.blenderArt.dispose();
+    this.securityDroneModels.dispose();
     this.surfaceCleanup.dispose();
     this.voltFinaleSet.dispose();
     this.passageArt.dispose();

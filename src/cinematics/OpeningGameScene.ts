@@ -153,6 +153,7 @@ export class OpeningGameScene {
       if (this.disposed) return;
       this.laboratoryValue = new OpeningLaboratory(this.room);
     }
+    await this.laboratoryValue.prepare();
     await yieldFrame();
     if (this.disposed) return;
     this.apply(sampleOpeningGame(OPENING_GAME_TIMING.formEnd), this.room.camera.aspect);

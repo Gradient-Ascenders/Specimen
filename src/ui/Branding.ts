@@ -20,12 +20,20 @@ export const createBrandMarkMarkup = (
   </span>
 `;
 
-/** Shared indeterminate scanner. The mark stays still while its orbit moves. */
-export const createBrandedScannerMarkup = (): string => `
-  <div class="brand-scanner" aria-hidden="true">
-    <span class="brand-scanner-orbit brand-scanner-orbit--outer"></span>
-    <span class="brand-scanner-orbit brand-scanner-orbit--inner"></span>
-    <span class="brand-scanner-node"></span>
-    ${createBrandMarkMarkup('simple', 'brand-scanner-mark')}
+/** Shared decorative loading art. The activity bar is indeterminate: only
+ * the real readiness owner may mark its enclosing surface as ready. */
+export const createLiquidLoaderMarkup = (): string => `
+  <div class="liquid-loader" aria-hidden="true">
+    <div class="liquid-emblem">
+      <div class="liquid-emblem-gel">
+        <img src="${BRAND_ASSETS.simpleMark}" alt="" draggable="false" decoding="async">
+        <span class="liquid-emblem-sheen" style="mask-image: url('${BRAND_ASSETS.simpleMark}'); -webkit-mask-image: url('${BRAND_ASSETS.simpleMark}')"><span></span></span>
+      </div>
+      <span class="liquid-droplet liquid-droplet--one"></span>
+      <span class="liquid-droplet liquid-droplet--two"></span>
+      <span class="liquid-droplet liquid-droplet--three"></span>
+    </div>
+    <span class="liquid-wordmark">SP<span>E</span>CIMEN</span>
+    <span class="liquid-loading-track"><span class="liquid-loading-fill"></span></span>
   </div>
 `;

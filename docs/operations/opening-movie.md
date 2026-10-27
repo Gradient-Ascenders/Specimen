@@ -11,6 +11,11 @@ Vite copies the movie into production assets with a relative, hashed URL,
 including subdirectory hosting, but ordinary Start does not request the file.
 The main menu remains live 3D in both modes.
 
+The default live opening uses the Blender-authored containment wing and custom
+surveillance cameras in `assets/environments/opening-laboratory/`, sharing Room
+1's baked surface finishes. These assets prepare under the initial blackout.
+The opt-in MP4 backup currently predates this environment pass.
+
 ## Loading and handoff
 
 ### Default live opening

@@ -10,6 +10,11 @@ import { CollisionWorld } from '../../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../../src/physics/SurfaceRegistry.ts';
 import { createAuthoredDissolveTarget } from '../../src/abilities/DissolveTarget.ts';
 import {VOLT_FINALE} from '../../src/cinematics/CultivationFinaleTimeline.ts';
+import {visitCultivationRoomTwoSurfaceStates} from './cultivation-room-two-surface-states.ts';
+import {visitCultivationConnectorSurfaceStates} from './cultivation-connector-surface-states.ts';
+import {visitCultivationRoomThreeSurfaceStates} from './cultivation-room-three-surface-states.ts';
+import {visitCultivationLiftSurfaceStates} from './cultivation-lift-surface-states.ts';
+import {addCultivationRoomThreeBoosters,addCultivationButtonPlatformBooster} from '../../src/render/environment/cultivation/CultivationBoosterPlatforms.ts';
 
 /** Deterministic authored poses; every state is scanned after updating world matrices. */
 export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (name: string) => void): void {
@@ -22,12 +27,23 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
   const roomThree = new RoomThreeDroneEncounter({config: CULTIVATION_ROOM_THREE_DRONE_AUTHORING,
     supportsById: new Map(targets.map(t => [t.id, t])), collisionWorld: world, surfaceRegistry: surfaces,
     bobBody: bob, goopBody: goop, requestDeath: () => true, radiationSurface: scene.roomThree.radiationHazard,
-    surfaceMaps: scene.coverArt.droneSurfaceMaps});
+    surfaceMaps: scene.coverArt.droneSurfaceMaps,presentationModels:scene.securityDroneModels,
+    attachPresentation:root=>scene.blenderArt.attachRuntimeOwners(root)});
   scene.roomThree.root.add(roomThree.root);
   const dissolve = new DissolveSystem(targets);
-  const roomFour = new ElevatorDroneEncounter(scene.roomFour, world, surfaces, bob, goop, targets, dissolve, () => {});
-  const roomFive = new RoomFiveDroneEncounter(scene.roomFive, world, surfaces, bob, goop, () => true);
-  const sample = (name: string) => {scene.root.updateWorldMatrix(true, true); visit(name);};
+  const roomFour = new ElevatorDroneEncounter(scene.roomFour, world, surfaces, bob, goop, targets, dissolve, () => {},scene.coverArt.droneSurfaceMaps,scene.securityDroneModels);
+  const roomFive = new RoomFiveDroneEncounter(scene.roomFive, world, surfaces, bob, goop, () => true,scene.coverArt.droneSurfaceMaps,undefined,scene.securityDroneModels);
+  addCultivationRoomThreeBoosters(roomFive.platformBoosters,scene.roomThree);
+  addCultivationButtonPlatformBooster(roomFive.platformBoosters,scene.roomTwo);
+  const sample = (name: string) => {
+    // An assembled-level audit includes every room's submitted static geometry
+    // even after reset applies distance culling. Descendant mechanism/actor
+    // visibility remains authoritative for the sampled state.
+    const roots=[...scene.root.children,scene.roomFourGeometry,scene.roomFourEntranceGeometry,scene.roomFourLighting];
+    const saved=roots.map(root=>root.visible);
+    try{for(const root of roots)root.visible=true;scene.root.updateWorldMatrix(true,true);visit(name);}
+    finally{roots.forEach((root,i)=>root.visible=saved[i]);}
+  };
   try {
     sample('initial');
     for (const target of targets) if (target.mesh.userData.roomId !== 4 && target.mesh.userData.roomId !== 5) target.advance(target.dissolveDurationSeconds);
@@ -35,15 +51,25 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
       scene.roomOne.update(time); scene.roomTwo.update(time, []); scene.roomThree.update(time, []);
       sample(`drops-${time}`);
     }
-    for (const passage of [scene.roomOneToTwoPassage, scene.roomTwoToThreeGoopPassage]) for (const door of passage.doors) {
+    const passages=[scene.roomOneToTwoPassage, scene.roomTwoToThreeGoopPassage];
+    const doors=passages.flatMap(passage=>[...passage.doors]);
+    const openDoor=(door:typeof doors[number],dt:number)=>{
       door.setLocked(false);
       const centre = door.root.getWorldPosition(new THREE.Vector3()); centre.y += 1;
-      door.update(2, [{id: 'bob', position: centre, radiusMetres: .45}]);
-    }
+      door.update(dt, [{id: 'bob', position: centre, radiusMetres: .45}]);
+    };
+    for(const door of doors)openDoor(door,.24);
+    sample('doors-opening');
+    for(const door of doors)openDoor(door,2);
     sample('doors-open');
-    const occupants = ['bob', 'goop'].map((id, i) => ({id, radiusMetres: .45, position: scene.roomFour.root.localToWorld(new THREE.Vector3(i ? 2 : -2, .66, 9))}));
-    scene.roomFour.update(1.5, occupants);
-    for (const dt of [1, 15, 17, 27, 1.5]) {scene.roomFour.update(dt, occupants); roomFour.update(dt, 'goop'); sample(`lift-${scene.roomFour.controller.readModel.elapsed}-${scene.roomFour.controller.readModel.arrivalElapsed}`);}
+    for(const door of doors)door.update(.24,[]);
+    sample('doors-closing');
+    for(const door of doors)door.update(2,[]);
+    sample('doors-reclosed');
+    for(const door of doors)openDoor(door,2);
+    visitCultivationLiftSurfaceStates(scene,roomFour,sample,()=>{
+      for(const target of targets)target.reset();world.registerAll(scene.roomFour.solubleTargetMeshes);
+    });
     scene.roomFive.restoreCheckpoint('rescued'); sample('volt-rescued');
     scene.voltFinaleSet.annex.visible=true;
     for(const [name,time] of [['closed',VOLT_FINALE.ductRun],['buckling',VOLT_FINALE.brake],['breaking',VOLT_FINALE.grateBreak+.3],['open',VOLT_FINALE.ductSilence]] as const){
@@ -52,5 +78,29 @@ export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (
     scene.voltFinaleSet.reset();
     for (const target of targets) target.reset();
     scene.reset(); roomThree.reset(); roomFour.reset(); roomFive.reset(); sample('reset');
+    // Supplemental mechanism histories follow the original fixture so its
+    // existing collision/light fingerprints remain directly comparable.
+    scene.roomFive.restoreCheckpoint('controls');
+    for(const network of ['red','blue','green'] as const){
+      scene.roomFive.controller.security.select(network);scene.roomFive.syncPresentation(.08);
+      sample(`network-${network}-switching`);
+    }
+    scene.roomFive.controller.security.release();
+    for(const elapsed of [1.6,3.2,3.6]){
+      scene.roomFive.controller.releaseElapsed=elapsed;scene.roomFive.syncPresentation(.1);
+      sample(`volt-release-${elapsed}`);
+    }
+    for(const [name,open] of [['closed',0],['opening',.5],['open',1]] as const){
+      scene.roomFive.presentCinematicCell(open);sample(`volt-cell-${name}`);
+    }
+    for(const target of targets)if(target.mesh.userData.roomId===5)target.reset();
+    scene.roomFive.reset();roomFive.reset();
+    for(const hits of [1,2,3]){
+      scene.roomFive.controller.hitBrokenDrone();roomFive.update(1/60);sample(`sewer-drone-damage-${hits}`);
+    }
+    scene.reset();roomThree.reset();roomFour.reset();roomFive.reset();sample('release-reset');
+    visitCultivationRoomTwoSurfaceStates(scene,targets,sample);
+    visitCultivationConnectorSurfaceStates(scene,targets,sample);
+    visitCultivationRoomThreeSurfaceStates(scene,targets,roomThree,sample);
   } finally { roomFive.dispose(); roomFour.dispose(); roomThree.dispose(); dissolve.dispose(); for (const target of targets) target.dispose(); }
 }

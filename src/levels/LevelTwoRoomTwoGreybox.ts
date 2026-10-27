@@ -507,7 +507,7 @@ export class LevelTwoRoomTwoGreybox {
         position: [suspendedX, 23.55, suspendedZ],
         material: support,
       });
-      const strongRope = this.builder.addVisualBox({
+      const strongRope = this.builder.addCollider({
         name: `${definition.id}-non-soluble-rope`,
         size: [0.22, 1, 0.22],
         position: [suspendedX, 22.8, suspendedZ],

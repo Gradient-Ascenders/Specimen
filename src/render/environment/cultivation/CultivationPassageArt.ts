@@ -19,7 +19,8 @@ export class CultivationPassageArt {
   private readonly lights: { light: THREE.PointLight; position: THREE.Vector3; colour: THREE.Color; intensity: number; distance: number }[] = [];
   private disposed = false;
 
-  constructor(passage: LevelTwoLabPassageGreybox, lab: CultivationLabMaterials, contamination: CultivationContaminationArt) {
+  constructor(passage: LevelTwoLabPassageGreybox, lab: CultivationLabMaterials, contamination: CultivationContaminationArt,
+    options:{authoredReplacement?:boolean}={}) {
     this.root.name = 'cultivation-observation-passage-art';
     this.root.userData.presentationOnly = true;
     this.wall = passage.builder.collisionMeshes.find(mesh => mesh.name.endsWith('-east-wall'))!;
@@ -28,32 +29,34 @@ export class CultivationPassageArt {
     // continues to seal the recess; it is never a new route or landing.
     this.wall.material = this.hidden;
 
-    const metal = contamination.finishes.metal;
-    const dark = this.finish(lab.metal, 'rubber-and-service-recess', 0x272c29, .94);
-    const iron = this.finish(lab.pole, 'corroded-pipes', 0x9b8b6a, .93);
-    const tank = this.finish(lab.duct, 'clouded-culture-cartridges', 0x737c69, .57, .035);
-    const growth = this.finish(lab.metal, 'desiccated-culture-roots', 0x57543c, .98);
-    const paint = this.finish(contamination.finishes.metal, 'abraded-ivory-markings', 0xc4beaa, .9);
-    const amber = this.finish(lab.fixture, 'aged-amber-work-light', 0xc39a59, .7, .65);
-    amber.emissive.setHex(0xdca35c);
-    const lamp = this.finish(lab.fixture, 'observation-fluorescent', 0xc2c8b6, .65, .28);
-    const residue = this.finish(contamination.finishes.wall, 'dried-seal-runoff', 0x817960, .98);
-    const damp = this.finish(contamination.finishes.wall, 'old-leak-cores', 0x545747, .95);
+    if(!options.authoredReplacement){
+      const metal = contamination.finishes.metal;
+      const dark = this.finish(lab.metal, 'rubber-and-service-recess', 0x272c29, .94);
+      const iron = this.finish(lab.pole, 'corroded-pipes', 0x9b8b6a, .93);
+      const tank = this.finish(lab.duct, 'clouded-culture-cartridges', 0x737c69, .57, .035);
+      const growth = this.finish(lab.metal, 'desiccated-culture-roots', 0x57543c, .98);
+      const paint = this.finish(contamination.finishes.metal, 'abraded-ivory-markings', 0xc4beaa, .9);
+      const amber = this.finish(lab.fixture, 'aged-amber-work-light', 0xc39a59, .7, .65);
+      amber.emissive.setHex(0xdca35c);
+      const lamp = this.finish(lab.fixture, 'observation-fluorescent', 0xc2c8b6, .65, .28);
+      const residue = this.finish(contamination.finishes.wall, 'dried-seal-runoff', 0x817960, .98);
+      const damp = this.finish(contamination.finishes.wall, 'old-leak-cores', 0x545747, .95);
 
-    this.observation(contamination, metal, dark, iron, tank, growth, paint, lamp);
-    this.services(metal, dark, iron, paint, amber);
-    this.decontamination(metal, dark, iron, paint, lamp);
-    // Local leak sources complement the shared, metre-scaled panel weathering.
-    // Keep the dark trails attached to seals and fittings, away from the route.
-    for (const [i, z] of [8.05, 10.8, 14.25, 16.8].entries()) {
-      this.runoff(residue, 1, z, 1.04, .62 + i % 2 * .17, .22 + i * .035, i);
-      this.runoff(damp, 1, z + .03, 1.035, .42 + i % 2 * .15, .055, i + 4, .014);
+      this.observation(contamination, metal, dark, iron, tank, growth, paint, lamp);
+      this.services(metal, dark, iron, paint, amber);
+      this.decontamination(metal, dark, iron, paint, lamp);
+      // Local leak sources complement the shared, metre-scaled panel weathering.
+      // Keep the dark trails attached to seals and fittings, away from the route.
+      for (const [i, z] of [8.05, 10.8, 14.25, 16.8].entries()) {
+        this.runoff(residue, 1, z, 1.04, .62 + i % 2 * .17, .22 + i * .035, i);
+        this.runoff(damp, 1, z + .03, 1.035, .42 + i % 2 * .15, .055, i + 4, .014);
+      }
+      for (const [i, z] of [8.3, 12.5, 20.4].entries()) {
+        this.runoff(residue, -1, z, 5.65, 1.9 + i * .2, .28, i + 7);
+        this.runoff(damp, -1, z + .025, 5.65, 1.5 + i * .22, .07, i + 10, .014);
+      }
+      this.batch();
     }
-    for (const [i, z] of [8.3, 12.5, 20.4].entries()) {
-      this.runoff(residue, -1, z, 5.65, 1.9 + i * .2, .28, i + 7);
-      this.runoff(damp, -1, z + .025, 5.65, 1.5 + i * .22, .07, i + 10, .014);
-    }
-    this.batch();
     passage.root.add(this.root);
 
     // Reuse the two original passage pools. No extra light/shadow slots or

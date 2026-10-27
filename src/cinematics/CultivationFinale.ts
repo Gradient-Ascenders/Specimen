@@ -327,7 +327,11 @@ export class CultivationFinale {
       }
     }
     this.boardPivot.position.copy(this.boardStart);
-    if(t<T.coverImpact)this.boardPivot.position.y-=finaleSmooth(T.coverHit,T.coverImpact,t)*.24;
+    if(t<T.coverImpact){
+      const tilt=finaleSmooth(T.coverHit,T.coverImpact,t);
+      // Clear the antenna while rotating, then settle flush on the authored hull.
+      this.boardPivot.position.y-=tilt*(this.boardStart.y-COVER.droneY-COVER.restOffsetY)-Math.sin(tilt*Math.PI)*.35;
+    }
     else{
       // One trajectory for the crushed hull AND the panel resting on its deck.
       sampleVoltFinaleDrone(0,t,this.base);

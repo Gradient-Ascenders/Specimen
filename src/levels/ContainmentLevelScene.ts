@@ -12,6 +12,15 @@ import { RoomThreeMonitor } from '../render/environment/containment/RoomThreeMon
 import { RoomFiveMonitor } from '../render/environment/containment/RoomFiveMonitor.ts';
 import { ContainmentSurveillanceCameras } from '../render/environment/containment/ContainmentSurveillanceCameras.ts';
 import { fitContainmentShadowCullingBounds } from '../render/environment/containment/ContainmentShadowCoverage.ts';
+import type {RoomTwoShellLoader} from '../render/environment/containment/RoomTwoShell.ts';
+import type {RoomThreeShellLoader} from '../render/environment/containment/RoomThreeShell.ts';
+import type {RoomFourShellLoader} from '../render/environment/containment/RoomFourShell.ts';
+import type {RoomFiveShellLoader} from '../render/environment/containment/RoomFiveShell.ts';
+import {ContainmentLightingArt} from '../render/environment/containment/ContainmentLightingArt.ts';
+import {ContainmentRadiance} from '../render/environment/containment/ContainmentRadiance.ts';
+import {setContainmentSoftShadowQuality} from '../render/environment/containment/ContainmentSoftShadows.ts';
+import type {GraphicsSettings} from '../render/GraphicsProfiles.ts';
+import type {ContainmentSurveillanceModelLoader} from '../render/environment/containment/ContainmentSurveillanceModel.ts';
 import {
   consolidateContainmentRoomStaticVisuals,
   type ContainmentStaticBatchDiagnostics,
@@ -33,11 +42,12 @@ export type ContainmentHazardFailure =
   | RoomFiveHazardFailure;
 
 /**
- * Exact first-use geometry owners measured on Intel Iris Xe / ANGLE D3D11.
+ * Historical first-use owners measured on Intel Iris Xe / ANGLE D3D11.
  *
  * Event A was the 354 -> 361 upload batch and Event B was the 444 -> 460
- * batch in the authoritative DPR1 production trace. Keep this allowlist
- * explicit: additions require another physical-Iris first-use measurement.
+ * batch in the authoritative DPR1 production trace. CPU-only storyboards keep
+ * this list. Once Room 2 prepares, its authored buffers replace its retired
+ * entries; the old hardware timings do not describe those new buffers.
  */
 export const MEASURED_FIRST_USE_GEOMETRY_OWNER_NAMES = {
   eventA: [
@@ -152,6 +162,9 @@ const PRESERVED_STATIC_ART_NAMES = {
 
 /** Complete Level 1 scene composition while preserving the teaching-scene API. */
 export class ContainmentLevelScene {
+  readonly lightingArt=new ContainmentLightingArt();
+  readonly radiance=new ContainmentRadiance();
+  private lightingQualityKey='';
   readonly platformBoosters: PlatformBoosters;
   readonly root = new THREE.Group();
   readonly artResources = new ContainmentArtResources();
@@ -170,8 +183,12 @@ export class ContainmentLevelScene {
   private readonly measuredFirstUseGeometryResources: readonly THREE.Mesh[];
   private measuredFirstUseGeometryResourcesPrimed = false;
   private measuredFirstUseGeometryResourcePrimeCount = 0;
+  private disposed=false;
   private readonly roomOneOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
+  private readonly roomTwoOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
+  private readonly completedRoomOneBranches: readonly { root: THREE.Object3D; visible: boolean }[];
   private readonly roomThreeOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
+  private readonly lowerFloorOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
   private readonly finaleOccludedBranches: readonly { root: THREE.Object3D; visible: boolean }[];
 
   get goop() { return this.teaching.goop; }
@@ -254,7 +271,12 @@ export class ContainmentLevelScene {
     this.roomOneOccludedBranches = collectLightlessBranches([
       this.roomThree.root, this.roomFour.root, this.roomFive.root,
     ]);
+    this.roomTwoOccludedBranches = collectLightlessBranches([this.roomFour.root,this.roomFive.root]);
+    this.completedRoomOneBranches = collectLightlessBranches([this.teaching.roomOneArt.root]);
     this.roomThreeOccludedBranches = collectLightlessBranches([this.roomFive.root]);
+    this.lowerFloorOccludedBranches = collectLightlessBranches([
+      this.teaching.roomOneArt.root, this.teaching.roomTwoArt.root, this.roomThree.root,
+    ]);
     this.finaleOccludedBranches = collectLightlessBranches([
       this.teaching.roomOneArt.root, this.teaching.roomTwoArt.root,
       this.roomThree.root, this.roomFour.root,
@@ -297,19 +319,60 @@ export class ContainmentLevelScene {
     ];
   }
 
+  async prepareEnvironmentArt(roomTwoLoader?:RoomTwoShellLoader,roomThreeLoader?:RoomThreeShellLoader,
+    cameraLoader?:ContainmentSurveillanceModelLoader,roomFourLoader?:RoomFourShellLoader,roomFiveLoader?:RoomFiveShellLoader):Promise<void>{
+    await this.teaching.roomOneArt.prepare();
+    if(this.disposed)return;
+    await this.teaching.roomTwoArt.prepare(name=>this.teaching.roomOneArt.shell.borrowFinish(name),roomTwoLoader);
+    if(this.disposed)return;
+    await this.surveillanceCameras.prepare(name=>this.teaching.roomOneArt.shell.borrowFinish(name),cameraLoader);
+    if(this.disposed)return;
+    await this.roomThree.prepareArt(name=>this.teaching.roomOneArt.shell.borrowFinish(name),roomThreeLoader);
+    if(this.disposed)return;
+    await this.roomFour.prepareArt(name=>this.teaching.roomOneArt.shell.borrowFinish(name),
+      this.roomThree.art.shell.borrowLaserEmitter()!,roomFourLoader);
+    if(this.disposed)return;
+    await this.roomFive.prepareArt(name=>this.teaching.roomOneArt.shell.borrowFinish(name),
+      this.roomThree.art.shell.borrowLaserEmitter()!,roomFiveLoader);
+    if(this.disposed)return;
+    this.lightingArt.prepare(this.root);
+    for(const owner of this.lightingArt.movingOwners)this.lighting.trackShadowOwner(owner.root,owner.radius,owner.localCentre);
+  }
+
+  private currentFirstUseGeometryResources():readonly THREE.Mesh[]{
+    // The old hardware timings are historical. Prime the new authored buffers
+    // explicitly instead of uploading retired procedural Room 2/3 proxies.
+    const roomTwo=this.teaching.roomTwoArt.shell,roomThree=this.roomThree.art.shell,roomFour=this.roomFour.art.shell,roomFive=this.roomFive.art.shell;
+    return [...this.measuredFirstUseGeometryResources.filter(object=>
+      !(roomTwo.ready&&object.name.startsWith('room-2-'))&&!(roomThree.ready&&object.name.startsWith('room-3-'))&&
+      !(roomFour.ready&&object.name.startsWith('room-4-'))&&!(roomFive.ready&&object.name.startsWith('room-5-'))),
+      ...(roomTwo.ready?roomTwo.renderMeshes:[]),...(roomThree.ready?this.roomThree.authoredRenderMeshes:[]),
+      ...this.surveillanceCameras.authoredRenderMeshes,...(roomFour.ready?roomFour.renderMeshes:[]),...(roomFive.ready?roomFive.renderMeshes:[]),
+      ...this.lightingArt.renderMeshes];
+  }
+
+  configureLightingQuality(settings:GraphicsSettings,type:THREE.ShadowMapType):void{
+    const key=`${settings.shadowMapSizeCap}:${settings.effectsDensity}:${type}`;
+    if(key===this.lightingQualityKey)return;this.lightingQualityKey=key;
+    this.radiance.setQuality(settings);
+    this.lighting.shafts.setQuality(settings,type);
+    setContainmentSoftShadowQuality(this.lighting.root,type===THREE.BasicShadowMap);
+  }
+
   /** Explicitly-authored meshes eligible for Goop's dissolve runtime. */
   get solubleTargetMeshes(): readonly THREE.Mesh[] {
     return [this.roomFive.goopWoodenDoor];
   }
 
   get measuredFirstUseGeometryPrimeDiagnostics(): MeasuredFirstUseGeometryPrimeDiagnostics {
+    const resources=this.currentFirstUseGeometryResources();
     return {
-      ownerNames: MEASURED_FIRST_USE_GEOMETRY_OWNER_ALLOWLIST,
-      resourceCount: this.measuredFirstUseGeometryResources.length,
+      ownerNames: resources.map(object=>object.name),
+      resourceCount: resources.length,
       uniqueGeometryCount: new Set(
-        this.measuredFirstUseGeometryResources.map(({ geometry }) => geometry),
+        resources.map(({ geometry }) => geometry),
       ).size,
-      instancedResourceCount: this.measuredFirstUseGeometryResources.filter(
+      instancedResourceCount: resources.filter(
         (resource) => resource instanceof THREE.InstancedMesh,
       ).length,
       resourcesPrimed: this.measuredFirstUseGeometryResourcesPrimed,
@@ -321,7 +384,7 @@ export class ContainmentLevelScene {
     render: (resources: readonly THREE.Mesh[]) => void,
   ): boolean {
     if (this.measuredFirstUseGeometryResourcesPrimed) return false;
-    render(this.measuredFirstUseGeometryResources);
+    render(this.currentFirstUseGeometryResources());
     this.measuredFirstUseGeometryResourcesPrimed = true;
     this.measuredFirstUseGeometryResourcePrimeCount += 1;
     return true;
@@ -347,9 +410,9 @@ export class ContainmentLevelScene {
   }
 
   /**
-   * Enclosed Room 1 cannot see Rooms 3–5, and Room 3 cannot see the Room 5
-   * laboratory above the elevator shaft. Climbing cameras still submit that
-   * hidden geometry (and cold material variants) when they tilt upward.
+   * Enclosed rooms cannot see scenery beyond their solid ceilings and duct
+   * turns. Use both actor and camera positions: the Room 2 checkpoint can lag
+   * the drop, and a trailing camera can still be inside an earlier portal.
    * Cull only for the draw, preserving light ancestry and authored visibility.
    * Stop before each exit so doorway views and subsequent rooms are unchanged.
    */
@@ -363,21 +426,47 @@ export class ContainmentLevelScene {
       activePosition.z < 24 && cameraPosition.z < 24 &&
       activePosition.y < 14 && cameraPosition.y < 14
       ? this.roomOneOccludedBranches
-      : roomId === 3 &&
+      : roomId <= 3 &&
+        activePosition.z >= 24 && cameraPosition.z >= 24 &&
+        activePosition.z < 49 && cameraPosition.z < 49 &&
+        activePosition.y < 18 && cameraPosition.y < 18
+        ? this.roomTwoOccludedBranches
+        : roomId === 3 &&
         activePosition.z < 78 && cameraPosition.z < 78 &&
         activePosition.y < 34 && cameraPosition.y < 34
         ? this.roomThreeOccludedBranches
-        : undefined;
-    if (!branches) return draw();
+        // The lift's opaque floor/walls separate these chambers. Keep the
+        // entry vent and low arrival view until both actor and camera clear it.
+        : roomId === 4 && activePosition.x >= 3.2 && activePosition.x <= 14.8 &&
+          cameraPosition.x >= 3.2 && cameraPosition.x <= 14.8 &&
+          activePosition.z >= 80.2 && activePosition.z <= 91 &&
+          cameraPosition.z >= 80.2 && cameraPosition.z <= 91 &&
+          activePosition.y >= 36 && cameraPosition.y >= 36
+          ? this.lowerFloorOccludedBranches : undefined;
+    // Past the two opaque duct bends, the old pod is fully occluded. Keeping
+    // it submitted creates otherwise-unused material variants under later rigs.
+    const completedRoomOne = (roomId <= 3 &&
+      activePosition.z >= 25.1 && cameraPosition.z >= 25.1 &&
+      activePosition.z < 78 && cameraPosition.z < 78 &&
+      activePosition.y < 34 && cameraPosition.y < 34) ||
+      // The enclosed lift is beyond two offset rooms and their opaque walls.
+      // The old pod cannot be seen here, even during the low arrival camera.
+      ((roomId===4||roomId===5)&&activePosition.z>=79.2&&cameraPosition.z>=79.2)
+      ? this.completedRoomOneBranches : undefined;
+    if (!branches && !completedRoomOne) return draw();
 
-    for (const branch of branches) {
+    if(branches)for (const branch of branches) {
       branch.visible = branch.root.visible;
       branch.root.visible = false;
+    }
+    if(completedRoomOne)for(const branch of completedRoomOne){
+      branch.visible=branch.root.visible;branch.root.visible=false;
     }
     try {
       return draw();
     } finally {
-      for (const branch of branches) branch.root.visible = branch.visible;
+      if(completedRoomOne)for(const branch of completedRoomOne)branch.root.visible=branch.visible;
+      if(branches)for (const branch of branches) branch.root.visible = branch.visible;
     }
   }
 
@@ -392,12 +481,12 @@ export class ContainmentLevelScene {
   }
 
   update(deltaSeconds: number, bobPosition?: Vector3State, activePosition = bobPosition): void {
-    this.surveillanceCameras.update(deltaSeconds, bobPosition);
+    if (activePosition) this.lighting.setTraversalPosition(activePosition);
+    this.surveillanceCameras.update(deltaSeconds, bobPosition, this.lighting.visibleRoomMask);
     this.roomOneMonitor.update(deltaSeconds);
     this.roomTwoMonitor.update(deltaSeconds, activePosition);
     this.roomThreeMonitor.update(deltaSeconds, activePosition);
     this.roomFiveMonitor.update(deltaSeconds, activePosition);
-    if (activePosition) this.lighting.setTraversalPosition(activePosition);
     if (bobPosition) {
       this.lighting.setBobInDarkDuct(
         this.isInsideCameraTightVent(bobPosition),
@@ -438,12 +527,16 @@ export class ContainmentLevelScene {
   }
 
   dispose(): void {
+    if(this.disposed)return;
+    this.disposed=true;
     this.platformBoosters.dispose();
     this.surveillanceCameras.dispose();
     this.roomOneMonitor.dispose();
     this.roomTwoMonitor.dispose();
     this.roomThreeMonitor.dispose();
     this.roomFiveMonitor.dispose();
+    this.lightingArt.dispose();
+    this.radiance.dispose();
     this.lighting.dispose();
     for (const staticBatch of this.staticBatches) staticBatch.dispose();
     this.roomFive.dispose();

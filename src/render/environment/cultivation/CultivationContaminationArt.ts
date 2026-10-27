@@ -10,7 +10,7 @@ type Finish = 'wall' | 'floor' | 'ceiling' | 'metal';
 
 /** Rooms 1–3 only. Borrows the lab's relief maps; owns weather maps and static dressing. */
 export class CultivationContaminationArt {
-  readonly textures: THREE.DataTexture[] = [];
+  readonly textures: THREE.Texture[] = [];
   readonly finishes: Record<Finish, THREE.MeshStandardMaterial>;
   readonly glass: THREE.MeshStandardMaterial;
   readonly roots: THREE.Group[] = [];
@@ -50,11 +50,14 @@ export class CultivationContaminationArt {
     return result;
   }
 
-  addRoom(root: THREE.Group, room: 1 | 2 | 3, warning: THREE.MeshStandardMaterial): void {
+  addRoom(root: THREE.Group, room: 1 | 2 | 3, warning: THREE.MeshStandardMaterial, options: {authoredReplacement?: boolean} = {}): void {
     const width = room === 1 ? 36 : room === 2 ? 38 : 48;
     const group = new THREE.Group();
     group.name = `cultivation-room-${room}-contamination`;
     group.userData.presentationOnly = true;
+    if (options.authoredReplacement) {
+      root.add(group); this.roots.push(group); this.lightRoom(root, room); return;
+    }
     const parts = new Map<THREE.Material, THREE.BufferGeometry[]>();
     const add = (material: THREE.Material, geometry: THREE.BufferGeometry) => {
       const list = parts.get(material) ?? []; list.push(geometry); parts.set(material, list);
@@ -310,7 +313,7 @@ export class CultivationContaminationArt {
   }
 
 
-  private glassAtlas(): THREE.DataTexture {
+  private glassAtlas(): THREE.Texture {
     const map = this.assets.textures('glass').albedo;
     this.textures.push(map);
     return map;

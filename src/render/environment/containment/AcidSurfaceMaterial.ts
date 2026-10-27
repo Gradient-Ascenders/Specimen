@@ -43,6 +43,8 @@ interface AcidSurfaceUniforms {
 export interface AcidSurfaceMaterialOptions {
   readonly foundationMap?: THREE.Texture;
   readonly microNormalMap?: THREE.Texture;
+  /** Room-local glow; uses the existing liquid shader and adds no lights. */
+  readonly emissionStrength?: number;
 }
 
 export interface AcidSurfaceMaterialDiagnostics {
@@ -75,7 +77,7 @@ export class AcidSurfaceMaterial extends THREE.MeshStandardMaterial {
       name: 'room-3-hazardous-chemical-liquid',
       color: 0x3d5215,
       emissive: 0x111a03,
-      emissiveIntensity: 0.025,
+      emissiveIntensity: options.emissionStrength ?? DEFAULT_ACID_EMISSION_STRENGTH,
       roughness: 0.3,
       metalness: 0,
       normalScale: new THREE.Vector2(0.018, 0.018),
@@ -97,7 +99,7 @@ export class AcidSurfaceMaterial extends THREE.MeshStandardMaterial {
       uFlowScale: { value: DEFAULT_ACID_FLOW_SCALE },
       uBubbleScale: { value: DEFAULT_ACID_BUBBLE_SCALE },
       uBubbleStrength: { value: DEFAULT_ACID_BUBBLE_STRENGTH },
-      uEmissionStrength: { value: DEFAULT_ACID_EMISSION_STRENGTH },
+      uEmissionStrength: { value: options.emissionStrength ?? DEFAULT_ACID_EMISSION_STRENGTH },
     };
 
     this.onBeforeCompile = (shader) => {

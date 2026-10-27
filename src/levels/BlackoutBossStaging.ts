@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { BlackoutCheckpointDefinition } from './BlackoutCheckpointManager.ts';
 import { BLACKOUT_TRANSIT_EXIT_HALLWAY } from './BlackoutTransitRoom.ts';
 import { BlackoutAscentLift, BLACKOUT_ASCENT_LIFT } from './BlackoutAscentLift.ts';
+import type {BlackoutMaintenanceMaterials} from '../render/environment/blackout/BlackoutMaintenanceMaterials.ts';
 
 const ENTRY_Z = BLACKOUT_TRANSIT_EXIT_HALLWAY.endZ;
 const CENTRE_Z = ENTRY_Z + 8;
@@ -28,9 +29,9 @@ export class BlackoutBossStaging {
   private readonly collisionMaterial = new THREE.MeshBasicMaterial({visible:false});
   private readonly amber = new THREE.MeshStandardMaterial({color:0xf8be58,emissive:0xffb73d,emissiveIntensity:.7});
 
-  constructor(openToArena = false) {
+  constructor(openToArena = false,kit?:BlackoutMaintenanceMaterials) {
     if (openToArena) {
-      this.ascentLift = new BlackoutAscentLift();
+      this.ascentLift = new BlackoutAscentLift(kit);
       this.root.add(this.ascentLift.root); this.collisionMeshes.push(...this.ascentLift.collisionMeshes);
       return;
     }

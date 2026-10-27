@@ -1,3 +1,4 @@
+import type {SecurityDroneGeometrySource} from '../render/hazards/SecurityDronePresentation.ts';
 import { SewerDroneMotion, sewerDroneLampPower, WEAK_SEWER_DRONE } from './WeakSewerDrone.ts';
 import { batchMaintenanceScout } from '../render/hazards/BatchMaintenanceScout.ts';
 import { WorldAudioSource } from '../audio/WorldAudio.ts';
@@ -6,6 +7,8 @@ import { applyCultivationShadowRoles } from '../render/environment/cultivation/C
 import { CultivationPlatformBoosters } from '../render/environment/cultivation/CultivationPlatformBoosters.ts';
 import * as THREE from 'three';
 import { ScannerBeamPresentation } from '../render/hazards/ScannerBeamPresentation.ts';
+import { ShadowedDroneBeam } from '../render/hazards/ShadowedDroneBeam.ts';
+import type { GraphicsSettings } from '../render/GraphicsProfiles.ts';
 import { RoomFivePatrol } from './RoomFivePatrol.ts';
 import { ROOM_FIVE_JUMPS } from '../levels/RoomFiveParkour.ts';
 import { createRustedSewerDrone } from '../levels/RustedSewerDrone.ts';
@@ -35,11 +38,15 @@ export class RoomFiveDroneEncounter {
   readonly patrols: RoomFivePatrol[] = [];
   private readonly flightAudio: WorldAudioSource[] = [];
   private readonly networks: SecurityNetwork[] = [];
-  private readonly flyers: ReturnType<typeof createRustedSewerDrone>[] = [];
+  private readonly flyers: {body:THREE.Object3D;eye:THREE.Mesh<THREE.BufferGeometry,THREE.MeshBasicMaterial>;authored:boolean}[] = [];
+  private readonly authoredModels:boolean;
   private readonly resources: SecurityDronePresentationResources;
   private readonly targets: readonly SecurityDroneTarget[];
   private readonly projectileTargets: readonly DroneProjectileTarget[];
   private readonly beams: THREE.Mesh[] = [];
+  private readonly beamVolumes: ShadowedDroneBeam[] = [];
+  private contactHardening = false;
+  private readonly lampPosition = new THREE.Vector3();
   private readonly scannerBeams: ScannerBeamPresentation;
   private readonly searchLights: THREE.SpotLight[] = [];
   private readonly sewerLight = new THREE.PointLight(0xff7935, 0, 8);
@@ -57,8 +64,9 @@ export class RoomFiveDroneEncounter {
   constructor(room: LevelTwoRoomFiveGreybox, world: CollisionWorld, surfaces: SurfaceRegistry,
     bob: KinematicBody, goop: KinematicBody, requestDeath: (id: 'bob' | 'goop') => boolean,
     surfaceMaps?: { bumpMap: THREE.Texture | null; roughnessMap: THREE.Texture | null },
-    boosterScope?: THREE.Object3D) {
-    this.resources = new SecurityDronePresentationResources(surfaceMaps);
+    boosterScope?: THREE.Object3D, models?:SecurityDroneGeometrySource) {
+    this.authoredModels=!!models;
+    this.resources = new SecurityDronePresentationResources(surfaceMaps,!!models,!!models,models);
     this.room = room;
     this.sewerLighting = new CultivationSewerLighting(room.root, surfaceMaps);
     this.platformBoosters = new CultivationPlatformBoosters(room, surfaceMaps, boosterScope);
@@ -117,24 +125,33 @@ export class RoomFiveDroneEncounter {
       drone.root.userData.route = index;
       this.networks.push(network);
       this.patrols.push(new RoomFivePatrol(position.clone(), forward.clone(), partner ? Math.PI : 0));
-      const flyer = createRustedSewerDrone(false);
-      batchMaintenanceScout(flyer.body, flyer.eye, surfaceMaps);
-      flyer.body.scale.setScalar(.75);
-      flyer.body.name = `${drone.id}-flying-shell`;
+      if(models){
+        const shell=drone.presentation.root.getObjectByName(`${drone.id}-tracking-head`)!;
+        // The finale already owns this shell's flight orientation. Retain its
+        // anchor on the existing aim pivot, avoiding a second rotation layer.
+        shell.name=`${drone.id}-flying-shell`;
+        this.flyers.push({body:shell,eye:drone.frontIndicator,authored:true});
+      }else{
+        const flyer = createRustedSewerDrone(false);
+        batchMaintenanceScout(flyer.body, flyer.eye, surfaceMaps);
+        flyer.body.scale.setScalar(.75);
+        flyer.body.name = `${drone.id}-flying-shell`;
+        drone.presentation.root.visible = false; drone.root.add(flyer.body);
+        this.flyers.push({...flyer,authored:false});
+      }
       // Network switches disable weapons; these patrols still hover in place.
       this.flightAudio.push(new WorldAudioSource({ root: drone.root, kind: 'drone', enabled: () => !this.cinematic }));
-      drone.presentation.root.visible = false; drone.root.add(flyer.body); this.flyers.push(flyer);
       // Saturated blue, with stronger opacity so it stays readable without whitening it.
       const beamColour = network === 'blue' ? 0x165dff : ROOM_FIVE_NETWORK_COLOURS[network];
-      const beam = new THREE.Mesh(new THREE.ConeGeometry(Math.tan(ROOM_FIVE_DRONE_VIEW_HALF_ANGLE) * ROOM_FIVE_DRONE_VIEW_RANGE, ROOM_FIVE_DRONE_VIEW_RANGE, 24, 1, true),
-        new THREE.MeshBasicMaterial({ color: beamColour, transparent: true, opacity: network === 'blue' ? .09 : .02, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true }));
-      beam.geometry.translate(0, -ROOM_FIVE_DRONE_VIEW_RANGE / 2, 0); beam.name = `room-5-${network}-scanner-${index}`;
-      beam.position.copy(position); room.root.add(beam); this.beams.push(beam);
-      const search = new THREE.SpotLight(beamColour, network === 'blue' ? 65 : 45, ROOM_FIVE_DRONE_VIEW_RANGE, ROOM_FIVE_DRONE_VIEW_HALF_ANGLE, .2, 2);
+      const search = new THREE.SpotLight(beamColour, 65, ROOM_FIVE_DRONE_VIEW_RANGE, ROOM_FIVE_DRONE_VIEW_HALF_ANGLE, .2, 2);
       search.name = `${drone.id}-search-light`; search.castShadow = true;
-      search.shadow.mapSize.set(512, 512); search.shadow.bias = -.0002; search.shadow.normalBias = .025;
-      search.shadow.camera.near = .2;
+      search.shadow.mapSize.set(512, 512); search.shadow.bias = -.00015; search.shadow.normalBias = .012;
+      search.shadow.camera.near = .35;
       room.root.add(search, search.target); this.searchLights.push(search);
+      const volume = new ShadowedDroneBeam(search, ROOM_FIVE_DRONE_VIEW_RANGE, ROOM_FIVE_DRONE_VIEW_HALF_ANGLE,
+        { colour: beamColour, opacity: network === 'blue' ? .09 : .075, soft: true, occlusionFallback: true });
+      const beam = volume.mesh; beam.name = `room-5-${network}-scanner-${index}`;
+      beam.position.copy(position); room.root.add(beam); this.beams.push(beam); this.beamVolumes.push(volume);
       return drone;
     };
     const drones = ROOM_FIVE_ROUTE_NETWORKS.map((network, index) => makePatrol(network, index));
@@ -179,9 +196,9 @@ export class RoomFiveDroneEncounter {
       drone.update(dt, this.targets);
       drone.frontIndicator.material.color.setHex(drone.readModel.enabled ? ROOM_FIVE_NETWORK_COLOURS[network] : 0x20252a);
       this.direction.copy(drone.readModel.scanDirection);
-      this.flyers[i].body.quaternion.setFromUnitVectors(this.sewerForward, this.direction);
+      if(!this.flyers[i].authored)this.flyers[i].body.quaternion.setFromUnitVectors(this.sewerForward, this.direction);
       this.flyers[i].eye.material.color.copy(drone.frontIndicator.material.color);
-      const search = this.searchLights[i]; search.intensity = enabled ? (network === 'blue' ? 65 : 45) : 0;
+      const search = this.searchLights[i]; search.intensity = enabled ? 65 : 0;
       search.shadow.autoUpdate = enabled;
       search.shadow.needsUpdate = enabled || search.shadow.map === null;
       // Shadow maps now handle partial occlusion without cutting all illumination short.
@@ -207,16 +224,38 @@ export class RoomFiveDroneEncounter {
     if (sewerState === 'dormant') this.room.sewer.eye.material.color.setHex(0x080b07);
     this.projectiles.update(dt, this.projectileTargets);
   }
+  /** Skins/effects only: the render scope never hides colliders or light owners. */
+  get chamberPresentationRoots():readonly THREE.Object3D[]{
+    return [...this.drones.map(drone=>drone.presentation.root),...this.flyers.filter(flyer=>!flyer.authored).map(flyer=>flyer.body),
+      ...this.beams,this.platformBoosters.root];
+  }
+
   /** Cosmetic queries run once per presented frame, after room/camera selection. */
   updatePresentation(deltaSeconds: number, camera: THREE.Camera): void {
     if (this.disposed) return;
+    let hero = -1, nearest = Infinity;
+    for (let i = 0; this.contactHardening && i < this.searchLights.length; i++) {
+      const light = this.searchLights[i];
+      const distance = light.getWorldPosition(this.lampPosition).distanceToSquared(camera.position);
+      if (light.intensity > 0 && distance < nearest) { nearest = distance; hero = i; }
+    }
     for (let i = 0; i < this.drones.length; i++) {
       const drone = this.drones[i], beam = this.beams[i];
+      this.searchLights[i].shadow.radius = i === hero ? -ROOM_FIVE_DRONE_VIEW_RANGE : 1.25;
+      drone.presentation.updateDetail(camera);
       beam.position.copy(drone.root.position).addScaledVector(drone.readModel.scanDirection, 1.4);
       this.direction.copy(drone.readModel.scanDirection).negate();
       beam.quaternion.setFromUnitVectors(this.up, this.direction);
     }
     this.scannerBeams.update(deltaSeconds, camera);
+  }
+  setLightingQuality(settings: GraphicsSettings, type: THREE.ShadowMapType): void {
+    this.contactHardening = type === THREE.BasicShadowMap;
+    for (let i = 0; i < this.beamVolumes.length; i++) {
+      const volume = this.beamVolumes[i]; volume.setShadowType(type);
+      const base = this.networks[i] === 'blue' ? .09 : .075;
+      volume.mesh.material.uniforms.beamOpacity.value = base * (.7 + .3 * settings.effectsDensity);
+    }
   }
   private updateSewerLightPosition(): void {
     const shell = this.room.brokenCore;
@@ -242,7 +281,7 @@ export class RoomFiveDroneEncounter {
     }
     for (let i = 0; i < this.drones.length; i++) {
       this.patrols[i].reset(); this.drones[i].reset();
-      this.drones[i].setPresentationVisible(false);
+      this.drones[i].setPresentationVisible(this.authoredModels);
       this.drones[i].root.position.copy(this.patrols[i].position);
       this.drones[i].setPatrolDirection(this.patrols[i].direction);
     }
@@ -273,6 +312,7 @@ export class RoomFiveDroneEncounter {
     this.sewerLight.removeFromParent(); disposeShadowLight(this.sewerLight);
     for (const light of this.searchLights) { light.target.removeFromParent(); light.removeFromParent(); disposeShadowLight(light); }
     for (const flyer of this.flyers) {
+      if(flyer.authored)continue;
       const geometries = new Set<THREE.BufferGeometry>(), materials = new Set<THREE.Material>();
       flyer.body.traverse(object => { if (object instanceof THREE.Mesh) {
         geometries.add(object.geometry);

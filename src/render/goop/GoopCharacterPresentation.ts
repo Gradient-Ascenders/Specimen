@@ -74,6 +74,7 @@ export class GoopCharacterPresentation {
   private bodyReflection = 0;
   private eyeReflection = 0;
   private reflectionSnapPending = true;
+  private spawnYaw = 0;
   private yaw = 0;
   private previousYaw = 0;
   private targetYaw = 0;
@@ -197,6 +198,8 @@ export class GoopCharacterPresentation {
   get detailDiagnostics() { return this.detail?.diagnostics; }
 
   setPosition(position: Vector3State): void { this.position.set(position.x, position.y, position.z); this.character.position.copy(this.position); }
+  /** Level heading restored on recovery, independent of temporary cinematic turns. */
+  setSpawnYaw(yaw: number): void { this.spawnYaw = yaw; this.setYaw(yaw); }
   setYaw(yaw: number): void {
     this.yaw = this.previousYaw = this.targetYaw = yaw;
     this.reversing = false; this.reversalRemaining = 0; this.hasTravelHeading = false;
@@ -411,7 +414,7 @@ export class GoopCharacterPresentation {
     this.baseOffsetWorld.set(0, 0, 0); this.previousBaseOffsetWorld.set(0, 0, 0);
     this.moving = this.hasTravelHeading = this.reversing = this.impactPending = false;
     this.grounded = true; this.impactNormal.set(0, 1, 0);
-    this.seededTravel = false; this.yaw = this.previousYaw = this.targetYaw = 0;
+    this.seededTravel = false; this.yaw = this.previousYaw = this.targetYaw = this.spawnYaw;
     this.reflectionSnapPending = true;
     this.materials?.reset(); this.opacity = 1; this.requestedVisible = true;
     this.applyVisibility(); this.present();

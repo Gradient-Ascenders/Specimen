@@ -50,6 +50,8 @@ export class ElevatorPresentation {
 
   private warningLightIntensityValue = 0;
   private arrivalCueVisibleValue = false;
+  private authoredCar:THREE.Group|undefined;
+  private authoredActive=false;
 
   constructor(sequence: ElevatorSequence) {
     this.sequence = sequence;
@@ -78,6 +80,38 @@ export class ElevatorPresentation {
       arrivalCueVisible: this.arrivalCueVisibleValue,
       exitRouteVisible: this.exitRoute.visible,
     };
+  }
+
+  /** Mount the empty owner before visibility/prewarm scopes are collected. */
+  mountAuthoredCar(root:THREE.Group):void{
+    this.authoredCar=root;this.platformDecoration.add(root);
+  }
+
+  activateAuthoredCar():()=>void{
+    const previous=this.platformDecoration.children.filter(object=>object!==this.authoredCar&&
+      !(object instanceof THREE.Light)&&!/-warning-light-(housing|lens)$/.test(object.name))
+      .map(object=>({object,visible:object.visible}));
+    for(const {object} of previous)object.visible=false;
+    const material=this.closedShutter.material as THREE.Material,visible=material.visible;
+    material.visible=false;
+    const route=this.exitRoute.children.map(object=>({object,visible:object.visible}));
+    for(const {object} of route)object.visible=false;
+    const beaconPosition=this.arrivalBeacon.position.clone();
+    this.arrivalBeacon.position.set(this.sequence.routeEnd.x,this.sequence.routeEnd.y+3.80,
+      this.sequence.routeEnd.z+5.54);
+    this.authoredActive=true;
+    let detached=false;
+    return ()=>{
+      if(detached)return;detached=true;
+      for(const item of [...previous,...route])item.object.visible=item.visible;
+      material.visible=visible;this.arrivalBeacon.position.copy(beaconPosition);this.authoredActive=false;
+    };
+  }
+
+  get renderSources():readonly THREE.Object3D[]{
+    if(!this.authoredActive)return [this.platformDecoration,this.root];
+    return [...this.platformDecoration.children.filter(object=>object===this.authoredCar||
+      object instanceof THREE.Light||/-warning-light-(housing|lens)$/.test(object.name)),this.arrivalBeacon];
   }
 
   /** Derive every transient cue directly from current runtime state. */

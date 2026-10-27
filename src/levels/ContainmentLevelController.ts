@@ -9,6 +9,7 @@ import { PuzzleRegistry, type ResettablePuzzleComponent } from '../puzzle/Puzzle
 import type { DeathRecoveryAction } from '../systems/DeathSequence.ts';
 import { ContainmentLevelScene, type ContainmentHazardFailure } from './ContainmentLevelScene.ts';
 import { LevelTriggerVolume } from './LevelTriggerVolume.ts';
+import type { CheckpointReachedEvent } from './GameLevelRuntime.ts';
 import {
   ROOM_3_CHECKPOINT_ID,
   ROOM_3_CHECKPOINT_POSITION,
@@ -34,11 +35,12 @@ const BUTTON_CONTACT_SECONDS = 0.08;
 export type ContainmentLevelState = 'playing' | 'completing' | 'complete';
 export const CONTAINMENT_ROOM_OBJECTIVES = {
   1: 'Climb through the vent',
-  2: 'Learn how to jump',
-  3: 'Get past the lasers',
-  4: 'Survive the elevator!',
-  5: 'Free Goop!',
+  2: 'Cross the platforms to reach the next chamber',
+  3: 'Time your jumps through the laser chamber',
+  4: 'Survive the lift and reach the upper floor',
+  5: 'Reach the release controls and free Goop',
 } as const;
+const ROOM_LABELS = { 1: 'Incubation', 2: 'Traversal lab', 3: 'Laser chamber', 4: 'Freight lift', 5: 'Containment atrium' } as const;
 export type ContainmentRoomId = keyof typeof CONTAINMENT_ROOM_OBJECTIVES;
 const DEBUG_ROOM_ENTRY_CHECKPOINT_IDS: Readonly<
   Record<ContainmentRoomId, string>
@@ -56,6 +58,7 @@ export interface ContainmentObjectiveChangedEvent {
 }
 
 export interface ContainmentLevelEvents {
+  checkpointReached: CheckpointReachedEvent;
   damaged: ContainmentHazardFailure;
   objectiveChanged: ContainmentObjectiveChangedEvent;
   completed: {
@@ -329,7 +332,7 @@ export class ContainmentLevelController {
       // Secure the upper recovery point as soon as the lift stops, but keep
       // Room 4 authoritative until its arrival pause has actually opened the
       // exit. Otherwise switching active rooms strands the sequence forever.
-      this.checkpoints.activate(ROOM_5_ENTRY_CHECKPOINT_ID);
+      this.activateCheckpoint(5, ROOM_5_ENTRY_CHECKPOINT_ID);
     }
     if (!exitWasReady && this.scene.roomFour.elevator.exitReady) {
       this.activateRoomFiveEntryCheckpoint();
@@ -397,7 +400,7 @@ export class ContainmentLevelController {
     // but it does not transfer simulation ownership. A recovery spawn lies in
     // Room 5's entry trigger, so that trigger must not strand Room 4's
     // arrivalPause by advancing ownership prematurely.
-    this.checkpoints.activate(ROOM_5_ENTRY_CHECKPOINT_ID);
+    this.activateCheckpoint(5, ROOM_5_ENTRY_CHECKPOINT_ID);
     if (!this.scene.roomFour.elevator.exitReady) return;
 
     this.setActiveRoom(5);
@@ -408,8 +411,14 @@ export class ContainmentLevelController {
     checkpointId: string,
   ): void {
     if (roomId <= this.activeRoomIdValue) return;
-    this.checkpoints.activate(checkpointId);
+    this.activateCheckpoint(roomId, checkpointId);
     this.setActiveRoom(roomId);
+  }
+
+  private activateCheckpoint(roomId: ContainmentRoomId, checkpointId: string): void {
+    const changed = this.checkpoints.activeCheckpointId !== checkpointId;
+    this.checkpoints.activate(checkpointId);
+    if (changed) this.events.emit('checkpointReached', { checkpointId, roomId, label: ROOM_LABELS[roomId] });
   }
 
   private setActiveRoom(roomId: ContainmentRoomId, force = false): void {

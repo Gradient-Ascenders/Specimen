@@ -1,0 +1,739 @@
+{
+  "version": "SPBK0001",
+  "sources": {
+    "assets/environments/blackout-maintenance/maintenance-bay.glb": "51ae5971f3a6b4ca4f3a45820c3d6231ecacfa57af7296b156b5fbbffa423c5e",
+    "assets/environments/blackout-transit/transit-hall.glb": "d7ed9f32da0191e2223083e18716c1983c05c42569fcbf4cb36edafe23513c6b",
+    "assets/environments/blackout-ascent/research-ascent.glb": "91fc51bdfebd0de7b9b8fd79d3390e20b4e69171189df1d98d5442d0cb45f44a",
+    "generatorSha256": "1a24dbe5ae1bf6ad5a9dcb7872b214ede131db5cfa39d6c979b967e9c238f1fe"
+  },
+  "geometrySha256": "7ce220f7c9e964c420babe2b010c4295c039c5afbcb5e3a6af0f5aea8dfa8b65",
+  "triangles": 53356,
+  "meshCount": 253,
+  "lights": [
+    {
+      "name": "",
+      "position": [
+        -6,
+        1.1,
+        53.6
+      ],
+      "colour": [
+        0.181164244239483,
+        0.8227857543924378,
+        1
+      ],
+      "intensity": 0.5,
+      "range": 3,
+      "decay": 2,
+      "circuit": -1,
+      "zones": [
+        0,
+        1,
+        2,
+        7
+      ]
+    },
+    {
+      "name": "hallway-flicker-light-1",
+      "position": [
+        6,
+        3.7,
+        56.5
+      ],
+      "colour": [
+        1,
+        0.623960391667596,
+        0.16202937562896222
+      ],
+      "intensity": 8,
+      "range": 8.2,
+      "decay": 2,
+      "circuit": -1,
+      "zones": [
+        0,
+        1,
+        2,
+        7
+      ],
+      "target": [
+        6,
+        0,
+        56.5
+      ],
+      "angle": 0.95,
+      "penumbra": 0.45
+    },
+    {
+      "name": "hallway-flicker-light-2",
+      "position": [
+        6,
+        3.7,
+        62
+      ],
+      "colour": [
+        1,
+        0.623960391667596,
+        0.16202937562896222
+      ],
+      "intensity": 8,
+      "range": 8.2,
+      "decay": 2,
+      "circuit": -1,
+      "zones": [
+        0,
+        1,
+        2,
+        7
+      ],
+      "target": [
+        4.6,
+        1,
+        63
+      ],
+      "angle": 0.95,
+      "penumbra": 0.45
+    },
+    {
+      "name": "hallway-flicker-light-3",
+      "position": [
+        6,
+        3.7,
+        68
+      ],
+      "colour": [
+        1,
+        0.623960391667596,
+        0.16202937562896222
+      ],
+      "intensity": 8,
+      "range": 8.2,
+      "decay": 2,
+      "circuit": -1,
+      "zones": [
+        0,
+        1,
+        2,
+        7
+      ],
+      "target": [
+        6,
+        0,
+        68
+      ],
+      "angle": 0.95,
+      "penumbra": 0.45
+    },
+    {
+      "name": "hallway-flicker-light-4",
+      "position": [
+        6,
+        3.7,
+        74
+      ],
+      "colour": [
+        1,
+        0.623960391667596,
+        0.16202937562896222
+      ],
+      "intensity": 8,
+      "range": 8.2,
+      "decay": 2,
+      "circuit": -1,
+      "zones": [
+        0,
+        1,
+        2,
+        7
+      ],
+      "target": [
+        7,
+        0.4,
+        76
+      ],
+      "angle": 0.95,
+      "penumbra": 0.45
+    },
+    {
+      "name": "",
+      "position": [
+        -9,
+        3.55,
+        53.25
+      ],
+      "colour": [
+        1,
+        0.02028856305209031,
+        0.008023192982520563
+      ],
+      "intensity": 0.7,
+      "range": 2,
+      "decay": 2,
+      "circuit": -1,
+      "zones": [
+        0,
+        1,
+        2,
+        7
+      ]
+    },
+    {
+      "name": "transit-exit-hallway-light-1",
+      "position": [
+        0,
+        5.3,
+        159
+      ],
+      "colour": [
+        1,
+        0.623960391667596,
+        0.16202937562896222
+      ],
+      "intensity": 22.31814359002164,
+      "range": 8,
+      "decay": 2,
+      "circuit": -1,
+      "zones": [
+        0,
+        1,
+        2,
+        7
+      ]
+    },
+    {
+      "name": "transit-exit-hallway-light-2",
+      "position": [
+        0,
+        5.3,
+        165
+      ],
+      "colour": [
+        1,
+        0.623960391667596,
+        0.16202937562896222
+      ],
+      "intensity": 20.428324533288556,
+      "range": 8,
+      "decay": 2,
+      "circuit": -1,
+      "zones": [
+        0,
+        1,
+        2,
+        7
+      ]
+    },
+    {
+      "name": "transit-exit-hallway-light-3",
+      "position": [
+        0,
+        5.3,
+        171
+      ],
+      "colour": [
+        1,
+        0.623960391667596,
+        0.16202937562896222
+      ],
+      "intensity": 12.488271648825737,
+      "range": 8,
+      "decay": 2,
+      "circuit": -1,
+      "zones": [
+        0,
+        1,
+        2,
+        7
+      ]
+    },
+    {
+      "name": "transit-light-a-illumination",
+      "position": [
+        14,
+        8.05,
+        96
+      ],
+      "colour": [
+        1,
+        0.6938717612856897,
+        0.28314874041918053
+      ],
+      "intensity": 110,
+      "range": 23,
+      "decay": 2,
+      "circuit": 0,
+      "zones": [
+        3
+      ],
+      "target": [
+        12,
+        0.40000000000000036,
+        96
+      ],
+      "angle": 1.02,
+      "penumbra": 0.6
+    },
+    {
+      "name": "transit-light-b-illumination",
+      "position": [
+        14,
+        11.75,
+        120
+      ],
+      "colour": [
+        1,
+        0.6938717612856897,
+        0.28314874041918053
+      ],
+      "intensity": 110,
+      "range": 23,
+      "decay": 2,
+      "circuit": 1,
+      "zones": [
+        4
+      ],
+      "target": [
+        12,
+        4.1,
+        120
+      ],
+      "angle": 1.02,
+      "penumbra": 0.6
+    },
+    {
+      "name": "transit-light-c-illumination",
+      "position": [
+        -4,
+        8.55,
+        139
+      ],
+      "colour": [
+        1,
+        0.6938717612856897,
+        0.28314874041918053
+      ],
+      "intensity": 110,
+      "range": 23,
+      "decay": 2,
+      "circuit": 2,
+      "zones": [
+        5
+      ],
+      "target": [
+        -3,
+        0.9000000000000004,
+        139
+      ],
+      "angle": 1.02,
+      "penumbra": 0.6
+    },
+    {
+      "name": "transit-light-d-illumination",
+      "position": [
+        10,
+        14.05,
+        142.5
+      ],
+      "colour": [
+        1,
+        0.6938717612856897,
+        0.28314874041918053
+      ],
+      "intensity": 110,
+      "range": 23,
+      "decay": 2,
+      "circuit": 3,
+      "zones": [
+        6
+      ],
+      "target": [
+        8,
+        6.4,
+        142.5
+      ],
+      "angle": 1.02,
+      "penumbra": 0.6
+    },
+    {
+      "name": "service-car-average-passing-spill",
+      "position": [
+        4.4,
+        4,
+        180.1
+      ],
+      "colour": [
+        0.35,
+        0.55,
+        0.65
+      ],
+      "intensity": 8,
+      "range": 12,
+      "decay": 2,
+      "circuit": 4,
+      "zones": [
+        8
+      ]
+    },
+    {
+      "name": "lift-white-lab-light",
+      "position": [
+        0,
+        5,
+        187.4
+      ],
+      "colour": [
+        0.7011018919268015,
+        0.8631572134510892,
+        1
+      ],
+      "intensity": 95,
+      "range": 17,
+      "decay": 2,
+      "circuit": 5,
+      "zones": [
+        9
+      ]
+    }
+  ],
+  "layout": [
+    {
+      "name": "maintenance-bay",
+      "min": [
+        -17,
+        0,
+        -2
+      ],
+      "max": [
+        17,
+        12,
+        54
+      ],
+      "grid": [
+        7,
+        4,
+        9
+      ],
+      "capture": [
+        0,
+        4,
+        26
+      ],
+      "circuit": -1
+    },
+    {
+      "name": "service-hall",
+      "min": [
+        3,
+        0,
+        54
+      ],
+      "max": [
+        9,
+        4.5,
+        80
+      ],
+      "grid": [
+        3,
+        3,
+        7
+      ],
+      "capture": [
+        6,
+        1.8,
+        66
+      ],
+      "circuit": -1
+    },
+    {
+      "name": "volt-duct",
+      "min": [
+        -17.6,
+        0,
+        53.5
+      ],
+      "max": [
+        -5,
+        5,
+        80
+      ],
+      "grid": [
+        5,
+        3,
+        7
+      ],
+      "capture": [
+        -16,
+        1.5,
+        67
+      ],
+      "circuit": -1
+    },
+    {
+      "name": "distribution-a",
+      "min": [
+        -18,
+        -0.6,
+        80
+      ],
+      "max": [
+        18,
+        18,
+        108
+      ],
+      "grid": [
+        7,
+        5,
+        7
+      ],
+      "capture": [
+        4,
+        5,
+        96
+      ],
+      "circuit": 0
+    },
+    {
+      "name": "distribution-b",
+      "min": [
+        -18,
+        -0.6,
+        106
+      ],
+      "max": [
+        18,
+        18,
+        129
+      ],
+      "grid": [
+        7,
+        5,
+        7
+      ],
+      "capture": [
+        4,
+        7,
+        120
+      ],
+      "circuit": 1
+    },
+    {
+      "name": "distribution-c",
+      "min": [
+        -18,
+        -0.6,
+        127
+      ],
+      "max": [
+        18,
+        18,
+        151
+      ],
+      "grid": [
+        7,
+        5,
+        7
+      ],
+      "capture": [
+        -2,
+        4,
+        138
+      ],
+      "circuit": 2
+    },
+    {
+      "name": "switch-platform",
+      "min": [
+        5,
+        5,
+        134
+      ],
+      "max": [
+        17,
+        18,
+        148
+      ],
+      "grid": [
+        4,
+        4,
+        5
+      ],
+      "capture": [
+        10,
+        10,
+        142.5
+      ],
+      "circuit": 3
+    },
+    {
+      "name": "lift-approach",
+      "min": [
+        -4.4,
+        0,
+        151
+      ],
+      "max": [
+        4.4,
+        6.5,
+        176.5
+      ],
+      "grid": [
+        3,
+        3,
+        7
+      ],
+      "capture": [
+        0,
+        2,
+        164
+      ],
+      "circuit": -1
+    },
+    {
+      "name": "service-car",
+      "min": [
+        -5.8,
+        -1,
+        176.5
+      ],
+      "max": [
+        5.8,
+        8,
+        184.9
+      ],
+      "grid": [
+        5,
+        4,
+        5
+      ],
+      "capture": [
+        0,
+        2.5,
+        180.7
+      ],
+      "circuit": 4
+    },
+    {
+      "name": "research-landing",
+      "min": [
+        -6.4,
+        0.4,
+        184.9
+      ],
+      "max": [
+        6.4,
+        7.2,
+        190
+      ],
+      "grid": [
+        5,
+        4,
+        3
+      ],
+      "capture": [
+        0,
+        2.5,
+        187
+      ],
+      "circuit": 5
+    }
+  ],
+  "zoneTints": [
+    [
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1
+    ]
+  ],
+  "rays": 48,
+  "captureSize": [
+    64,
+    32
+  ],
+  "atlas": [
+    7,
+    20,
+    168
+  ],
+  "bandHeight": 5,
+  "geometryFile": "../../../artifacts/evidence/blackout-lighting/bake-geometry.bin",
+  "liquids": [
+    {
+      "min": [
+        -17,
+        -2,
+        7
+      ],
+      "max": [
+        17,
+        -0.8,
+        48
+      ],
+      "colour": [
+        0.0004,
+        0.0012,
+        0.00016
+      ]
+    },
+    {
+      "min": [
+        -18,
+        -2,
+        88
+      ],
+      "max": [
+        18,
+        -0.8,
+        145
+      ],
+      "colour": [
+        0.0016,
+        0.0044,
+        0.0004
+      ]
+    }
+  ]
+}

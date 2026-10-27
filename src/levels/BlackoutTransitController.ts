@@ -23,7 +23,9 @@ import { WEAK_SEWER_DRONE } from '../hazards/WeakSewerDrone.ts';
 import type { DissolveSystem } from '../abilities/DissolveSystem.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
 import { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
+import {disposeShadowLight} from '../render/ShadowLightResources.ts';
 import { SlimeDamageSystem } from '../systems/SlimeDamageSystem.ts';
+import type { BlackoutTransitArtBindings, BlackoutTransitArtDevice, BlackoutTransitArtLoader } from '../render/environment/blackout/BlackoutTransitArt.ts';
 
 export type TransitSlimeId = 'bob' | 'goop' | 'volt';
 export type TransitBodies = Record<TransitSlimeId, KinematicBody>;
@@ -56,7 +58,7 @@ interface TransitSnapshot {
 interface MutableTimedReceiver {
   readonly target: ElectricalConnectionTarget;
   readonly root: THREE.Group;
-  readonly light: THREE.PointLight;
+  readonly light: THREE.PointLight | THREE.SpotLight;
   readonly unregister: () => void;
   readonly targetMaterial: THREE.MeshStandardMaterial;
   readonly ownsTargetMaterial: boolean;
@@ -127,7 +129,8 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   private readonly steel = new THREE.MeshStandardMaterial({ color: 0x2a3337, roughness: 0.7, metalness: 0.72 });
   private readonly indicatorMaterials: THREE.MeshStandardMaterial[] = [];
   private readonly targetUnregisters: (() => void)[] = [];
-  private readonly lampLights: THREE.PointLight[] = [];
+  private readonly lampLights: THREE.SpotLight[] = [];
+  get lightBanks():readonly THREE.SpotLight[]{return this.lampLights;}
   private readonly bridge: THREE.Mesh;
   get voltRouteCleared(): boolean { return this.guardDestroyed(2); }
   private bridgeRegistered = false;
@@ -164,7 +167,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
       this.damage.events.on('died', ({ slimeId }) => { this.pendingFailure = slimeId; });
       const lights = this.room.receiverPositions.map((position, index) => {
         const target = this.makeReceiver(`transit-light-${String.fromCharCode(97 + index)}`, `Light bank ${String.fromCharCode(65 + index)}`, position, options.electricalTargets, unregisterTargets, true);
-        this.lampLights.push(target.light);
+        this.lampLights.push(target.light as THREE.SpotLight);
         return target;
       });
       this.lights = lights;
@@ -320,6 +323,25 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
 
   get isActive(): boolean { return this.active; }
 
+  prepareArt(loader?: BlackoutTransitArtLoader): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    const owners: BlackoutTransitArtBindings['owners'] = new Map<BlackoutTransitArtDevice, THREE.Object3D>([
+      ['LiftA', this.lifts[0]!.root], ['LiftB', this.lifts[1]!.root], ['Bridge', this.bridge],
+      ['BankA', this.lights[0]!.root], ['BankB', this.lights[1]!.root], ['BankC', this.lights[2]!.root],
+      ['BankD', this.lights[3]!.root],
+    ]);
+    const retiredDevices: THREE.Mesh[] = [this.bridge];
+    for (const lift of this.lifts) {
+      retiredDevices.push(lift.platform.collisionMesh);
+      const stem = lift.root.getObjectByName(lift.id + '-contact-mount');
+      if (stem instanceof THREE.Mesh) retiredDevices.push(stem);
+    }
+    for (const receiver of this.lights) for (const child of receiver.root.children) {
+      if (child instanceof THREE.Mesh && !receiver.target.hitMeshes.includes(child)) retiredDevices.push(child);
+    }
+    return this.room.prepareArt({ owners, retiredDevices }, loader);
+  }
+
   setActive(active: boolean): void {
     if (this.disposed) return;
     this.active = active;
@@ -468,6 +490,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.room.art?.detachDevices();
     this.bridgeAudio.dispose();
     for (const unregister of [...this.targetUnregisters].reverse()) unregister();
     this.targetUnregisters.length = 0;
@@ -483,7 +506,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     for (const laser of [...this.lasers].reverse()) laser.dispose();
     this.projectilePresentation.dispose();
     this.projectiles.dispose(); this.damage.dispose(); this.resources.dispose();
-    for (const light of this.lampLights) light.removeFromParent();
+    for (const light of this.lampLights){disposeShadowLight(light);light.removeFromParent();}
     this.root.removeFromParent(); this.root.clear();
     this.lightGeometry.dispose(); this.lightTargetGeometry.dispose(); this.liftSocketGeometry.dispose();
     this.dressingGeometry.dispose();
@@ -515,9 +538,20 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
     if (!existingTargetMesh) {
       targetMesh.name = isLamp ? `${id}-conducting-lamp` : `${id}-electrical-socket`; targetMesh.position.y = isLamp ? 0 : 0.55; root.add(targetMesh);
     }
-    const light = new THREE.PointLight(0xffd36c, 0, isLamp ? 18 : 8, 2);
+    // Existing powered fixtures become downward area-like cones. Two banks
+    // own a single depth pass each; decorative spill never uses cube shadows.
+    const light = isLamp ? new THREE.SpotLight(0xffe4b2,0,23,1.02,.60,2) : new THREE.PointLight(0xffd36c,0,8,2);
+    light.name=id+'-illumination';
     light.position.set(0, isLamp ? -0.35 : existingTargetMesh ? 0.2 : 0.7, existingTargetMesh ? -0.4 : 0.4);
-    light.castShadow = false; root.add(light);
+    if(light instanceof THREE.SpotLight){
+      light.position.z=0;
+      light.target.position.set(id==='transit-light-c'?1:-2,-8,0);root.add(light.target);
+      light.castShadow=id==='transit-light-a'||id==='transit-light-c';
+      light.shadow.mapSize.set(512,512);light.shadow.camera.near=.35;
+      light.shadow.bias=-.0001;light.shadow.normalBias=.025;light.shadow.radius=1.5;
+      light.shadow.autoUpdate=false;light.shadow.needsUpdate=true;
+    }
+    root.add(light);
     const receiver = {} as MutableTimedReceiver;
     const target: ElectricalConnectionTarget = {
       id, displayName, hitMeshes: [targetMesh],
@@ -545,7 +579,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   private updateLampBanks(): void {
     for (let i = 0; i < this.lampLights.length; i++) {
       const lit = this.active && this.lights[i]?.latched;
-      this.lampLights[i]!.intensity = lit ? 70 : 0;
+      this.lampLights[i]!.intensity = lit ? 110 : 0;
       this.lights[i]!.targetMaterial.emissive.setHex(0xffcc7a);
       this.lights[i]!.targetMaterial.emissiveIntensity = lit ? 3 : 0;
     }

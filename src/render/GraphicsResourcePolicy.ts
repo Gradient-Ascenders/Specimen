@@ -39,6 +39,17 @@ export class GraphicsResourcePolicy {
 
   sync(): void { if (this.dirty) this.refresh(); }
 
+  /** Comparison and raw-depth samplers require different texture state. Also
+   * release dormant/padding maps: they can otherwise survive a quality change
+   * and become a mismatched sampler on a later room's first visible draw. */
+  invalidateShadowMaps():void{
+    this.sync();
+    for(const {light} of this.shadows){
+      light.shadow.dispose();light.shadow.map=null;light.shadow.mapPass=null;
+      light.shadow.needsUpdate=true;
+    }
+  }
+
   /** Call explicitly if a future owner adds nested lights/effects after load. */
   refresh(): void {
     if (this.disposed) return;

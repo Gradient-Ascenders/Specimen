@@ -34,7 +34,8 @@ export const CONTAINMENT_FIXTURE_AIMS: Readonly<Record<string, readonly [number,
   'room-2-sticky-and-exit-route-light': [14, 7, 43],
   'room-3-industrial-route-received-light': [16, 18, 63],
   'room-3-high-exit-vent-cue': [9, 31.2, 79],
-  'room-5-upper-traversal-received-light': [18, 82, 116],
+  'room-5-safe-entry-received-light': [7,78,101],
+  'room-5-upper-traversal-received-light': [16,87,116],
 };
 
 /** Doorway overlap is spatial presentation, independent of checkpoint/timer state. */
@@ -44,6 +45,9 @@ export const CONTAINMENT_SHADOW_HANDOFFS = [
   { rooms: [3, 4], z: 79.5, halfWidth: 1.5, minY: 29, maxY: 35 },
   { rooms: [4, 5], z: 91.5, halfWidth: 2, minY: 73, maxY: 79 },
 ] as const;
+
+const SINGLE_ROOM_WEIGHTS = ([1, 2, 3, 4, 5] as const)
+  .map(room => new Map<ContainmentLightingRoomId, number>([[room, 1]]));
 
 export function containmentRoomLightWeights(
   roomId: ContainmentLightingRoomId,
@@ -62,9 +66,9 @@ export function containmentRoomLightWeights(
     // drop). Keep presentation on the physical side after the overlap ends.
     const spatialRoom = position.z >= 91.5 ? 5 : position.z >= 79.5 ? 4
       : position.z >= 49 ? 3 : position.z >= 27 ? 2 : 1;
-    return new Map([[spatialRoom, 1]]);
+    return SINGLE_ROOM_WEIGHTS[spatialRoom - 1]!;
   }
-  return new Map([[roomId, 1]]);
+  return SINGLE_ROOM_WEIGHTS[roomId - 1]!;
 }
 
 export function configureContainmentShadow(light: THREE.PointLight | THREE.SpotLight): boolean {

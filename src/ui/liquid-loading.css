@@ -1,0 +1,224 @@
+/* Loading uses the existing mark and small compositor animations. No canvas,
+   animated filters, extra fonts, timers or minimum display duration. */
+.liquid-loading-screen {
+  color: var(--ui-text);
+  background:
+    radial-gradient(ellipse at 50% 40%, rgb(46 106 105 / 16%), transparent 52%),
+    var(--ui-bg);
+}
+
+.liquid-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(29rem, 100%);
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.liquid-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  pointer-events: none;
+  animation: liquid-arrive 800ms var(--ui-ease) both;
+}
+
+.liquid-emblem {
+  position: relative;
+  width: clamp(8rem, 31vh, 17.5rem);
+  aspect-ratio: 1;
+}
+
+.liquid-emblem::before {
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(116 172 169 / 12%), transparent 72%);
+  content: '';
+}
+
+.liquid-emblem-gel {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 75%;
+  animation: liquid-breathe 5.6s ease-in-out infinite;
+}
+
+.liquid-emblem-gel img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+
+.liquid-emblem-sheen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  mask-position: center;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+}
+
+.liquid-emblem-sheen > span {
+  position: absolute;
+  inset: -35% -50%;
+  background: linear-gradient(112deg, transparent 40%, rgb(224 243 234 / 8%) 46%, rgb(224 243 234 / 40%) 50%, transparent 57%);
+  animation: liquid-shine 5.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.liquid-droplet {
+  position: absolute;
+  width: var(--drop-size, .45rem);
+  aspect-ratio: .84;
+  border: 1px solid rgb(189 219 213 / 32%);
+  border-radius: 56% 44% 48% 52%;
+  background: radial-gradient(circle at 30% 25%, #bddbd5, #4e8e91 30%, #112a33 76%);
+  box-shadow: 0 0 .6rem rgb(116 172 169 / 13%);
+  animation: liquid-drift 4.8s ease-in-out infinite;
+}
+
+.liquid-droplet--one { top: 13%; right: 17%; --drop-size: .6rem; animation-delay: -1.3s; }
+.liquid-droplet--two { top: 43%; right: 5%; --drop-size: .3rem; animation-delay: -3.2s; }
+.liquid-droplet--three { bottom: 17%; left: 12%; --drop-size: .35rem; animation-delay: -.4s; }
+
+.liquid-wordmark {
+  margin-top: .75rem;
+  color: var(--ui-lavender-pale);
+  font-family: var(--ui-font-display);
+  font-size: clamp(1.4rem, 4.2vw, 2rem);
+  font-weight: 400;
+  letter-spacing: .22em;
+  line-height: 1.5;
+  text-indent: .22em;
+}
+
+.liquid-wordmark > span { color: var(--ui-violet); }
+
+.liquid-loading-track {
+  display: block;
+  width: min(14rem, 64vw);
+  height: 2px;
+  margin-top: 2rem;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(163 203 194 / 14%);
+}
+
+.liquid-loading-fill {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--ui-lavender), var(--ui-violet), transparent);
+  animation: liquid-travel 2.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+.liquid-loading-label {
+  margin: 1.25rem 0 0;
+  color: var(--ui-text-muted);
+  font-family: var(--ui-font-body);
+  font-size: .875rem;
+  font-weight: var(--ui-weight-regular);
+  line-height: 1.5;
+  letter-spacing: .035em;
+}
+
+.liquid-loading-sector {
+  margin: 1.25rem 0 -.65rem;
+  color: var(--ui-lavender-pale);
+  font-size: .9375rem;
+  letter-spacing: .04em;
+}
+
+.liquid-loading-state .transition-action {
+  align-self: center;
+  margin: 1rem 0 0;
+}
+
+.liquid-loading-description {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+[data-loading-state='ready'] .liquid-loader *,
+[data-loading-state='failed'] .liquid-loader * { animation-play-state: paused; }
+
+[data-loading-state='ready'] .liquid-loading-fill {
+  width: 100%;
+  animation: none;
+  transform: none;
+  background: var(--ui-lavender);
+}
+
+[data-loading-state='failed'] .liquid-loading-fill { opacity: .35; }
+[data-loading-state='failed'] .liquid-loading-label { color: var(--ui-warning); }
+
+/* Keep the actual movie/live scene visible during playback. Its readiness
+   and existing Retry/Skip controls still own the handoff. */
+.opening-loading { position: absolute; z-index: 1; inset: 0; display: none; place-items: center; }
+.opening-screen[data-loading='true'] .opening-loading,
+#app[data-opening-state='preparing'] .opening-loading,
+#app[data-opening-state='waiting'] .opening-loading { display: grid; }
+#app[data-opening-state='playing'] .opening-loading { display: none; }
+.opening-screen .opening-controls { z-index: 2; }
+.opening-screen[data-loading='true']:not([data-loading-state='failed']) [data-opening-status] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes liquid-arrive {
+  from { opacity: 0; transform: translateY(.7rem) scale(.97, 1.025); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes liquid-breathe {
+  0%, 100% { transform: translateY(0) scale(1) rotate(-.6deg); }
+  50% { transform: translateY(-.3rem) scale(1.018, .99) rotate(.6deg); }
+}
+@keyframes liquid-shine {
+  0%, 14% { transform: translateX(-68%); }
+  58%, 100% { transform: translateX(68%); }
+}
+@keyframes liquid-drift {
+  0%, 100% { transform: translateY(.12rem) rotate(-8deg); }
+  50% { transform: translateY(-.38rem) rotate(9deg); }
+}
+@keyframes liquid-travel {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(350%); }
+}
+
+@media (max-height: 440px) {
+  .liquid-loading-state { padding: .75rem; }
+  .liquid-emblem { width: min(8rem, 31vh); }
+  .liquid-wordmark { margin-top: .25rem; font-size: 1.25rem; }
+  .liquid-loading-track { margin-top: 1rem; }
+  .liquid-loading-label { margin-top: .75rem; }
+}
+
+#app[data-reduced-menu-motion='true'] .liquid-loader,
+#app[data-reduced-menu-motion='true'] .liquid-loader * { animation: none; }
+#app[data-reduced-menu-motion='true'] .liquid-emblem-sheen { display: none; }
+#app[data-reduced-menu-motion='true'] .liquid-loading-fill { width: 100%; opacity: .55; }
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-loader, .liquid-loader * { animation: none; }
+  .liquid-emblem-sheen { display: none; }
+  .liquid-loading-fill { width: 100%; opacity: .55; }
+}

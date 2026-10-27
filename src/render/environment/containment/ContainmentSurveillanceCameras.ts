@@ -3,11 +3,12 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 import type { Vector3State } from '../../slime/SlimePresentationContract.ts';
 import { markVisualOnly } from './ContainmentModularComponents.ts';
+import {ContainmentSurveillanceModel,type ContainmentSurveillanceModelLoader} from './ContainmentSurveillanceModel.ts';
 
 export const CONTAINMENT_SURVEILLANCE_PLACEMENTS = [
   { id: 'room-1-monitor-surveillance-camera', roomId: 1, position: [-6.69, 4.25, 2.95], yaw: Math.PI / 2 },
   { id: 'room-2-monitor-surveillance-camera', roomId: 2, position: [14.81, 7.98804, 34.65], yaw: -Math.PI / 2 },
-  { id: 'room-2-exit-surveillance-camera', roomId: 2, position: [0, 15.2, 48.81], yaw: Math.PI },
+  { id: 'room-2-exit-surveillance-camera', roomId: 2, position: [0, 16.15, 48.81], yaw: Math.PI },
   { id: 'room-3-monitor-surveillance-camera', roomId: 3, position: [16.81, 13.1, 56.15], yaw: -Math.PI / 2 },
   // Facing the rear (+Z) wall, the blank area right of the final strip is -X.
   { id: 'room-3-upper-wall-surveillance-camera', roomId: 3, position: [1.5, 27.85, 76.82], yaw: Math.PI },
@@ -89,6 +90,7 @@ export class ContainmentSurveillanceCamera {
 /** Scene-owned pool: three shared geometries, two materials, no textures/lights/shadows. */
 export class ContainmentSurveillanceCameras {
   readonly cameras: readonly ContainmentSurveillanceCamera[];
+  private readonly model=new ContainmentSurveillanceModel();
   private readonly geometries: readonly THREE.BufferGeometry[];
   private readonly housingMaterial = new THREE.MeshStandardMaterial({
     name: 'containment-surveillance-painted-metal', vertexColors: true,
@@ -110,13 +112,24 @@ export class ContainmentSurveillanceCameras {
     });
   }
 
-  update(deltaSeconds: number, bobPosition?: Vector3State): void {
+  async prepare(borrowFinish:(name:string)=>THREE.Material,loader?:ContainmentSurveillanceModelLoader):Promise<void>{
+    await this.model.prepare(borrowFinish,loader);
+    if(this.disposed)return;
+    for(const camera of this.cameras)this.model.attachCamera(camera.tilt);
+  }
+  get authoredRenderMeshes():readonly THREE.Mesh[]{return this.model.renderMeshes;}
+  get modelDiagnostics(){return this.model.diagnostics;}
+
+  update(deltaSeconds: number, bobPosition?: Vector3State, visibleRoomMask?: number): void {
     if (this.disposed) return;
     if (!Number.isFinite(deltaSeconds) || deltaSeconds < 0) throw new RangeError('Invalid camera timestep.');
     if (!isFinitePosition(bobPosition)) return;
     const blend = -Math.expm1(-CONTAINMENT_SURVEILLANCE_TRACKING.responsePerSecond * deltaSeconds);
     if (blend === 0) return;
-    for (const camera of this.cameras) camera.track(bobPosition, blend);
+    for (const camera of this.cameras) {
+      if (visibleRoomMask !== undefined && !(visibleRoomMask & (1 << camera.placement.roomId))) continue;
+      camera.track(bobPosition, blend);
+    }
   }
 
   reset(bobPosition?: Vector3State): void {
@@ -130,6 +143,7 @@ export class ContainmentSurveillanceCameras {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.model.dispose();
     for (const camera of this.cameras) { camera.root.removeFromParent(); camera.root.clear(); }
     for (const geometry of this.geometries) geometry.dispose();
     this.housingMaterial.dispose(); this.indicatorMaterial.dispose();

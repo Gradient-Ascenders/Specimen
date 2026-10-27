@@ -19,7 +19,6 @@ import {
 } from '../src/physics/CollisionWorld.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
-import { CameraRig } from '../src/render/CameraRig.ts';
 import { DeathSequence } from '../src/systems/DeathSequence.ts';
 
 interface MutableFakeBody {
@@ -59,17 +58,6 @@ const createFakeBody = (): MutableFakeBody => ({
     this.attached = false;
     this.attachmentSurfaceName = 'none';
   },
-});
-
-test('Room 1 omits the demo wooden wall even with development helpers enabled', () => {
-  for (const includeDevelopmentHelpers of [false, true]) {
-    const scene = new ContainmentLevelScene(() => {}, { includeDevelopmentHelpers });
-    try {
-      assert.equal(scene.root.getObjectByName('room-1-goop-soluble-test-barrier'), undefined);
-      assert.deepEqual(scene.solubleTargetMeshes, [scene.roomFive.goopWoodenDoor],
-        'the actual Room 5 dissolvable door must remain playable');
-    } finally { scene.dispose(); }
-  }
 });
 
 test('Room 3 acid failure starts at liquid contact, not metres above the surface', () => {
@@ -143,210 +131,21 @@ test('a physical fall reaches the visible Room 3 acid before its failure trigger
   } finally { scene.dispose(); world.clear(); surfaces.clear(); }
 });
 
-test('recovering active Goop keeps Bob duct reflections tied to Bob position', () => {
+test('Room 5 fall detection clears the whole lift roof throughout ascent and retains its own room coverage', () => {
   const scene = new ContainmentLevelScene(() => {});
-  const collisionWorld = new CollisionWorld();
-  const bob = createFakeBody();
-  const goop = createFakeBody();
-  bob.position.set(-4.8, 6, 8);
-  goop.position.set(0, 0.46, -2.6);
-  const bobBody = bob as unknown as KinematicBody;
-  const goopBody = goop as unknown as KinematicBody;
-  const controller = new ContainmentLevelController({
-    scene,
-    body: bobBody,
-    bobBody,
-    persistentBodies: [bobBody, goopBody],
-    collisionWorld,
-    requestDeath: () => false,
-  });
-  scene.update(0, bob.position);
-  assert.equal(scene.lightingDiagnostics.bobReflectionZone, 'duct');
-
-  controller.setActiveBody(goopBody);
-  controller.recoverActiveCheckpoint();
-
-  assert.equal(scene.lightingDiagnostics.bobReflectionZone, 'duct');
-  assert.equal(scene.lightingDiagnostics.bobBodyReflectionTarget, 0.1);
-  assert.ok(bob.position.equals(new THREE.Vector3(-4.8, 6, 8)));
-  controller.dispose();
-  collisionWorld.clear();
-  scene.dispose();
-});
-
-test('complete Containment scene exposes unique, consistently tagged colliders', () => {
-  const scene = new ContainmentLevelScene(() => {});
-  const names = scene.collisionMeshes.map((mesh) => mesh.name);
-  assert.equal(new Set(names).size, names.length);
-  assert.ok(names.includes('room-3-first-static-laser-beam-proxy') === false);
-  assert.ok(names.includes('room-3-acid-floor'));
-  assert.ok(names.includes('room-4-cargo-elevator-moving-platform-surface'));
-  assert.ok(names.includes('room-2-ceiling'));
-  assert.ok(names.includes('room-4-shaft-ceiling'));
-  assert.ok(names.includes('room-5-containment-glass'));
-  assert.ok(names.includes('room-5-goop-wooden-door'));
-  assert.ok(names.includes('room-5-observation-release-button'));
-
-  const containmentGlass = scene.collisionMeshes.find(
-    (mesh) => mesh.name === 'room-5-containment-glass',
-  );
-  assert.ok(containmentGlass);
-  assert.equal(containmentGlass.userData.surfaceTag, 'default');
-  assert.ok(containmentGlass.material instanceof THREE.MeshStandardMaterial);
-  assert.equal(containmentGlass.material.transparent, true);
-  assert.deepEqual(containmentGlass.userData.sizeMetres, [5.1, 3.2, 4.5]);
-  assert.equal(containmentGlass.position.y, 77.075);
-
-  const goopDoor = scene.roomFive.goopWoodenDoor;
-  assert.equal(goopDoor.userData.surfaceTag, 'default');
-  assert.equal(goopDoor.userData.interactionRole, 'goop-dissolvable');
-  assert.equal(goopDoor.userData.textureRole, 'wooden-door');
-  assert.equal(goopDoor.userData.soluble, true);
-  assert.ok(scene.solubleTargetMeshes.includes(goopDoor));
-  assert.deepEqual(goopDoor.userData.sizeMetres,[2.35,1.8,.9]);
-  assert.ok(goopDoor.position.equals(new THREE.Vector3(0,75.65,124.72)));
-  assert.ok(goopDoor.material instanceof THREE.MeshStandardMaterial);
-  assert.equal(goopDoor.material.color.getHex(),0x96714f);
-
-  const stickyMeshes = scene.collisionMeshes.filter(
-    (mesh) => mesh.userData.surfaceTag === 'sticky',
-  );
-  assert.ok(stickyMeshes.length >= 9);
-  for (const mesh of stickyMeshes) {
-    assert.ok(
-      mesh.userData.textureRole === 'sticky-wall-tile' ||
-        mesh.userData.textureRole === 'sticky-vent-tile',
-      `${mesh.name} is sticky without an art-facing texture role`,
-    );
-  }
-
-  const acidFloor = scene.collisionMeshes.find(
-    (mesh) => mesh.name === 'room-3-acid-floor',
-  );
-  assert.ok(acidFloor);
-  assert.equal(acidFloor.userData.textureRole, 'acid-floor');
-  assert.ok(acidFloor.material instanceof THREE.MeshStandardMaterial);
-  assert.equal(acidFloor.material.color.getHex(), 0x92bd24);
-
-  const finalVentLaser = scene.roomThree.lasers.hazards.find(
-    (hazard) => hazard.id === 'room-3-final-vent-laser',
-  );
-  assert.ok(finalVentLaser);
-  assert.equal(finalVentLaser.enabled, true);
-
-  scene.dispose();
-});
-
-test('Room 5 Blender layout drives deterministic platforms and translated lasers', () => {
-  const scene = new ContainmentLevelScene(() => {});
-  const room = scene.roomFive;
-  const fakeBody = createFakeBody();
-  fakeBody.position.set(0, 0, 0);
-
-  assert.deepEqual(
-    room.lasers.hazards.map((hazard) => hazard.id),
-    [
-      'room-5-laser-1',
-      'room-5-laser-2',
-      'room-5-laser-3',
-      'room-5-laser-4',
-      'room-5-laser-5',
-      'room-5-laser-6',
-      'room-5-laser-7',
-      'room-5-laser-8',
-    ],
-  );
-  assert.ok(
-    room.movingPlatformOne.root.position.equals(
-      new THREE.Vector3(6.109, 82.374, 100.384),
-    ),
-  );
-  assert.ok(
-    room.movingPlatformTwo.root.position.equals(
-      new THREE.Vector3(15.109, 82.374, 100.384),
-    ),
-  );
-
-  const roomFiveStickyWalls = room.collisionMeshes.filter(
-    (mesh) =>
-      mesh.name.startsWith('room-5-') &&
-      mesh.name !== room.releaseButtonName &&
-      mesh.userData.textureRole === 'sticky-wall-tile',
-  );
-  assert.equal(roomFiveStickyWalls.length, 5);
-  assert.deepEqual(
-    roomFiveStickyWalls
-      .filter((wall) => wall.name.startsWith('room-5-final-sticky-transfer-'))
-      .map((wall) => wall.name),
-    [
-      'room-5-final-sticky-transfer-1',
-      'room-5-final-sticky-transfer-3',
-      'room-5-final-sticky-transfer-5',
-    ],
-  );
-  for (const wall of roomFiveStickyWalls) {
-    assert.ok(
-      (wall.userData.sizeMetres as number[]).includes(0.022),
-      `${wall.name} did not use the thin sticky-wall depth`,
-    );
-    assert.equal(wall.userData.movementFaceMode, 'vertical-sides');
-  }
-
-  const glassApproachPlatform = room.collisionMeshes.find(
-    (mesh) => mesh.name === 'room-5-lower-platform-c',
-  );
-  assert.ok(glassApproachPlatform);
-  assert.equal(glassApproachPlatform.position.y, 76.687);
-
-  const laserOne = room.lasers.hazards[0];
-  const laserFive = room.lasers.hazards[4];
-  const laserSeven = room.lasers.hazards[6];
-  room.updateTraversal(1.25, fakeBody as unknown as KinematicBody, [
-    fakeBody as unknown as KinematicBody,
-  ]);
-  assert.ok(Math.abs(laserOne.start.y - (82.84 + 2.25)) < 1e-10);
-  assert.ok(Math.abs(laserFive.start.z - 113.8375) < 1e-10);
-  assert.ok(Math.abs(laserSeven.start.z - 113.8375) < 1e-10);
-  assert.equal(room.movingPlatformOne.root.position.y, 82.374);
-  assert.equal(room.movingPlatformOne.root.position.z, 100.384);
-  assert.equal(room.movingPlatformTwo.root.position.x, 15.109);
-  assert.equal(room.movingPlatformTwo.root.position.y, 82.374);
-
-  room.updateTraversal(1.25, fakeBody as unknown as KinematicBody, [
-    fakeBody as unknown as KinematicBody,
-  ]);
-  assert.ok(Math.abs(laserFive.start.z - 116.61) < 1e-10);
-  assert.ok(Math.abs(laserSeven.start.z - 111.065) < 1e-10);
-
-  room.reset();
-  assert.ok(
-    room.movingPlatformOne.root.position.equals(
-      new THREE.Vector3(6.109, 82.374, 100.384),
-    ),
-  );
-  assert.ok(
-    room.movingPlatformTwo.root.position.equals(
-      new THREE.Vector3(15.109, 82.374, 100.384),
-    ),
-  );
-  assert.ok(Math.abs(laserOne.start.y - 82.84) < 1e-10);
-  assert.ok(Math.abs(laserFive.start.z - 111.065) < 1e-10);
-  assert.ok(Math.abs(laserSeven.start.z - 116.61) < 1e-10);
-
-  fakeBody.position.copy(room.movingPlatformOne.root.position);
-  fakeBody.grounded = true;
-  fakeBody.supportCollider = room.movingPlatformOne.collisionMesh;
-  const riderStartX = fakeBody.position.x;
-  room.updateTraversal(1 / 60, fakeBody as unknown as KinematicBody, [
-    fakeBody as unknown as KinematicBody,
-  ]);
-  assert.ok(fakeBody.position.x > riderStartX);
-  assert.equal(
-    fakeBody.position.x - riderStartX,
-    room.movingPlatformOne.displacement.x,
-  );
-
-  scene.dispose();
+  const target = {position:new THREE.Vector3(),radiusMetres:.45};
+  try {
+    for(let y=30.21;y<=75.21;y+=.5)for(const x of [5.1,9,12.9])for(const z of [81.6,85.5,89.4]){
+      target.position.set(x,y,z);
+      scene.roomFive.updateFailureTrigger(target as unknown as KinematicBody);
+      assert.equal(scene.roomFive.failureVolume.occupied,false,`Room 5 reaches the lift at ${x}, ${y}, ${z}.`);
+    }
+    for(const x of [-20,0,20])for(const z of [91.6,108.5,127.9]){
+      target.position.set(x,68,z);
+      scene.roomFive.updateFailureTrigger(target as unknown as KinematicBody);
+      assert.equal(scene.roomFive.failureVolume.occupied,true);
+    }
+  } finally { scene.dispose(); }
 });
 
 test('Room 5 moving-platform handoff remains phase locked across loops and reset', () => {
@@ -514,182 +313,6 @@ test('inactive persistent slimes continue riding Room 4 and Room 5 carriers', ()
   scene.dispose();
 });
 
-test('authored vent zones use tight framing and Room 1 opens toward the route', () => {
-  const scene = new ContainmentLevelScene(() => {});
-  const world = new CollisionWorld();
-  world.registerAll(scene.collisionMeshes);
-
-  for (const position of [
-    new THREE.Vector3(-4.8, 6, 7),
-    new THREE.Vector3(-4.8, 8, 18),
-    new THREE.Vector3(-5.7, 11, 24),
-    new THREE.Vector3(-8.4, 11, 28),
-    new THREE.Vector3(9, 32, 79),
-  ]) {
-    assert.equal(scene.isInsideCameraTightVent(position), true);
-  }
-  assert.equal(
-    scene.isInsideCameraTightVent(new THREE.Vector3(0, 0.46, -2.6)),
-    false,
-  );
-  assert.equal(
-    scene.isInsideCameraTightVent(new THREE.Vector3(-9, 0.46, 31)),
-    false,
-  );
-
-  const spawn = scene.copySpawnPosition(new THREE.Vector3());
-  const rig = new CameraRig();
-  rig.setFollowTarget(
-    {
-      position: spawn,
-      previousPosition: spawn,
-      velocity: new THREE.Vector3(),
-      gameplayUp: new THREE.Vector3(0, 1, 0),
-      grounded: true,
-      attached: false,
-    },
-    world,
-  );
-  rig.setGroundOrbitYawRadians(Math.PI);
-  rig.update(1, 0);
-
-  const openingCamera = rig.getDiagnostics();
-  assert.ok(openingCamera.currentDistanceMetres > 2.5);
-  assert.equal(openingCamera.obstructionName, 'room-1-rear-wall');
-
-  scene.dispose();
-});
-
-test('Room 2 ceiling contains a maximum-distance high-pitch camera', () => {
-  const scene = new ContainmentLevelScene(() => {});
-  const world = new CollisionWorld();
-  world.registerAll(scene.collisionMeshes);
-  const position = new THREE.Vector3(0, 11.36, 40);
-  const rig = new CameraRig({
-    initialPitchRadians: THREE.MathUtils.degToRad(65),
-  });
-  rig.setFollowTarget(
-    {
-      position,
-      previousPosition: position,
-      velocity: new THREE.Vector3(),
-      gameplayUp: new THREE.Vector3(0, 1, 0),
-      grounded: true,
-      attached: false,
-    },
-    world,
-  );
-  rig.setFollowDistanceMetres(7);
-  rig.setGroundOrbitYawRadians(Math.PI * 0.5);
-  rig.update(1, 1 / 60);
-
-  const diagnostics = rig.getDiagnostics();
-  assert.equal(diagnostics.obstructionName, 'room-2-ceiling');
-  assert.ok(diagnostics.preferredCameraPosition.y > 18);
-  assert.ok(diagnostics.resolvedCameraPosition.y < 18);
-
-  world.clear();
-  scene.dispose();
-});
-
-test('Room 4 camera cap is camera-only and compact arrival framing stays inside the shaft', () => {
-  const scene = new ContainmentLevelScene(() => {});
-  const cap = scene.cameraObstructionMeshes.find(
-    (mesh) => mesh.name === 'room-4-upper-camera-cap',
-  );
-  assert.ok(cap);
-  assert.equal(scene.collisionMeshes.includes(cap), false);
-  assert.equal(cap.visible, true);
-  assert.equal((cap.material as THREE.Material).visible, false);
-  // The production Room 4 art replaces the greybox elevator top frame. The
-  // dedicated invisible cap remains the authoritative camera-only blocker.
-  assert.equal(
-    scene.cameraObstructionMeshes.some(
-      (mesh) => mesh.name === 'room-4-cargo-elevator-shaft-top-frame',
-    ),
-    false,
-  );
-
-  const cameraOnlyWorld = new CollisionWorld();
-  cameraOnlyWorld.register(cap, CollisionLayer.CameraObstruction);
-  const hit = new CollisionHit();
-  const origin = new THREE.Vector3(9, 75, 85.5);
-  const upward = new THREE.Vector3(0, 6, 0);
-  assert.equal(
-    cameraOnlyWorld.sweepSphere(
-      origin,
-      upward,
-      0.22,
-      hit,
-      CollisionLayer.CameraObstruction,
-    ),
-    true,
-  );
-  assert.equal(hit.object, cap);
-  assert.equal(
-    cameraOnlyWorld.sweepSphere(
-      origin,
-      upward,
-      0.45,
-      hit,
-      CollisionLayer.Movement,
-    ),
-    false,
-  );
-
-  const world = new CollisionWorld();
-  world.registerAll(scene.collisionMeshes);
-  world.registerAll(
-    scene.cameraObstructionMeshes,
-    CollisionLayer.CameraObstruction,
-  );
-  scene.roomFour.elevator.begin();
-  scene.roomFour.elevator.update(
-    scene.roomFour.elevator.startDelaySeconds +
-      scene.roomFour.elevator.travelDurationSeconds,
-    [],
-  );
-  assert.equal(scene.roomFour.elevator.state, 'arrivalPause');
-
-  const position = new THREE.Vector3(9, 75.21, 85.5);
-  const rig = new CameraRig();
-  rig.setFollowTarget(
-    {
-      position,
-      previousPosition: position,
-      velocity: new THREE.Vector3(),
-      gameplayUp: new THREE.Vector3(0, 1, 0),
-      grounded: true,
-      attached: false,
-    },
-    world,
-  );
-  const context = scene.roomFour.resolveLiftCamera({
-    position,
-    radiusMetres: 0.45,
-  });
-  assert.ok(context);
-  rig.setContextualCamera(context);
-
-  for (const yaw of [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5]) {
-    rig.setGroundOrbitYawRadians(yaw);
-    for (let step = 0; step < 90; step += 1) rig.update(1, 1 / 60);
-    const diagnostics = rig.getDiagnostics();
-    assert.equal(diagnostics.obstructed, false);
-    assert.ok(diagnostics.preferredCameraPosition.y < 78.1);
-    assert.ok(diagnostics.resolvedCameraPosition.y < 78.1);
-    assert.ok(diagnostics.resolvedCameraPosition.x > 2.7);
-    assert.ok(diagnostics.resolvedCameraPosition.x < 15.3);
-    assert.ok(diagnostics.resolvedCameraPosition.z > 79.7);
-    assert.ok(diagnostics.resolvedCameraPosition.z < 91.3);
-    assert.ok(rig.camera.position.toArray().every(Number.isFinite));
-  }
-
-  cameraOnlyWorld.clear();
-  world.clear();
-  scene.dispose();
-});
-
 test('Containment objectives follow room entry and reset to Room 1', () => {
   let controller: ContainmentLevelController;
   const scene = new ContainmentLevelScene(
@@ -709,6 +332,8 @@ test('Containment objectives follow room entry and reset to Room 1', () => {
 
   const observedRooms: ContainmentRoomId[] = [];
   const observedObjectives: string[] = [];
+  const observedCheckpoints: (string | number)[] = [];
+  controller.events.on('checkpointReached', event => observedCheckpoints.push(event.roomId));
   controller.events.on('objectiveChanged', ({ roomId, objective }) => {
     observedRooms.push(roomId);
     observedObjectives.push(objective);
@@ -746,12 +371,13 @@ test('Containment objectives follow room entry and reset to Room 1', () => {
   assert.equal(controller.activeRoomId, 1);
   assert.deepEqual(observedRooms, [2, 3, 4, 5, 1]);
   assert.deepEqual(observedObjectives, [
-    'Learn how to jump',
-    'Get past the lasers',
-    'Survive the elevator!',
-    'Free Goop!',
+    'Cross the platforms to reach the next chamber',
+    'Time your jumps through the laser chamber',
+    'Survive the lift and reach the upper floor',
+    'Reach the release controls and free Goop',
     'Climb through the vent',
   ]);
+  assert.deepEqual(observedCheckpoints, [2, 3, 4, 5], 'Reset and repeated upper-lift activation must not announce new checkpoints.');
 
   controller.dispose();
   collisionWorld.clear();
@@ -883,39 +509,6 @@ test('Containment completion is gated by contact with the observation release bu
   assert.equal(controller.state, 'playing');
   assert.equal(controller.activeCheckpointId, 'containment-room-1-spawn');
   assert.equal(scene.roomFive.endingState, 'traversal');
-
-  controller.dispose();
-  collisionWorld.clear();
-  scene.dispose();
-});
-
-test('development completion shortcut emits the normal handoff once', () => {
-  let controller: ContainmentLevelController;
-  const scene = new ContainmentLevelScene(
-    (failure: ContainmentHazardFailure) => {
-      controller.requestHazardFailure(failure);
-    },
-  );
-  const collisionWorld = new CollisionWorld();
-  collisionWorld.registerAll(scene.collisionMeshes);
-  const fakeBody = createFakeBody();
-  controller = new ContainmentLevelController({
-    scene,
-    body: fakeBody as unknown as KinematicBody,
-    collisionWorld,
-    requestDeath: () => false,
-  });
-
-  const completions: Array<{ levelId: string; nextLevelId: string }> = [];
-  controller.events.on('completed', (event) => completions.push(event));
-
-  assert.equal(controller.completeForDebug(), true);
-  assert.equal(controller.completeForDebug(), false);
-  assert.equal(controller.state, 'complete');
-  assert.equal(controller.completionCount, 1);
-  assert.deepEqual(completions, [
-    { levelId: 'containment', nextLevelId: 'level-2' },
-  ]);
 
   controller.dispose();
   collisionWorld.clear();

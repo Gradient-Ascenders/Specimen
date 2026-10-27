@@ -6,7 +6,14 @@ import type { LevelLifecycleState } from './LevelLifecycle.ts';
 import type { LevelProgressionSnapshot } from './LevelProgression.ts';
 import type { SlimeHealthReadModel } from '../systems/SlimeDamageSystem.ts';
 
+export interface CheckpointReachedEvent {
+  readonly checkpointId: string;
+  readonly roomId: string | number;
+  readonly label: string;
+}
+
 export interface GameLevelRuntimeEvents {
+  checkpointReached: CheckpointReachedEvent;
   objectiveChanged: { readonly roomId: string | number; readonly objective: string };
   completed: { readonly levelId: string; readonly nextLevelId: string };
 }

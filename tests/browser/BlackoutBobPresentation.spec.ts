@@ -45,6 +45,8 @@ interface BlackoutRuntimeProbe {
     readonly bobReflectionEnvironment?: {
       readonly diagnostics: { readonly disposed: boolean };
     };
+    readonly renderedBobPosition: {readonly x: number; readonly y: number; readonly z: number};
+    readonly goopReflectionLighting: {weightAt(position: {readonly x: number; readonly y: number; readonly z: number}): number};
     readonly group: {
       readonly bobBody: {
         readonly position: { readonly x: number; readonly y: number; readonly z: number };
@@ -174,6 +176,7 @@ test('Blackout uses prepared shared Bob through movement, switching, merge, spli
       activeSlimeId: resources.manager.activeSlimeId,
       asset: resources.bobPresentation.diagnostics.asset,
       materials: resources.bobPresentation.diagnostics.materials,
+      reflectionWeight: resources.goopReflectionLighting.weightAt(resources.renderedBobPosition),
       goopVisible: resources.goopPresentation.diagnostics.visible,
       voltVisible: resources.voltPresentation.diagnostics.visible,
       voltLightVisible: resources.voltLight.visible,
@@ -194,8 +197,8 @@ test('Blackout uses prepared shared Bob through movement, switching, merge, spli
     materials: {
       selfLit: false,
       reflectionMapName: 'bob-laboratory-pmrem',
-      targetBodyReflectionIntensity: 0.12,
-      targetEyeReflectionIntensity: 0.28,
+      targetBodyReflectionIntensity: 0.12 * initial.reflectionWeight,
+      targetEyeReflectionIntensity: 0.28 * initial.reflectionWeight,
     },
     goopVisible: true,
     voltVisible: true,

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import type { RenderLayer } from './RenderLayer.ts';
-import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
+import { prepareShadowSamplerMaps, renderIsolatedPrewarmResources, withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
 import { copyPrewarmMaterial, createShadowPrewarmMaterial, clonePrewarmDrawable } from './ShadowPrewarmMaterial.ts';
 import { requiresTransmissionPreparation } from './TransmissionPreparation.ts';
+import type {BlackoutLightLayout} from './environment/blackout/BlackoutLightLayout.ts';
 
 /** Blackout has one retained light signature through power, switching and merge.
  * Prepare hidden forms and caster passes without advancing encounter authority. */
@@ -15,15 +16,16 @@ export class BlackoutPresentationPreparation {
   private busy = false;
   private released = false;
 
-  async prepare(layer: RenderLayer, camera: THREE.Camera): Promise<void> {
+  async prepare(layer: RenderLayer, camera: THREE.Camera,layout?:BlackoutLightLayout): Promise<void> {
     if (this.disposed) return;
     const started = performance.now();
     const visible = new THREE.Group(), shadows = new THREE.Group();
     const shadowScene = new THREE.Scene();
     // Shadow draws use a null scene in Three.js: no visible-pass fog/environment.
-    layer.scene.traverseVisible(object => {
+    const withLights=<T>(action:()=>T):T=>layout?layout.withLayout(camera,camera.position,action):action();
+    withLights(()=>layer.scene.traverseVisible(object => {
       if (object instanceof THREE.Light) shadowScene.add(object.clone(false));
-    });
+    }));
     const hasDepth = shadowScene.children.some(o => o instanceof THREE.Light && o.castShadow && !(o instanceof THREE.PointLight));
     const point = shadowScene.children.find(o => o instanceof THREE.PointLight && o.castShadow);
     const clone = (source: THREE.Mesh | THREE.Line | THREE.Points | THREE.Sprite, material: THREE.Material) => {
@@ -67,17 +69,17 @@ export class BlackoutPresentationPreparation {
     const primeVisible = (action: () => void): void => {
       const viewport = layer.renderer.getViewport(new THREE.Vector4());
       const scale = layer.renderer.transmissionResolutionScale;
-      withIsolatedPrewarmState(layer.renderer, () => {
+      withLights(()=>withIsolatedPrewarmState(layer.renderer, () => {
         if (transmission) { layer.renderer.setViewport(viewport); layer.renderer.transmissionResolutionScale = scale; }
         action();
-      });
+      }));
     };
     this.busy = true;
     try {
       for (const [group, scene, target] of [[visible, layer.scene, undefined], [shadows, shadowScene, this.target]] as const) {
         if (this.disposed) return;
-        await withIsolatedPrewarmState(layer.renderer, () => layer.withShadowPreparation(true,
-          () => layer.renderer.compileAsync(group, camera, scene)), target);
+        await withLights(()=>withIsolatedPrewarmState(layer.renderer, () => layer.withShadowPreparation(true,
+          () => layer.renderer.compileAsync(group, camera, scene)), target));
         if (this.disposed) return;
         // Compile the transmission target's linear-output variants separately.
         if (group === visible && transmission) {
@@ -87,18 +89,14 @@ export class BlackoutPresentationPreparation {
             if (!(mesh.material as THREE.Material).transparent) opaque.add(clonePrewarmDrawable(mesh, this.instanceDisposers));
           }
           try {
-            await withIsolatedPrewarmState(layer.renderer, () => layer.withShadowPreparation(true,
-              () => layer.renderer.compileAsync(opaque, camera, scene)), this.target);
+            await withLights(()=>withIsolatedPrewarmState(layer.renderer, () => layer.withShadowPreparation(true,
+              () => layer.renderer.compileAsync(opaque, camera, scene)), this.target));
           } finally { opaque.clear(); }
           if (this.disposed) return;
         }
-        if (group === visible) {
-          // PCF receivers use comparison samplers in r185. Preparation suppresses
-          // shadow updates, so allocate the level-owned maps with a live draw
-          // before submitting receiver proxies; null fallback textures cannot
-          // satisfy those samplers on SwiftShader.
-          primeVisible(() => layer.renderer.render(layer.scene, liveCamera));
-        }
+        // Resolve the selected samplers before exposing receiver proxies. This
+        // empty draw also avoids warming the entire room's geometry twice.
+        if (group === visible) withLights(() => prepareShadowSamplerMaps(layer.renderer, layer.scene, liveCamera));
         scene.add(group);
         try {
           if (group === visible) primeVisible(() => layer.withShadowPreparation(true,

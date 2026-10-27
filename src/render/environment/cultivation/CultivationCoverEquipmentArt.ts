@@ -9,7 +9,7 @@ import { LARGE_STATIC_BATCH_CELL_SIZE, staticBatchCell } from '../../StaticBatch
 export const COVER_EQUIPMENT = [
   { name: 'cultivation-room-3-goop-checkpoint-shield', identity: 'Decontamination unit', label: 'DECON', yawDegrees: 0, size: [8, 4.5, 1] },
   { name: 'cultivation-room-3-goop-cover-1', identity: 'Sample freezer', label: 'FREEZER', yawDegrees: 180, size: [5, 3.5, 3] },
-  { name: 'cultivation-room-3-goop-cover-2', identity: 'Chemical storage cabinet', label: 'CHEMICAL', yawDegrees: 90, size: [4.5, 4, 3] },
+  { name: 'cultivation-room-3-goop-cover-2', identity: 'Pressure conditioning skid', label: 'PRESSURE', yawDegrees: 90, size: [4.5, 4, 3] },
   { name: 'cultivation-room-3-goop-cover-3', identity: 'Analysis machine', label: 'ANALYSIS', yawDegrees: 0, size: [5.5, 3.2, 3] },
   { name: 'cultivation-room-3-goop-cover-4', identity: 'Specimen drawer cabinet', label: 'SPECIMEN', yawDegrees: 180, size: [5, 4.4, 3.2] },
   { name: 'cultivation-room-3-goop-cover-5', identity: 'Centrifuge processing unit', label: 'PROCESS', yawDegrees: -12, size: [5, 3.6, 3] },
@@ -23,9 +23,9 @@ type Triple = [number, number, number];
 /** Static laboratory props; original cover boxes remain the only gameplay geometry. */
 export class CultivationCoverEquipmentArt extends CultivationAssetOwner {
   readonly material = new THREE.MeshStandardMaterial({ name: 'cover-collider-hidden', visible: false });
-  private readonly wear = createCultivationEquipmentWear(this.assets);
+  private readonly wear: ReturnType<typeof createCultivationEquipmentWear>|undefined;
   private readonly droneWear = createCultivationEquipmentWear(this.assets, true);
-  readonly textures: readonly THREE.Texture[] = [...Object.values(this.wear), ...Object.values(this.droneWear)];
+  readonly textures: readonly THREE.Texture[];
   readonly droneSurfaceMaps = { scuffMap: this.droneWear.albedo,
     bumpMap: this.droneWear.roughness, roughnessMap: this.droneWear.roughness };
   readonly root = new THREE.Group();
@@ -36,8 +36,10 @@ export class CultivationCoverEquipmentArt extends CultivationAssetOwner {
   private disposed = false;
   private triangleCount = 0;
 
-  constructor(assets: CultivationAssetSource, surface?: THREE.MeshStandardMaterial) {
+  constructor(assets: CultivationAssetSource, surface?: THREE.MeshStandardMaterial,options:{authoredReplacement?:boolean}={}) {
     super(assets);
+    this.wear=options.authoredReplacement?undefined:createCultivationEquipmentWear(this.assets);
+    this.textures=[...Object.values(this.wear??{}),...Object.values(this.droneWear)];
     const finish = (name: string, colour: number, roughness: number, metalness: number) => new THREE.MeshStandardMaterial({
       name: `cover-prop-${name}`, color: colour, roughness, metalness,
       normalMap: surface?.normalMap ?? null, roughnessMap: surface?.roughnessMap ?? null,
@@ -54,8 +56,8 @@ export class CultivationCoverEquipmentArt extends CultivationAssetOwner {
     this.finishes.display.emissive.setHex(0x153a40);
     this.finishes.display.emissiveIntensity = 0.15;
     for (const role of ['shell', 'metal', 'dark', 'teal', 'yellow'] as const) {
-      this.finishes[role].map = this.wear.albedo;
-      this.finishes[role].roughnessMap = this.wear.roughness;
+      this.finishes[role].map = this.wear?.albedo??null;
+      this.finishes[role].roughnessMap = this.wear?.roughness??null;
       this.finishes[role].roughness = role === 'shell' ? .88 : .78;
     }
     this.root.name = 'cultivation-room-3-laboratory-cover-props';
@@ -66,7 +68,14 @@ export class CultivationCoverEquipmentArt extends CultivationAssetOwner {
     return new Map(COVER_EQUIPMENT.map(item => [item.name, this.material]));
   }
 
-  build(builder: GreyboxRoomBuilder): void {
+  build(builder: GreyboxRoomBuilder,options:{authoredReplacement?:boolean}={}): void {
+    if(options.authoredReplacement){
+      for(const item of COVER_EQUIPMENT){
+        const mesh=builder.root.getObjectByName(item.name) as THREE.Mesh;
+        mesh.geometry.computeBoundingBox();this.propBounds.set(item.name,mesh.geometry.boundingBox!.clone());
+      }
+      this.buildShadowHulls(builder);builder.root.add(this.root);return;
+    }
     const baked = this.assets.geometries('cover-props', () => {
       builder.root.updateWorldMatrix(true, true);
       const inverse = builder.root.matrixWorld.clone().invert();
@@ -254,6 +263,11 @@ export class CultivationCoverEquipmentArt extends CultivationAssetOwner {
       mesh.userData.shadowProxyReceiver = true;
       this.root.add(mesh);
     }
+    this.buildShadowHulls(builder);
+    builder.root.add(this.root);
+  }
+
+  private buildShadowHulls(builder:GreyboxRoomBuilder):void{
     // Match the maintenance decks: detailed fittings receive shadows while
     // the unchanged cover envelopes provide cheap, stable caster silhouettes.
     const hulls = this.assets.geometries('cover-shadow-hulls', () => {
@@ -279,7 +293,6 @@ export class CultivationCoverEquipmentArt extends CultivationAssetOwner {
       Object.assign(hull.userData, { presentationOnly: true, shadowHull: true, staticBatchCell: cell });
       this.root.add(hull);
     }
-    builder.root.add(this.root);
   }
 
   get diagnostics() {

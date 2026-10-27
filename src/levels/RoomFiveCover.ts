@@ -82,10 +82,4 @@ export function addRoomFiveCover(b: GreyboxRoomBuilder, index: number, station: 
       position: [x + (a.x + c.x) / 2 + plane.x * .125, y + 1.6, z + (a.z + c.z) / 2 + plane.z * .125], material: hidden });
     collider.rotation.y = Math.atan2(plane.x, plane.z);
   }
-  // Suspend from points that actually lie on the carved deck.
-  for (const [i, point] of polygon.entries()) {
-    const px = x + point.x * .86, pz = z + point.z * .86;
-    b.addVisualBox({ name: `room-5-safe-${index}-suspension-${i}`, size: [.1, 38 - y, .1],
-      position: [px, (38 + y) / 2, pz], material: b.materials.cable });
-  }
 }

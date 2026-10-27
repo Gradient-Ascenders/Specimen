@@ -4,6 +4,7 @@ import type { LaserHazard } from '../../../hazards/LaserHazard.ts';
 import type { MovingPlatform } from '../../../puzzle/MovingPlatform.ts';
 import type { ContainmentArtResources } from './ContainmentArtResources.ts';
 import { RoomFiveContainmentSecurity } from './RoomFiveContainmentSecurity.ts';
+import {RoomFiveShell,type RoomFiveShellLoader} from './RoomFiveShell.ts';
 import { ROOM_FIVE_ESCAPE } from '../../../levels/RoomFiveEscapeLayout.ts';
 import {
   createBorrowedBox,
@@ -54,6 +55,8 @@ const CLOSED_PANEL_ROTATION = new THREE.Euler(0, 0, 0);
  */
 export class RoomFiveArt {
   readonly root = new THREE.Group();
+  readonly shell=new RoomFiveShell();
+  private readonly proxyNames=new Set<string>();
   readonly containmentAssembly = new THREE.Group();
   readonly containmentPanelRoot = new THREE.Group();
   readonly panelPivots: RoomFivePanelPivots;
@@ -103,7 +106,28 @@ export class RoomFiveArt {
     this.movingPlatformDressings = movingPlatforms.map((platform, index) =>
       this.buildMovingPlatformDressing(platform, index + 1),
     );
+    for(const root of [this.root,...this.movingPlatformDressings])root.traverse(object=>{
+      if(object instanceof THREE.Mesh)this.proxyNames.add(object.name);
+    });
+    this.root.add(this.shell.root);
+    for(const name of ['front','rear','left','right'] as const)this.panelPivots[name].add(this.shell.panels[name]);
+    this.movingPlatformDressings.forEach((parent,index)=>parent.add(this.shell.carriages[index]));
     this.reset();
+  }
+
+  async prepare(borrowFinish:(name:string)=>THREE.Material,loader?:RoomFiveShellLoader):Promise<void>{
+    // The authored safety plates reuse the existing security atlas and owner.
+    await this.shell.prepare(name=>name==='Security'?this.security.signs.material:borrowFinish(name),this.resources.materials,loader);
+    if(this.disposed)return;
+    for(const root of [this.root,...this.movingPlatformDressings])root.traverse(object=>{
+      if(!(object instanceof THREE.Mesh))return;
+      const names:string[]=object.userData.staticBatchSourceNames??[object.name];
+      if(names.every(name=>this.proxyNames.has(name)))object.visible=false;
+    });
+    // Seat the existing lock lens below the warning triangle on the armour's
+    // front face; the lighting owner retains its release colour and intensity.
+    const fixture=this.panelPivots.front.getObjectByName('room-5-containment-front-lock-status');
+    fixture?.position.set(-2.30,-.66,-.36);
   }
 
   /** Shared hinge pose for art inspection and the authored release cinematic. */
@@ -116,10 +140,14 @@ export class RoomFiveArt {
 
   /** The front hatch lifts outward above Goop, never across the cell or exit. */
   setReleaseProgress(progress: number): void {
-    this.setPanelPreview('front', THREE.MathUtils.clamp(progress, 0, 1) * 1.65);
+    // The drop bolts clear the sill before the armoured leaf starts lifting.
+    const opening=THREE.MathUtils.clamp((progress-.15)/.85,0,1);
+    this.setPanelPreview('front', opening * 1.65);
+    this.shell.setReleaseProgress(progress);
   }
 
   reset(): void {
+    this.shell.setReleaseProgress(0);
     for (const dressing of this.movingPlatformDressings) dressing.position.set(0, 0, 0);
     for (const pivot of Object.values(this.panelPivots)) {
       pivot.rotation.copy(CLOSED_PANEL_ROTATION);
@@ -144,6 +172,7 @@ export class RoomFiveArt {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.shell.dispose();
     this.root.removeFromParent();
     this.security.dispose();
     for (const dressing of this.movingPlatformDressings) {

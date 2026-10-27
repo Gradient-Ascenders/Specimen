@@ -50,20 +50,27 @@ function fixture() {
   };
 }
 
-test('three room lights latch after 1.5 seconds and remain powered after disconnect', () => {
+test('four room lights latch after 1.5 seconds, including the final switch platform bank', () => {
   const f = fixture();
   try {
-    const light = f.controller.lights[0]!;
-    light.target.setConnectionState(true);
+    assert.equal(f.controller.lights.length, 4);
+    for (const light of f.controller.lights) light.target.setConnectionState(true);
     for (let i = 0; i < 89; i++) f.controller.update(DT, f.bodies);
-    assert.equal(light.latched, false);
+    assert.ok(f.controller.lights.every(light => !light.latched));
     f.controller.update(DT, f.bodies);
-    assert.equal(light.latched, true);
-    light.target.setConnectionState(false);
+    assert.ok(f.controller.lights.every(light => light.latched));
+    for (const light of f.controller.lights) light.target.setConnectionState(false);
     f.controller.update(DT, f.bodies);
-    assert.equal(light.latched, true);
-    assert.ok(light.light.intensity > 0);
-    assert.equal(f.controller.lights.length, 3);
+    assert.ok(f.controller.lights.every(light => light.latched && light.light.intensity > 0));
+    const final = f.controller.lights[3]!;
+    assert.deepEqual(final.root.position.toArray(), [10, 14.4, 142.5]);
+    // Older saves contain three banks. The new one must start unpowered.
+    const saved = f.controller.capture() as any;
+    saved.lights.pop(); f.controller.restore(saved);
+    assert.equal(final.latched, false); assert.equal(final.light.intensity, 0);
+    assert.ok(f.controller.lights.slice(0, 3).every(light => light.latched));
+    f.controller.reset();
+    assert.ok(f.controller.lights.every(light => !light.latched && light.light.intensity === 0));
   } finally { f.dispose(); }
 });
 

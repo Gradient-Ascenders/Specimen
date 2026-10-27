@@ -33,9 +33,9 @@ export function createContainmentPlatformBoosters(scene: ContainmentLevelScene):
         ...(id === 'room-3-entry-platform' ? { spillRangeMetres: 1.4 } : {}),
         // This balcony shares the doorway wall with Room 3. A non-shadowed
         // light here leaks through its deck/wall, so keep its glow on the skin.
-        // The rendered deck seat ends .32 m below the tread; offset .015 m
-        // underneath that skin, rather than using the thicker collision box.
-        ...(id === 'room-2-exit-balcony' ? { surfaceGlowY: point.y - .335 } : {}),
+        // The authored armour ends .41 m below the tread; keep the existing
+        // glow .015 m beneath that skin without adding a spill light.
+        ...(id === 'room-2-exit-balcony' ? { surfaceGlowY: point.y - .425 } : {}),
       };
     });
     boosters.addPlatforms(parent, platforms, `containment-room-${room}`);

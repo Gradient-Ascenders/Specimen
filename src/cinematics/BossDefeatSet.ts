@@ -52,6 +52,8 @@ export class BossDefeatSet {
     this.structural = new THREE.InstancedMesh(this.unitBox, this.metal, 48); this.structural.name = 'collapsing-major-roof-girders';
     this.structural.frustumCulled = false; this.structural.count = 0; this.root.add(this.structural);
     this.buildCracks(); this.buildPassage(); this.buildExterior(); this.buildDeploymentBays(); this.buildBossDamage();
+    // Wreck dressing belongs to the ending, outside the live RAM contact hull.
+    this.bossDamage.traverse(object => { object.userData.contactSolid = false; });
   }
   private geometry<G extends THREE.BufferGeometry>(g: G): G { this.geometries.add(g); return g; }
   private material<M extends THREE.Material>(m: M): M { this.materials.add(m); return m; }

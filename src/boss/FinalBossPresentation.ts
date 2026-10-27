@@ -27,7 +27,7 @@ export class FinalBossPresentation {
   readonly coreWorld=new THREE.Vector3();
   readonly ramWarning:THREE.Mesh;
   readonly beamWarning:THREE.InstancedMesh<THREE.BufferGeometry,THREE.MeshBasicMaterial>;
-  readonly ramHull:ExterminatorRamHull;
+  ramHull:ExterminatorRamHull;
   readonly ramImpact:THREE.Mesh<THREE.RingGeometry,THREE.MeshBasicMaterial>;
   readonly smoke:THREE.InstancedMesh;
   readonly evasionOffset=new THREE.Vector3();
@@ -321,6 +321,12 @@ export class FinalBossPresentation {
   kickGuns():void {this.warDrone.kickGuns();}
   kickEye():void {this.eyeFlash=.12;}
   copyGunMuzzle(index:number,out:THREE.Vector3):THREE.Vector3 {return this.warDrone.copyGunMuzzle(index,out);}
+  adoptDroneModel(root:THREE.Object3D):void {
+    this.warDrone.adoptModel(root);
+    // The RAM envelope follows the actual prepared rigid parts, including its
+    // gimbals and shutters. Projectile proxies retain their existing identity.
+    this.machine.updateWorldMatrix(true,true);this.ramHull=new ExterminatorRamHull(this.rollRig);this.refreshWorldAnchors();
+  }
   copyBeamDirection(out:THREE.Vector3):THREE.Vector3 {return out.set(0,0,-1).applyQuaternion(this.machine.quaternion);}
   burst(position:THREE.Vector3,count=12):void {
     for(let i=0;i<count;i++) {
@@ -359,10 +365,14 @@ export class FinalBossPresentation {
       vertexShader:'varying vec3 vN; varying vec3 vP; void main(){vN=normalize(normalMatrix*normal);vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
       fragmentShader:`varying vec3 vN,vP;uniform float uTime,uOpen,uHit;
         void main(){float rim=pow(1.-abs(vN.z),2.);float vein=pow(abs(sin(vP.y*5.+vP.x*9.+sin(vP.z*7.)+uTime*3.)),44.);
-        vec3 col=${slime?'mix(vec3(.015,.28,.31),vec3(.16,.63,.18),rim*.8)':'mix(vec3(.025,.24,.85),vec3(1.,.38,.035),uOpen)'};
+        vec3 col=${slime?'mix(vec3(.015,.28,.31),vec3(.16,.63,.18),rim*.8)':'mix(vec3(.22,.004,.012),vec3(1.,.32,.025),uOpen)'};
         ${slime?'':`float r=length(vP.xy);float rings=pow(.5+.5*cos(r*32.),10.);
           float pupil=1.-smoothstep(.16,.36,r);float sweep=pow(max(0.,cos(atan(vP.y,vP.x)-uTime*.7)),26.);
-          col*=.55+rings*.8;col+=vec3(.55,.75,1.)*(pupil*.9+rings*.16+sweep*.13);`}
+          float iris=smoothstep(.25,.42,r)*(1.-smoothstep(1.08,1.3,r));
+          col*=.12+iris*(.4+rings*.75);
+          col+=mix(vec3(1.,.06,.035),vec3(1.,.78,.32),uOpen)*(pupil*.8+rings*iris*.2+sweep*.1);
+          float reflection=pow(max(0.,dot(normalize(vN),normalize(vec3(-.45,.65,1.)))),48.);
+          col+=vec3(.7,.83,.92)*reflection*.75;`}
         col+=vec3(.8,.35,.25)*vein*.23+rim*vec3(.15,.1,.13)+uHit*vec3(.8,.7,.6);
         gl_FragColor=vec4(col,1.);}`});this.material.add(m);return m;
   }

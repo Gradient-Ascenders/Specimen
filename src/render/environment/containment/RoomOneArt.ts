@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoomOneShell } from './RoomOneShell.ts';
 
 import type { ContainmentArtResources } from './ContainmentArtResources.ts';
 import {
@@ -29,6 +30,7 @@ const EGG_STATES: readonly RoomOneEggState[] = [
 /** Static Room 1 production dressing and cutscene-ready hero states. */
 export class RoomOneArt {
   readonly root = new THREE.Group();
+  readonly shell = new RoomOneShell();
   readonly specimenAssembly = new THREE.Group();
   readonly pedestalDressing = new THREE.Group();
   readonly containmentBoxRoot = new THREE.Group();
@@ -67,7 +69,7 @@ export class RoomOneArt {
       this.eggRoot,
     ]) markVisualOnly(object);
 
-    this.buildArchitecture();
+    this.root.add(this.shell.root);
     this.buildSpecimenPod();
     this.eggStates = this.buildEggStates();
     this.buildDoor();
@@ -87,6 +89,8 @@ export class RoomOneArt {
   get eggStateNames(): readonly RoomOneEggState[] {
     return EGG_STATES;
   }
+
+  prepare(): Promise<void> { return this.shell.prepare(); }
 
   setEggState(state: RoomOneEggState): void {
     for (const name of EGG_STATES) this.eggStates[name].visible = name === state;
@@ -118,104 +122,11 @@ export class RoomOneArt {
     if (this.disposed) return;
     this.disposed = true;
     this.root.removeFromParent();
+    this.shell.dispose();
     this.specimenPod.dispose();
     for (const geometry of this.uniqueGeometries) geometry.dispose();
     this.uniqueGeometries.clear();
     this.root.clear();
-  }
-
-  private buildArchitecture(): void {
-    const { mainCeramic, secondaryCeramic, graphite, serviceMetal, neutralFixture } =
-      this.resources.materials;
-
-    const panels: readonly {
-      name: string;
-      size: readonly [number, number, number];
-      position: readonly [number, number, number];
-      rotation?: readonly [number, number, number];
-      secondary?: boolean;
-    }[] = [
-      { name: 'rear-lower-west', size: [4.2, 2.75, 0.11], position: [-4.55, 1.55, -5.73] },
-      { name: 'rear-lower-centre', size: [4.65, 2.75, 0.11], position: [-0.02, 1.55, -5.72], secondary: true },
-      { name: 'rear-lower-east', size: [4.15, 2.75, 0.11], position: [4.48, 1.55, -5.73] },
-      { name: 'rear-upper-west', size: [3.35, 4.28, 0.11], position: [-5.0, 5.16, -5.73] },
-      { name: 'rear-upper-centre', size: [3.55, 4.28, 0.11], position: [-1.45, 5.16, -5.72] },
-      { name: 'rear-upper-east', size: [5.72, 4.28, 0.11], position: [3.37, 5.16, -5.73], secondary: true },
-      { name: 'west-wall-rear', size: [4.8, 3.65, 0.11], position: [-6.73, 2.0, -3.5], rotation: [0, Math.PI / 2, 0] },
-      { name: 'west-wall-front', size: [5.9, 3.65, 0.11], position: [-6.73, 2.0, 2.05], rotation: [0, Math.PI / 2, 0], secondary: true },
-      { name: 'west-wall-upper', size: [10.9, 3.7, 0.11], position: [-6.72, 5.86, -0.35], rotation: [0, Math.PI / 2, 0] },
-      { name: 'east-wall-rear', size: [5.25, 3.7, 0.11], position: [6.73, 2.02, -3.22], rotation: [0, -Math.PI / 2, 0], secondary: true },
-      { name: 'east-wall-front', size: [5.45, 3.7, 0.11], position: [6.73, 2.02, 2.35], rotation: [0, -Math.PI / 2, 0] },
-      { name: 'east-wall-upper', size: [10.95, 3.68, 0.11], position: [6.72, 5.85, -0.3], rotation: [0, -Math.PI / 2, 0] },
-      { name: 'north-west-service', size: [0.98, 7.35, 0.11], position: [-6.39, 4.0, 5.72], secondary: true },
-      { name: 'north-centre-quiet', size: [3.72, 7.35, 0.11], position: [-1.82, 4.0, 5.72] },
-      { name: 'north-door-west', size: [1.12, 3.45, 0.11], position: [1.0, 1.9, 5.72], secondary: true },
-      { name: 'north-door-east', size: [1.08, 3.45, 0.11], position: [6.35, 1.9, 5.72] },
-      { name: 'north-door-overhead', size: [4.45, 3.62, 0.11], position: [4.22, 5.88, 5.72], secondary: true },
-      { name: 'north-vent-cap', size: [1.92, 1.02, 0.11], position: [-4.8, 7.38, 5.72] },
-    ];
-    for (const panel of panels) {
-      this.root.add(
-        createChamferedBox(this.resources, {
-          name: `room-1-panel-${panel.name}`,
-          size: panel.size,
-          radius: 0.035,
-          position: panel.position,
-          rotation: panel.rotation,
-          material: panel.secondary ? secondaryCeramic : mainCeramic,
-        }),
-      );
-    }
-
-    // One controlled maintenance reveal: enough substrate to explain the skin,
-    // without turning the clean room into an exposed-machine corridor.
-    this.root.add(
-      createChamferedBox(this.resources, {
-        name: 'room-1-rear-service-reveal',
-        size: [1.08, 2.55, 0.15],
-        radius: 0.025,
-        position: [-5.02, 4.9, -5.64],
-        material: this.resources.materials.mechanicalBacking,
-      }),
-      createInstancedChamferedBoxes(this.resources, {
-        name: 'room-1-rear-service-rail-brackets',
-        size: [0.82, 0.1, 0.16],
-        radius: 0.018,
-        material: serviceMetal,
-        transforms: [3.95, 4.92, 5.89].map((y) => ({ position: [-5.02, y, -5.53] })),
-      }),
-      createBorrowedCylinder(this.resources, {
-        name: 'room-1-rear-service-pressure-line',
-        size: [0.055, 1.05, 0.055],
-        position: [-5.21, 4.9, -5.48],
-        material: serviceMetal,
-      }),
-      createBorrowedCylinder(this.resources, {
-        name: 'room-1-rear-service-data-line',
-        size: [0.035, 1.05, 0.035],
-        position: [-4.82, 4.9, -5.47],
-        material: graphite,
-      }),
-    );
-
-    for (const x of [-3.8, 3.8]) {
-      this.root.add(
-        createChamferedBox(this.resources, {
-          name: `room-1-ceiling-fixture-housing-${x}`,
-          size: [3.0, 0.16, 0.84],
-          radius: 0.04,
-          position: [x, 7.74, -1.5],
-          material: graphite,
-        }),
-        createChamferedBox(this.resources, {
-          name: `room-1-ceiling-neutral-diffuser-${x}`,
-          size: [2.55, 0.035, 0.5],
-          radius: 0.015,
-          position: [x, 7.645, -1.5],
-          material: neutralFixture,
-        }),
-      );
-    }
   }
 
   private buildSpecimenPod(): void {

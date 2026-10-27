@@ -121,7 +121,14 @@ export class BlackoutElevatorAscent {
         (sound,position,volume,vary)=>this.sound.cue(sound,position,volume,vary));
       actor.voice.update(dt, { text: line ? line.text.slice(0, Math.floor((t - line.start) * 24)) : '', pageIndex: Math.max(0, lineIndex) });
     }
-    if (!skip && !this.skipRequested) this.sound.update(before,t);
+    if (!skip && !this.skipRequested) {
+      this.sound.update(before,t);
+      // Keep the authored shaft accents alongside the dedicated lift recordings.
+      if (t-before <= .25) {
+        if (before < 19.4 && t >= 19.4) this.sound.cue('world-release-01',{x:-5.6,y:5,z:179.5},.10);
+        if (before < 35.8 && t >= 35.8) this.sound.cue('world-lever-lock-01',{x:5.6,y:-2,z:181.5},.08);
+      }
+    }
     this.presentLift(t); this.overlay.present(t);
     if (t >= T.duration) {
       for (const actor of this.actors) actor.body.teleport(actor.position);

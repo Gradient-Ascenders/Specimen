@@ -123,6 +123,7 @@ export class ExterminatorDroneFlight {
   }
 
   copyAimDirection(index: number, out: THREE.Vector3): THREE.Vector3 { return out.copy(this.slots[index]!.aim); }
+  copyVelocity(index:number,out:THREE.Vector3):THREE.Vector3 { return out.copy(this.slots[index]!.velocity); }
 
   /** Offset only the visible child; the squad root and collider remain at the
    * current fixed-step pose even on high-refresh displays. */

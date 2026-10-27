@@ -7,8 +7,8 @@ type Role = 'armour' | 'armourShadow' | 'mechanism' | 'barrel' | 'mount' | 'link
 type Triple = [number, number, number];
 
 /** Room 3 sentry parts, merged by finish and shared by drones of the same size. */
-export function createIndustrialDroneGeometry(config: SecurityDroneConfig, role: Role): THREE.BufferGeometry {
-  const preparation = prepareIndustrialDroneGeometry(config, role);
+export function createIndustrialDroneGeometry(config: SecurityDroneConfig, role: Role, distant = false): THREE.BufferGeometry {
+  const preparation = prepareIndustrialDroneGeometry(config, role, distant);
   try {
     for (const step of preparation.steps) step();
     return preparation.finish();
@@ -17,7 +17,7 @@ export function createIndustrialDroneGeometry(config: SecurityDroneConfig, role:
 
 /** Identical geometry, with individually bounded construction steps for idle
  * preparation. The synchronous factory above remains the gameplay API. */
-export function prepareIndustrialDroneGeometry(config: SecurityDroneConfig, role: Role) {
+export function prepareIndustrialDroneGeometry(config: SecurityDroneConfig, role: Role, distant = false) {
   const { x: w, y: h, z: d } = config.colliderSize;
   const s = Math.min(w, h, d), parts: THREE.BufferGeometry[] = [];
   const steps: (() => void)[] = [];
@@ -28,12 +28,13 @@ export function prepareIndustrialDroneGeometry(config: SecurityDroneConfig, role
     else parts.push(geometry);
   };
   const box = (size: Triple, at: Triple, radius = s * .035, rotate?: Triple) =>
-    steps.push(() => add(new RoundedBoxGeometry(...size, 1, Math.min(radius, ...size.map(v => v / 3))), at, rotate));
+    steps.push(() => add(distant ? new THREE.BoxGeometry(...size) :
+      new RoundedBoxGeometry(...size, 1, Math.min(radius, ...size.map(v => v / 3))), at, rotate));
   const cylinder = (radius: number, length: number, at: Triple, axis: 'x' | 'y' | 'z' = 'y', open = false) =>
-    steps.push(() => add(new THREE.CylinderGeometry(radius, radius, length, 12, 1, open), at,
+    steps.push(() => add(new THREE.CylinderGeometry(radius, radius, length, distant ? 6 : 12, 1, open), at,
       axis === 'x' ? [0, 0, Math.PI / 2] : axis === 'z' ? [Math.PI / 2, 0, 0] : [0, 0, 0]));
   const ring = (radius: number, thickness: number, at: Triple, axis: 'x' | 'z' = 'z') =>
-    steps.push(() => add(new THREE.TorusGeometry(radius, thickness, 5, 16), at, axis === 'x' ? [0, Math.PI / 2, 0] : [0, 0, 0]));
+    steps.push(() => add(new THREE.TorusGeometry(radius, thickness, distant ? 3 : 5, distant ? 8 : 16), at, axis === 'x' ? [0, Math.PI / 2, 0] : [0, 0, 0]));
 
   switch (role) {
     case 'armour':
@@ -60,7 +61,7 @@ export function prepareIndustrialDroneGeometry(config: SecurityDroneConfig, role
       cylinder(s * .18, d * .17, [0, 0, -d * .40], 'z');
       for (const side of [-1, 1]) {
         cylinder(s * .12, w * .15, [side * w * .29, 0, -.03 * d], 'x');
-        for (let n = 0; n < 4; n++) {
+        for (let n = 0; n < (distant ? 0 : 4); n++) {
           box([w * .14, h * .018, d * .025], [side * w * .19, h * (.02 + n * .055), d * .354], s * .004);
           box([w * .022, h * .02, d * .19], [side * w * (.34 + n * .025), h * .151, -d * .07], s * .003);
         }
