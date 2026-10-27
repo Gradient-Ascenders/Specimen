@@ -1,10 +1,10 @@
 import { registerLaserAudio, type WorldAudioSource } from '../audio/WorldAudio.ts';
 import * as THREE from 'three';
+import { LaserEmitterModel, type LaserEmitterVisual } from '../render/hazards/LaserEmitterModel.ts';
 
 const BEAM_EPSILON_SQ = 1e-12;
 const TIMELINE_EPSILON_SECONDS = 1e-9;
 const PROXY_BEAM_COLOUR = 0xff2038;
-const PROXY_EMITTER_COLOUR = 0x8f1728;
 
 export interface ReadonlyLaserVector3 {
   readonly x: number;
@@ -89,25 +89,19 @@ export class LaserHazard {
   private readonly targetPosition = new THREE.Vector3();
   private readonly midpoint = new THREE.Vector3();
   private readonly beamDirection = new THREE.Vector3();
+  private readonly reverseDirection = new THREE.Vector3();
   private readonly beamQuaternion = new THREE.Quaternion();
   private readonly upAxis = new THREE.Vector3(0, 1, 0);
 
   private readonly beamGeometry: THREE.CylinderGeometry;
   private readonly beamMaterial: THREE.MeshBasicMaterial;
-  private readonly emitterGeometry: THREE.CylinderGeometry;
-  private readonly emitterMaterial: THREE.MeshBasicMaterial;
+  private readonly emitterModel: LaserEmitterModel;
   private readonly beamMesh: THREE.Mesh<
     THREE.CylinderGeometry,
     THREE.MeshBasicMaterial
   >;
-  private readonly startEmitter: THREE.Mesh<
-    THREE.CylinderGeometry,
-    THREE.MeshBasicMaterial
-  >;
-  private readonly endEmitter: THREE.Mesh<
-    THREE.CylinderGeometry,
-    THREE.MeshBasicMaterial
-  >;
+  private readonly startEmitter: LaserEmitterVisual;
+  private readonly endEmitter: LaserEmitterVisual;
 
   private readonly initialEnabled: boolean;
   private readonly timeline: LaserTimelineDefinition | undefined;
@@ -185,43 +179,16 @@ export class LaserHazard {
     this.beamMesh.userData.laserHazardId = this.id;
     this.beamMesh.userData.runtimeProxy = true;
 
-    const emitterRadius = Math.max(
-      this.beamRadiusMetres * 2.4,
-      0.12,
-    );
-    this.emitterGeometry = new THREE.CylinderGeometry(
-      emitterRadius,
-      emitterRadius,
-      0.28,
-      12,
-      1,
-      false,
-    );
-    this.emitterMaterial = new THREE.MeshBasicMaterial({
-      color: PROXY_EMITTER_COLOUR,
-      toneMapped: false,
-    });
-
-    this.startEmitter = new THREE.Mesh(
-      this.emitterGeometry,
-      this.emitterMaterial,
-    );
-    this.startEmitter.name = `${this.id}-emitter-start-proxy`;
-    this.startEmitter.userData.laserHazardId = this.id;
-    this.startEmitter.userData.runtimeProxy = true;
-
-    this.endEmitter = new THREE.Mesh(
-      this.emitterGeometry,
-      this.emitterMaterial,
-    );
-    this.endEmitter.name = `${this.id}-emitter-end-proxy`;
-    this.endEmitter.userData.laserHazardId = this.id;
-    this.endEmitter.userData.runtimeProxy = true;
+    this.emitterModel = new LaserEmitterModel();
+    this.startEmitter = this.emitterModel.create(`${this.id}-emitter-start-proxy`, this.id);
+    this.endEmitter = this.emitterModel.create(`${this.id}-emitter-end-proxy`, this.id);
+    for (const emitter of [this.startEmitter, this.endEmitter])
+      emitter.root.traverse(object => { object.userData.runtimeProxy = true; });
 
     this.root.add(
       this.beamMesh,
-      this.startEmitter,
-      this.endEmitter,
+      this.startEmitter.root,
+      this.endEmitter.root,
     );
 
     this.reset();
@@ -459,8 +426,7 @@ export class LaserHazard {
     this.root.clear();
     this.beamGeometry.dispose();
     this.beamMaterial.dispose();
-    this.emitterGeometry.dispose();
-    this.emitterMaterial.dispose();
+    this.emitterModel.dispose();
   }
 
   private validateTimeline(
@@ -604,19 +570,22 @@ export class LaserHazard {
     this.beamMesh.quaternion.copy(this.beamQuaternion);
     this.beamMesh.scale.set(1, beamLength, 1);
 
-    this.startEmitter.position.copy(this.startValue);
-    this.startEmitter.quaternion.copy(this.beamQuaternion);
-    this.endEmitter.position.copy(this.endValue);
-    this.endEmitter.quaternion.copy(this.beamQuaternion);
+    this.startEmitter.root.position.copy(this.startValue);
+    this.startEmitter.root.quaternion.copy(this.beamQuaternion);
+    this.endEmitter.root.position.copy(this.endValue);
+    this.endEmitter.root.quaternion.setFromUnitVectors(this.upAxis, this.reverseDirection.copy(this.beamDirection).negate());
 
     this.updateProxyVisibility();
   }
 
   private updateProxyVisibility(): void {
-    // Emitter hardware remains visible when the beam is disabled so the player
-    // can read where a hazard can originate. Final presentation belongs to #67.
+    // Standalone and boss hazards use the same optical head as room adapters.
+    // Only the beam and aperture state change when a circuit switches off.
     this.beamMesh.visible = this.enabled;
-    this.startEmitter.visible = true;
-    this.endEmitter.visible = true;
+    for (const emitter of [this.startEmitter, this.endEmitter]) {
+      emitter.root.visible = true;
+      emitter.activeIndicator.visible = this.enabled;
+      for (const indicator of emitter.inactiveIndicators) indicator.visible = !this.enabled;
+    }
   }
 }

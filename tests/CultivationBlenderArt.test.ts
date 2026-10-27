@@ -11,6 +11,27 @@ import {createAuthoredDissolveTarget} from '../src/abilities/DissolveTarget.ts';
 
 const layout=JSON.parse(readFileSync(new URL('../assets/environments/cultivation/authoring-layout.json',import.meta.url),'utf8'));
 
+test('all Cultivation laser endpoints retain the shared Level 1 head through Blender dressing and reset',()=>{
+  const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets);
+  try{
+    const heads:THREE.Mesh[]=[];
+    for(const room of [scene.roomTwo,scene.roomThree])for(const hazard of room.lasers.hazards){
+      for(const end of ['start','end']){
+        const name=`${hazard.id}-presentation-emitter-${end}`,root=room.root.getObjectByName(name)!;
+        assert.equal(root.userData.laserEmitterAsset,'containment-room-three-laser-v1');
+        const head=root.getObjectByName(`${name}-housing-collar`) as THREE.Mesh;
+        assert.equal(head.visible,true);assert.equal(head.material.visible,true);
+        assert.equal(room.collisionMeshes.includes(head),false);heads.push(head);
+        assert.equal(root.children.some(child=>child.userData.blenderBatch),false,'no old cylindrical Blender skin');
+      }
+    }
+    assert.equal(heads.length,14);
+    assert.equal(new Set(heads.map(head=>head.geometry)).size,1,'both rooms share the exact original optical housing');
+    scene.reset();scene.blenderArt.dispose();
+    for(const head of heads){assert.equal(head.visible,true);assert.equal(head.material.visible,true);}
+  }finally{scene.dispose();}
+});
+
 test('Room 3 observation cavities have opaque backs and fitted returns independently of the glazing',()=>{
   const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),root=scene.roomThree.root;
   try{
@@ -160,6 +181,14 @@ test('the actual Blender buffers replace old coverage and share one Level 1 fini
     for(const asset of CULTIVATION_BLENDER_ASSETS){
       const root=(scene as any)[asset.owner].root as THREE.Group;
       for(const batch of asset.batches){
+        if(/-presentation-emitter-(start|end)$/.test(batch.target)){
+          assert.equal(root.getObjectByName(batch.name),undefined,'old optical skins cannot cover the shared Level 1 model');
+          const emitter=root.getObjectByName(batch.target)!;
+          assert.equal(emitter.userData.laserEmitterAsset,'containment-room-three-laser-v1');
+          const housing=emitter.getObjectByName(`${emitter.name}-housing-collar`) as THREE.Mesh;
+          assert.equal(housing.material.visible,true,'retired Room 2 collars cannot hide the shared housing');
+          continue;
+        }
         if(asset.id==='room-3'&&/^cultivation-room-3-roof-drone-[123]-replacement-(cable|hatch)$/.test(batch.target)){
           assert.equal(root.getObjectByName(batch.target),undefined,'the encounter creates this controller-owned cable later');
           continue; // Runtime attachment and cleanup are covered with the real encounter.

@@ -111,6 +111,7 @@ export class CultivationBlenderArt {
         const names=new Set(asset.retireNames);
         owner.traverse(object=>{
           if(!(object instanceof THREE.Mesh))return;
+          if(object.userData.sharedLaserEmitter)return;
           const original=object.name.replace(/-surface-skin$/,'');
           let subtree=false;for(let p:THREE.Object3D|null=object.parent;p&&p!==owner;p=p.parent)
             if(asset.retireSubtrees?.includes(p.name)){subtree=true;break;}
@@ -120,6 +121,9 @@ export class CultivationBlenderArt {
         });
         const geometries=scene.assets.geometries('cultivation-blender-'+asset.id,()=>{throw Error('Blender GLB geometry must be registered by the offline generator');});
         for(const batch of asset.batches){
+          // Older room exports included a second skin over each optical head.
+          // The shared Level 1 emitter now owns all of this hardware.
+          if(/-presentation-emitter-(start|end)$/.test(batch.target))continue;
           const geometry=geometries[batch.geometry??batch.name];if(!geometry)throw Error(`Missing authored GLB batch: ${batch.name}`);
           const parent=batch.target?owner.getObjectByName(batch.target):asset.owner==='roomFour'?scene.roomFourGeometry:owner;
           const deferred=!parent&&asset.id==='room-3'&&/^cultivation-room-3-roof-drone-[123]-replacement-(cable|hatch)$/.test(batch.target);
