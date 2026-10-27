@@ -113,6 +113,7 @@ export class RoomFiveGreybox {
   readonly collisionMeshes = this.builder.collisionMeshes;
   readonly movingPlatformOne = new MovingPlatform({
     id: 'room-5-moving-platform-1',
+    machineryAudio: false, // The authored booster engine supplies its hover sound.
     start: new THREE.Vector3(2.136, 82.374, 100.384),
     end: new THREE.Vector3(10.082, 82.374, 100.384),
     size: new THREE.Vector3(1.849, 0.523, 2.091),
@@ -122,6 +123,7 @@ export class RoomFiveGreybox {
   });
   readonly movingPlatformTwo = new MovingPlatform({
     id: 'room-5-moving-platform-2',
+    machineryAudio: false,
     start: new THREE.Vector3(15.109, 82.374, 100.384),
     end: new THREE.Vector3(15.109, 82.374, 107.234),
     size: new THREE.Vector3(1.849, 0.523, 2.091),

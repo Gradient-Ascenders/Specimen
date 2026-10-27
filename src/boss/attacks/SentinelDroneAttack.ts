@@ -70,6 +70,7 @@ class SentinelDroneProjectilePool {
   private readonly lifetimeSeconds: number;
   private readonly maximumRangeMetres: number;
   private readonly collisionMask:number;
+  private readonly onWorldHit:((object:THREE.Mesh|null)=>void)|undefined;
   private readonly hit = new CollisionHit();
   private readonly displacement = new THREE.Vector3();
   private readonly targetDisplacement = new THREE.Vector3();
@@ -85,6 +86,7 @@ class SentinelDroneProjectilePool {
       readonly lifetimeSeconds?: number;
       readonly maximumRangeMetres?: number;
       readonly collisionMask?:number;
+      readonly onWorldHit?:(object:THREE.Mesh|null)=>void;
     } = {},
   ) {
     this.world = world;
@@ -94,6 +96,7 @@ class SentinelDroneProjectilePool {
     this.lifetimeSeconds = options.lifetimeSeconds ?? 4;
     this.maximumRangeMetres = options.maximumRangeMetres ?? 50;
     this.collisionMask=options.collisionMask??CollisionLayer.Projectile;
+    this.onWorldHit=options.onWorldHit;
     if (!Number.isInteger(capacity) || capacity <= 0) {
       throw new Error('Sentinel hostile projectile pool capacity must be a positive integer.');
     }
@@ -234,6 +237,7 @@ class SentinelDroneProjectilePool {
         slot.position.copy(this.hit.point);
         syncProjectile(slot);
         deactivateProjectile(slot);
+        this.onWorldHit?.(this.hit.object);
         continue;
       }
 
@@ -533,6 +537,7 @@ export class SentinelDroneSquad {
     readonly fireStaggerSeconds?: number;
     readonly deploymentDelaySeconds?:number;
     readonly projectileCollisionMask?:number;
+    readonly onProjectileWorldHit?:(object:THREE.Mesh|null)=>void;
     readonly idPrefix?: string;
     readonly colliderSize?: THREE.Vector3Like;
     readonly blocksLineOfSight?:boolean;
@@ -561,7 +566,7 @@ export class SentinelDroneSquad {
       { capacity: options.projectileCapacity ?? 16,
         speedMetresPerSecond: options.projectileSpeedMetresPerSecond,
         lifetimeSeconds: options.projectileLifetimeSeconds,
-        maximumRangeMetres: options.projectileRangeMetres,collisionMask:options.projectileCollisionMask },
+        maximumRangeMetres: options.projectileRangeMetres,collisionMask:options.projectileCollisionMask,onWorldHit:options.onProjectileWorldHit },
     );
     this.projectileStates = this.projectiles.states;
     this.root.name = 'sentinel-drone-squad';

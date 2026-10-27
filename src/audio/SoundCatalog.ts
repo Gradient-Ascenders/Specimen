@@ -1,6 +1,7 @@
 export interface SoundSpatialProfile {
   readonly refDistance: number;
   readonly rolloffFactor: number;
+  readonly maxDistance?: number;
 }
 
 // Keep small body/electrical accents local; larger world sounds carry across a room.
@@ -10,9 +11,62 @@ const LASER: SoundSpatialProfile = { refDistance: 4, rolloffFactor: 0.8 };
 const MONITOR: SoundSpatialProfile = { refDistance: 4, rolloffFactor: 1 };
 const DISSOLVE: SoundSpatialProfile = { refDistance: 5, rolloffFactor: 0.9 };
 const HEAVY_IMPACT: SoundSpatialProfile = { refDistance: 8, rolloffFactor: 0.7 };
+// The boss sits roughly 80 m from the playable annulus. Small-room falloff
+// would make its warnings nearly inaudible; retain direction and some distance.
+const BOSS: SoundSpatialProfile = { refDistance: 65, rolloffFactor: .6, maxDistance: 250 };
+const BOSS_DRONE: SoundSpatialProfile = { refDistance: 24, rolloffFactor: .7, maxDistance: 200 };
+const CINEMATIC: SoundSpatialProfile = { refDistance: 18, rolloffFactor: .6, maxDistance: 180 };
 
 /** Mono OGG assets; requester-selected ElevenLabs character effects and shared turret audio. */
 export const SOUND_DEFINITIONS = {
+  'blackout-lift-power-restore-01': { path: 'assets/audio/blackout/blackout-lift-power-restore-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: CINEMATIC },
+  'blackout-lift-start-01': { path: 'assets/audio/blackout/blackout-lift-start-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: CINEMATIC },
+  'blackout-lift-travel-loop-01': { path: 'assets/audio/blackout/blackout-lift-travel-loop-01.ogg', loop: true, volume: .8, maxVoices: 1, spatial: CINEMATIC },
+  'blackout-lift-stop-01': { path: 'assets/audio/blackout/blackout-lift-stop-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: CINEMATIC },
+  'research-light-rupture-01': { path: 'assets/audio/blackout/research-light-rupture-01.ogg', loop: false, volume: 1, maxVoices: 3, spatial: CINEMATIC },
+  'research-energy-absorb-01': { path: 'assets/audio/blackout/research-energy-absorb-01.ogg', loop: false, volume: .75, maxVoices: 4, spatial: CINEMATIC },
+  'research-drone-destroy-01': { path: 'assets/audio/escape/escape-drone-destruction-01.ogg', loop: false, volume: .9, maxVoices: 4, spatial: CINEMATIC },
+  'research-fusion-charge-loop-01': { path: 'assets/audio/blackout/research-fusion-charge-loop-01.ogg', loop: true, volume: 1, maxVoices: 1, spatial: CINEMATIC },
+  'research-slime-fusion-01': { path: 'assets/audio/blackout/research-slime-fusion-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: CINEMATIC },
+  'research-fusion-burst-01': { path: 'assets/audio/blackout/research-fusion-burst-01.ogg', loop: false, volume: 1.1, maxVoices: 1, spatial: CINEMATIC },
+  'specimen-heavy-blast-01': { path: 'assets/audio/blackout/specimen-heavy-blast-01.ogg', loop: false, volume: 1.1, maxVoices: 2, spatial: CINEMATIC },
+  'research-door-breach-01': { path: 'assets/audio/blackout/research-door-breach-01.ogg', loop: false, volume: 1.1, maxVoices: 1, spatial: CINEMATIC },
+  'research-glass-shatter-01': { path: 'assets/audio/blackout/research-glass-shatter-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: CINEMATIC },
+  'research-shaft-fall-01': { path: 'assets/audio/blackout/research-shaft-fall-01.ogg', loop: false, volume: .8, maxVoices: 1 },
+  'research-specimen-land-01': { path: 'assets/audio/blackout/research-specimen-land-01.ogg', loop: false, volume: 1.1, maxVoices: 1, spatial: CINEMATIC },
+  'research-pit-unlock-01': { path: 'assets/audio/blackout/research-pit-unlock-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: BOSS },
+  'research-pit-retract-loop-01': { path: 'assets/audio/blackout/research-pit-retract-loop-01.ogg', loop: true, volume: 1, maxVoices: 1, spatial: BOSS },
+  'research-pit-stop-01': { path: 'assets/audio/blackout/research-pit-stop-01.ogg', loop: false, volume: 1.1, maxVoices: 1, spatial: BOSS },
+  'boss-hover-loop-01': { path: 'assets/audio/boss/boss-hover-loop-01.ogg', loop: true, volume: .65, maxVoices: 1, spatial: BOSS },
+  'boss-emergence-01': { path: 'assets/audio/boss/boss-emergence-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: BOSS },
+  'boss-cannon-spin-up-01': { path: 'assets/audio/boss/boss-cannon-spin-up-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: BOSS },
+  'boss-cannon-volley-01': { path: 'assets/audio/boss/boss-cannon-volley-01.ogg', loop: false, volume: 1, maxVoices: 4, spatial: BOSS },
+  'boss-orb-charge-01': { path: 'assets/audio/boss/boss-orb-charge-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: BOSS },
+  'boss-orb-launch-01': { path: 'assets/audio/boss/boss-orb-launch-01.ogg', loop: false, volume: 1, maxVoices: 4, spatial: BOSS },
+  'boss-orb-burst-01': { path: 'assets/audio/boss/boss-orb-burst-01.ogg', loop: false, volume: 1, maxVoices: 4, spatial: BOSS },
+  'boss-beam-charge-01': { path: 'assets/audio/boss/boss-beam-charge-01.ogg', loop: false, volume: 2, maxVoices: 1, spatial: BOSS },
+  'boss-beam-ignite-01': { path: 'assets/audio/boss/boss-beam-ignite-01.ogg', loop: false, volume: 2.5, maxVoices: 1, spatial: BOSS },
+  'boss-beam-sustain-loop-01': { path: 'assets/audio/boss/boss-beam-sustain-loop-01.ogg', loop: true, volume: 4, maxVoices: 1, spatial: BOSS },
+  'boss-beam-shutdown-01': { path: 'assets/audio/boss/boss-beam-shutdown-01.ogg', loop: false, volume: 1.7, maxVoices: 1, spatial: BOSS },
+  'boss-shield-activate-01': { path: 'assets/audio/boss/boss-shield-activate-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: BOSS },
+  'boss-shield-regeneration-loop-01': { path: 'assets/audio/boss/boss-shield-regeneration-loop-01.ogg', loop: true, volume: .8, maxVoices: 1, spatial: BOSS },
+  'boss-shield-collapse-01': { path: 'assets/audio/boss/boss-shield-collapse-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: BOSS },
+  'boss-drone-deploy-01': { path: 'assets/audio/boss/boss-drone-deploy-01.ogg', loop: false, volume: 1, maxVoices: 2, spatial: BOSS },
+  // Reuse the small turret recording with an arena-sized range and its own
+  // voice budget, keeping other levels' turret mix independent.
+  'boss-drone-shot-01': { path: 'assets/audio/turrets/specimen-turret-shot.ogg', loop: false, volume: .9, maxVoices: 6, spatial: BOSS_DRONE },
+  'boss-ram-windup-01': { path: 'assets/audio/boss/boss-ram-windup-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: BOSS },
+  'boss-ram-rush-01': { path: 'assets/audio/boss/boss-ram-rush-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: BOSS },
+  'boss-ram-impact-01': { path: 'assets/audio/boss/boss-ram-impact-01.ogg', loop: false, volume: 1.1, maxVoices: 1, spatial: BOSS },
+  'boss-cover-break-01': { path: 'assets/audio/boss/boss-cover-break-01.ogg', loop: false, volume: 1, maxVoices: 3, spatial: BOSS },
+  'boss-core-hit-01': { path: 'assets/audio/boss/boss-core-hit-01.ogg', loop: false, volume: 1, maxVoices: 4, spatial: BOSS },
+  'boss-hit-blocked-01': { path: 'assets/audio/boss/boss-hit-blocked-01.ogg', loop: false, volume: .8, maxVoices: 3, spatial: BOSS },
+  'boss-phase-two-overload-01': { path: 'assets/audio/boss/boss-phase-two-overload-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: BOSS },
+  'boss-reactor-failure-01': { path: 'assets/audio/boss/boss-reactor-failure-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: BOSS },
+  'boss-final-explosion-01': { path: 'assets/audio/boss/boss-final-explosion-01.ogg', loop: false, volume: 1.2, maxVoices: 1, spatial: BOSS },
+  'boss-health-pickup-01': { path: 'assets/audio/boss/boss-health-pickup-01.ogg', loop: false, volume: 1, maxVoices: 1 },
+  'specimen-damage-01': { path: 'assets/audio/boss/specimen-damage-01.ogg', loop: false, volume: 1, maxVoices: 2 },
+  'specimen-dash-01': { path: 'assets/audio/boss/specimen-dash-01.ogg', loop: false, volume: 1, maxVoices: 2 },
   'blackout-vent-slime-slide-01': { path: 'assets/audio/blackout/blackout-vent-slime-slide-01.ogg', loop: false, volume: .35, maxVoices: 1 },
   'cultivation-volt-cell-open-01': { path: 'assets/audio/cultivation/cultivation-volt-cell-open-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: MECHANISM },
   'cultivation-cover-break-free-01': { path: 'assets/audio/cultivation/cultivation-cover-break-free-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: MECHANISM },
@@ -89,13 +143,16 @@ export const SOUND_DEFINITIONS = {
 } as const;
 export type SoundId = keyof typeof SOUND_DEFINITIONS;
 const ALL_SOUND_IDS = Object.keys(SOUND_DEFINITIONS) as SoundId[];
+export const BOSS_SOUND_IDS = ALL_SOUND_IDS.filter(id => id.startsWith('boss-') || SOUND_DEFINITIONS[id].path.startsWith('assets/audio/boss/'));
+export const BLACKOUT_CUTSCENE_SOUND_IDS = ALL_SOUND_IDS.filter(id => id.startsWith('research-') || SOUND_DEFINITIONS[id].path.startsWith('assets/audio/blackout/') && id !== 'blackout-vent-slime-slide-01');
+const EARLIER_SOUND_IDS = ALL_SOUND_IDS.filter(id => !BOSS_SOUND_IDS.includes(id) && !BLACKOUT_CUTSCENE_SOUND_IDS.includes(id));
 // The live Cultivation escape includes Volt taking over a security drone.
 /** Cumulative banks start warming ahead of each level's visual preparation. */
 export const SOUND_BANKS = {
   escape: ALL_SOUND_IDS.filter(id => id.startsWith('escape-')),
   intro: ALL_SOUND_IDS.filter(id => id.startsWith('intro-')),
-  containment: ALL_SOUND_IDS.filter(id => id !== 'specimen-charge-loop-01' && !id.startsWith('volt-') && !id.startsWith('cultivation-') && !id.startsWith('blackout-')),
-  cultivation: ALL_SOUND_IDS.filter(id => id !== 'specimen-charge-loop-01' && !id.startsWith('blackout-') && (!id.startsWith('volt-') ||
+  containment: EARLIER_SOUND_IDS.filter(id => id !== 'specimen-charge-loop-01' && !id.startsWith('volt-') && !id.startsWith('cultivation-') && !id.startsWith('blackout-')),
+  cultivation: EARLIER_SOUND_IDS.filter(id => id !== 'specimen-charge-loop-01' && !id.startsWith('blackout-') && (!id.startsWith('volt-') ||
     id === 'volt-circuit-connect-01' || id === 'volt-charge-ready-01')),
   blackout: ALL_SOUND_IDS,
 } as const;

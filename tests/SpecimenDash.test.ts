@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import { SpecimenDash } from '../src/combat/SpecimenDash.ts';
+import { SpecimenDash, SPECIMEN_DASH } from '../src/combat/SpecimenDash.ts';
 import { FINAL_SPECIMEN_MOVEMENT } from '../src/boss/FinalBossConfig.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
@@ -57,4 +57,18 @@ test('a fast dash sweeps against thin walls and leaves airborne gravity unchange
     assert.ok(maximumSpeed > body.maximumLocomotionSpeedMetresPerSecond * 1.7);
     assert.equal(body.maximumLocomotionSpeedMetresPerSecond, FINAL_SPECIMEN_MOVEMENT.maxSpeedMetresPerSecond);
   } finally { world.clear(); surfaces.clear(); wall.geometry.dispose(); (wall.material as THREE.Material).dispose(); }
+});
+
+test('the stronger burst clears more than seven metres without extending its cooldown or adding lift', () => {
+  const world = new CollisionWorld(), surfaces = new SurfaceRegistry(), dash = new SpecimenDash();
+  const body = new KinematicBody({ world, surfaces, initialPosition: new THREE.Vector3(0, 30, 0), config: FINAL_SPECIMEN_MOVEMENT });
+  const step = 1 / 120;
+  try {
+    for (let i = 0; i < Math.ceil(SPECIMEN_DASH.durationSeconds / step); i++) {
+      dash.update(step, { enabled: true, pressed: i === 0, cancelled: false, movement: forward, forward, up });
+      body.update(step, dash.movementDirection, undefined, dash.locomotion);
+    }
+    assert.ok(-body.position.z > 7); assert.ok(body.position.y < 30);
+    assert.equal(SPECIMEN_DASH.cooldownSeconds, 1.2);
+  } finally { world.clear(); surfaces.clear(); }
 });

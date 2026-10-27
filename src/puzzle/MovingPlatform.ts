@@ -45,6 +45,8 @@ export interface MovingPlatformOptions {
     readonly playbackRate?:(progress:number)=>number;
     readonly travelAccents?:readonly {readonly at:number;readonly sound:SoundId;readonly volumeScale:number}[];
   };
+  /** Disable the mechanical motor layer when an authored hover engine owns audio. */
+  readonly machineryAudio?: boolean;
 }
 
 /**
@@ -56,7 +58,7 @@ export interface MovingPlatformOptions {
  */
 export class MovingPlatform {
   readonly root = new THREE.Group();
-  private readonly worldAudio: WorldAudioSource;
+  private readonly worldAudio: WorldAudioSource | undefined;
   readonly events = new EventBus<MovingPlatformEvents>();
   readonly displacement = new THREE.Vector3();
   readonly collisionMesh: THREE.Mesh<
@@ -138,7 +140,7 @@ export class MovingPlatform {
     );
     this.previousPositionValue.copy(this.root.position);
     this.state = this.resolveState();
-    this.worldAudio = new WorldAudioSource({ root: this.root, kind: 'machinery', progress: () => this.progressValue,
+    this.worldAudio = options.machineryAudio === false ? undefined : new WorldAudioSource({ root: this.root, kind: 'machinery', progress: () => this.progressValue,
       volumeScale:()=>options.audioPresentation?.volumeScale?.(this.progressValue)??1,
       playbackRate:()=>options.audioPresentation?.playbackRate?.(this.progressValue)??1,
       travelAccents:options.audioPresentation?.travelAccents,
@@ -227,7 +229,7 @@ export class MovingPlatform {
     this.previousPositionValue.copy(this.root.position);
     this.displacement.set(0, 0, 0);
     this.setState(this.resolveState());
-    this.worldAudio.reset();
+    this.worldAudio?.reset();
   }
 
   /**
@@ -313,11 +315,11 @@ export class MovingPlatform {
     this.previousPositionValue.copy(this.root.position);
     this.displacement.set(0, 0, 0);
     this.setState(this.resolveState());
-    this.worldAudio.reset();
+    this.worldAudio?.reset();
   }
 
   dispose(): void {
-    this.worldAudio.dispose();
+    this.worldAudio?.dispose();
     this.events.clear();
     this.root.removeFromParent();
     this.root.traverse((object) => {

@@ -1,3 +1,4 @@
+import { cinematicMusicEvents, type CinematicMusic } from '../src/audio/CinematicMusic.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { OpeningMoviePresentation, type OpeningMoviePresentationOptions } from '../src/cinematics/OpeningMoviePresentation.ts';
@@ -201,4 +202,26 @@ test('small upload slices yield one video frame; costly jobs give playback extra
   const expensive = f.player.yieldPreparation();
   assert.equal([...f.timers.values()][0].delay, 80);
   f.player.dispose(); await expensive;
+});
+
+test('MP4 music begins with visible media and tracks stalls, seeks, errors and skip', async () => {
+  const cues: CinematicMusic[] = [], stopped: CinematicMusic[] = [];
+  const offs = [cinematicMusicEvents.on('started', cue => cues.push(cue)), cinematicMusicEvents.on('stopped', cue => stopped.push(cue))];
+  const f = fixture();
+  try {
+    f.player.start(); f.blackout(); assert.equal(cues.length, 0);
+    f.video.emit('playing'); assert.equal(cues.length, 1);
+    const cue = cues[0]!; assert.equal(cue.track, 'awakening');
+    f.video.currentTime = 22; f.player.render(.016); assert.equal(cue.seconds, 22);
+    for (const event of ['waiting', 'pause', 'seeking']) {
+      f.video.emit(event); assert.equal(cue.playing, false);
+      f.video.currentTime = 5; f.video.emit('playing'); assert.equal(cue.playing, true); assert.equal(cue.seconds, 5);
+    }
+    assert.equal(cues.length, 1, 'resume is the same ownership session');
+    f.video.emit('error'); assert.equal(cue.playing, false);
+    f.player.retry(); f.video.currentTime = 0; f.video.emit('playing');
+    assert.equal(cue.seconds, 0); assert.equal(cues.length, 1);
+    f.player.skip(); f.player.dispose(); assert.deepEqual(stopped, [cue]);
+    assert.equal(f.video.muted, true);
+  } finally { f.player.dispose(); offs.forEach(off => off()); }
 });

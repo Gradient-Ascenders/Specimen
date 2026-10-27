@@ -5,9 +5,10 @@ import { applyExterminationShadowRoles } from './ExterminationShadowRoles.ts';
 import { EXTERMINATION_LAIR_COVER } from './ExterminationLairLayout.ts';
 import { applyLairMaterials, loadExterminationLairAsset, type ExterminationLairAsset } from './ExterminationLairAsset.ts';
 import type { KinematicBody } from '../physics/KinematicBody.ts';
-import { FINAL_ARENA, FINAL_ARENA_RING, FINAL_ARENA_ORBIT, finalArenaZ } from './FinalBossConfig.ts';
+import { FINAL_ARENA, FINAL_ARENA_RING, FINAL_ARENA_ORBIT, FINAL_BOSS_TUNING as T, finalArenaZ } from './FinalBossConfig.ts';
 
 type OrbitPlatform={collider:THREE.Mesh;visual:THREE.Group;previous:THREE.Vector3;current:THREE.Vector3};
+interface CoverState { readonly mesh:THREE.Mesh;readonly maximumHealth:number;health:number;lastBeamSerial:number|undefined; }
 
 /** Physics stays explicit; the fitted Blender asset owns the visible architecture. */
 export class ExterminationArena {
@@ -17,6 +18,8 @@ export class ExterminationArena {
   readonly exitDoor:THREE.Mesh;
   readonly cover:THREE.Mesh[]=[];
   readonly coverAssemblies:THREE.Group[]=[];
+  private readonly coverStates:CoverState[]=[];
+  get coverHealth():readonly Readonly<CoverState>[] {return this.coverStates;}
   readonly ringDecks:THREE.Mesh[]=[];
   readonly platforms:OrbitPlatform[]=[];
   readonly sectors:THREE.Mesh<THREE.RingGeometry,THREE.ShaderMaterial>[]=[];
@@ -83,6 +86,8 @@ export class ExterminationArena {
       const block=this.worldBox(`arena-cover-${i}`,[...definition.size],[Math.cos(definition.angle)*definition.radius,FINAL_ARENA.floorY+definition.size[1]/2,z+Math.sin(definition.angle)*definition.radius],this.white,true);
       block.rotation.y=definition.yaw;block.userData.ramClearRadius=Math.hypot(definition.size[0],definition.size[2])/2;
       assembly.add(block);this.cover.push(block);
+      const maximumHealth=T.playerHealth*T.coverHealthMultiplier;
+      this.coverStates.push({mesh:block,maximumHealth,health:maximumHealth,lastBeamSerial:undefined});
     }
     if(options.orbitingPlatforms??FINAL_ARENA_ORBIT.enabled)this.buildOrbiters();
     this.buildSectors();
@@ -235,17 +240,29 @@ export class ExterminationArena {
     this.lighting.setRoofOpening(progress);
   }
   setDamaged(damaged:boolean):void {for(const fragment of this.armourFragments)fragment.visible=damaged;}
+  damageCover(collider:THREE.Object3D|null,amount:number,onBreak?:(at:THREE.Vector3)=>void,beamSerial?:number):boolean {
+    if(!collider||!Number.isFinite(amount)||amount<=0)return false;
+    const index=this.cover.findIndex(mesh=>mesh===collider),state=this.coverStates[index];
+    if(!state||state.health<=0||!state.mesh.visible||beamSerial!==undefined&&state.lastBeamSerial===beamSerial)return false;
+    if(beamSerial!==undefined)state.lastBeamSerial=beamSerial;
+    state.health=Math.max(0,state.health-amount);
+    if(state.health===0)this.destroyCover(index,onBreak);
+    return true;
+  }
+  private destroyCover(index:number,onBreak?:(at:THREE.Vector3)=>void):void {
+    const state=this.coverStates[index]!;state.health=0;state.mesh.visible=false;this.coverAssemblies[index]!.visible=false;onBreak?.(state.mesh.position);
+  }
   breakCoverAlong(start:THREE.Vector3,end:THREE.Vector3,radius:number,onBreak?:(at:THREE.Vector3)=>void):number {
     this.coverLine.set(start,end);let count=0;
     this.cover.forEach((mesh,i)=>{
       if(!mesh.visible)return;this.coverLine.closestPointToPoint(mesh.position,true,this.coverPoint);
       if(this.coverPoint.distanceToSquared(mesh.position)>(radius+Number(mesh.userData.ramClearRadius??4))**2)return;
-      mesh.visible=false;this.coverAssemblies[i]!.visible=false;count++;onBreak?.(mesh.position);
+      this.destroyCover(i,onBreak);count++;
     });return count;
   }
   reset():void {
     this.setDoors(false);this.deployment(0);this.setDamaged(false);this.setPowered(false);this.resetPlatforms();
-    for(let i=0;i<6;i++)this.setSector(i,'inactive');this.cover.forEach((mesh,i)=>{mesh.visible=true;this.coverAssemblies[i]!.visible=true;});
+    for(let i=0;i<6;i++)this.setSector(i,'inactive');this.cover.forEach((mesh,i)=>{mesh.visible=true;this.coverAssemblies[i]!.visible=true;const state=this.coverStates[i]!;state.health=state.maximumHealth;state.lastBeamSerial=undefined;});
   }
   dispose():void {
     if(this.disposed)return;this.disposed=true;this.abort.abort();

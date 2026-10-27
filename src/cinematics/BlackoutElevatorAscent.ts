@@ -3,7 +3,7 @@ import type { KinematicBody } from '../physics/KinematicBody.ts';
 import type { BobCharacterPresentation, BobCharacterPresentationState } from '../render/bob/BobCharacterPresentation.ts';
 import type { GoopCharacterPresentation } from '../render/goop/GoopCharacterPresentation.ts';
 import type { VoltCharacterPresentation } from '../render/volt/VoltCharacterPresentation.ts';
-import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
+import { BlackoutElevatorAudio } from '../audio/BlackoutCutsceneAudio.ts';
 import { TypewriterAudio } from '../audio/TypewriterAudio.ts';
 import { BlackoutAscentLift, BLACKOUT_ASCENT_LIFT as V } from '../levels/BlackoutAscentLift.ts';
 import { BlackoutElevatorOverlay } from './BlackoutElevatorOverlay.ts';
@@ -28,6 +28,7 @@ export class BlackoutElevatorAscent {
   readonly actors: readonly Actor[];
   readonly overlay: BlackoutElevatorOverlay;
   private readonly options: Options;
+  private readonly sound = new BlackoutElevatorAudio();
   private playing = false;
   private played = false;
   private disposed = false;
@@ -111,26 +112,17 @@ export class BlackoutElevatorAscent {
       actor.presentation.update(dt, actor.state);
       const lineIndex = ELEVATOR_DIALOGUE.findIndex(line => t >= line.start && t < line.end && line.speaker === actor.id);
       const line = ELEVATOR_DIALOGUE[lineIndex];
+      if (!skip && !this.skipRequested) this.sound.movement.update(actor.id,this.elapsed,actor.position,airborne,true,
+        (sound,position,volume,vary)=>this.sound.cue(sound,position,volume,vary));
       actor.voice.update(dt, { text: line ? line.text.slice(0, Math.floor((t - line.start) * 24)) : '', pageIndex: Math.max(0, lineIndex) });
     }
     if (!skip && !this.skipRequested) {
-      const crosses = (at: number): boolean => before < at && t >= at;
-      if (crosses(-.2)) gameplayAudioEvents.emit('cue', { sound: 'world-door-stop-01', position: V.standing.bob, volumeScale: .16, maxDistance: 22 });
-      for (const at of [T.power, T.power + .65, T.power + 1.3]) if (crosses(at)) gameplayAudioEvents.emit('cue', { sound: 'volt-shoot-01', position: V.standing.volt, volumeScale: .7, maxDistance: 25 });
-      if (crosses(T.powered)) gameplayAudioEvents.emit('cue', { sound: 'volt-circuit-connect-01', position: V.outlet, volumeScale: .65, maxDistance: 25 });
-      if (crosses(T.lift)) {
-        gameplayAudioEvents.emit('cue', { sound: 'world-lift-start-01', position: V.outlet, volumeScale: .24, maxDistance: 30 });
-        gameplayAudioEvents.emit('loop', { key: 'blackout-elevator-motor', sound: 'world-machinery-loop-01', position: V.outlet, volumeScale: .035 });
+      this.sound.update(before,t);
+      // Keep the authored shaft accents alongside the dedicated lift recordings.
+      if (t-before <= .25) {
+        if (before < 19.4 && t >= 19.4) this.sound.cue('world-release-01',{x:-5.6,y:5,z:179.5},.10);
+        if (before < 35.8 && t >= 35.8) this.sound.cue('world-lever-lock-01',{x:5.6,y:-2,z:181.5},.08);
       }
-      // Quiet shaft accents occupy existing silent beats, without extending
-      // the cinematic or changing dialogue/boarding timing.
-      if(crosses(19.4))gameplayAudioEvents.emit('cue',{sound:'world-release-01',position:{x:-5.6,y:5,z:179.5},volumeScale:.10,maxDistance:18});
-      if(crosses(35.8))gameplayAudioEvents.emit('cue',{sound:'world-lever-lock-01',position:{x:5.6,y:-2,z:181.5},volumeScale:.08,maxDistance:18});
-      if (crosses(T.arrival)) {
-        gameplayAudioEvents.emit('stop', { key: 'blackout-elevator-motor' });
-        gameplayAudioEvents.emit('cue', { sound: 'world-lift-stop-01', position: V.outlet, volumeScale: .2, maxDistance: 25 });
-      }
-      if (crosses(T.open)) gameplayAudioEvents.emit('cue', { sound: 'intro-door-open-01', position: V.standing.bob, volumeScale: .3, maxDistance: 25 });
     }
     this.presentLift(t); this.overlay.present(t);
     if (t >= T.duration) {
@@ -198,7 +190,7 @@ export class BlackoutElevatorAscent {
     this.release(); this.played = arrived; this.elapsed = this.previousElapsed = 0; this.options.lift.setArrived(arrived);
   }
   private release(): void {
-    gameplayAudioEvents.emit('stop', { key: 'blackout-elevator-motor' });
+    this.sound.stop();
     if (this.playing) {
       for (const actor of this.actors) {
         if (actor.parent) actor.parent.add(actor.presentation.root); else actor.presentation.root.removeFromParent();

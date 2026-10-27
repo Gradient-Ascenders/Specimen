@@ -25,14 +25,14 @@ export class ExterminatorReinforcements {
   private readonly anchor=new THREE.Vector3(0,T.hoverY,FINAL_ARENA.centreZ);
   private damageSerial=-2000000;
   private disposed=false;
-  constructor(options:{world:CollisionWorld;targets:CombatTargetRegistry;onDestroyed:(position:THREE.Vector3,attacker:boolean)=>void;onShot:(position:THREE.Vector3)=>void}) {
+  constructor(options:{world:CollisionWorld;targets:CombatTargetRegistry;onDestroyed:(position:THREE.Vector3,attacker:boolean)=>void;onShot:(position:THREE.Vector3)=>void;onWorldHit?:(object:THREE.Mesh|null)=>void}) {
     this.root.name='advanced-drone-reinforcements';this.wings=this.slots;
     for(let wave=0;wave<T.reinforcementHealth.length;wave++) {
       const size=new THREE.Vector3(1.8,1,1.7).multiplyScalar(T.advancedScale*T.minionScale),count=T.advancedGroups.reduce((a,b)=>a+b,0)+T.advancedPursuers;
       const squad=new SentinelDroneSquad({collisionWorld:options.world,targetRegistry:options.targets,anchors:Array.from({length:count},()=>new THREE.Vector3()),maximumDrones:count,
         droneHealthUnits:T.droneHealth,colliderSize:size,fireIntervalSeconds:T.phaseOneDroneFireSeconds/T.advancedAttackSpeed,fireStaggerSeconds:.04,deploymentDelaySeconds:1.2,
         projectileSpeedMetresPerSecond:T.droneProjectileSpeed,projectileLifetimeSeconds:6,projectileRangeMetres:180,projectileCapacity:T.advancedProjectileCapacity,
-        projectileCollisionMask:CollisionLayer.Movement,idPrefix:`advanced-wing-${wave+1}`,blocksLineOfSight:false});
+        projectileCollisionMask:CollisionLayer.Movement,onProjectileWorldHit:options.onWorldHit,idPrefix:`advanced-wing-${wave+1}`,blocksLineOfSight:false});
       const flight=new ExterminatorDroneFlight(options.world,{capacity:count,pursuers:T.advancedPursuers,collisionRadius:1.5*T.minionScale,bearingOffset:wave*Math.PI*2/3});
       const wing:Wing={squad,flight,visuals:[],deployed:false};this.slots.push(wing);this.root.add(squad.root);
       squad.root.children.forEach((root,index)=>{

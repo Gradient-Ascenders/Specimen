@@ -3,11 +3,12 @@ import { build } from 'vite';
 import type { DeathScreen } from '../../src/ui/DeathScreen.ts';
 import type { GameFlowUI } from '../../src/ui/GameFlowUI.ts';
 import type { SlimeDamageSystem } from '../../src/systems/SlimeDamageSystem.ts';
+import type { GameSettings } from '../../src/ui/GameSettings.ts';
 import { test, expect } from './fixtures.ts';
 
 declare global {
   interface Window {
-    __hudTest: { flow: GameFlowUI; death: DeathScreen; damage: SlimeDamageSystem;
+    __hudTest: { flow: GameFlowUI; death: DeathScreen; damage: SlimeDamageSystem; settings: GameSettings;
       healthState: { slimeId: 'bob' | 'goop' | 'volt'; eligible: boolean } };
   }
 }
@@ -63,8 +64,9 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
     const app = document.querySelector<HTMLElement>('#app')!;
     const damage = new SlimeDamageSystem({}, ['bob', 'goop', 'volt']);
     const healthState = { slimeId: 'bob', eligible: true };
+    const settings = new GameSettings();
     const flow: GameFlowUI = new GameFlowUI({
-      settings: new GameSettings(),
+      settings,
       creditsMarkdown: '',
       slimeHUD: {
         subscribeSlimeHUD: (listener: (snapshot: unknown) => void) => { listener(EMPTY_SLIME_HUD_SNAPSHOT); return () => {}; },
@@ -90,7 +92,7 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
     app.append(flow.element);
     const death = new DeathScreen({ onRetry: () => {}, backgroundElements: [] });
     app.append(death.element);
-    Object.assign(window, { __hudTest: { flow, death, damage, healthState } });
+    Object.assign(window, { __hudTest: { flow, death, damage, healthState, settings } });
     flow.completeBoot();
   });
   const flow = page.locator('.game-flow');
@@ -109,6 +111,15 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
   await expect(page.locator('[data-current-objective]')).toBeVisible();
   await expect(page.locator('.hud-roster')).toBeVisible();
   await expect(page.locator('.hud-hint')).toBeVisible();
+  await page.evaluate(() => {
+    const { settings, flow } = window.__hudTest;
+    settings.setShowFPS(true);
+    flow.updateFrame(1.2);
+  });
+  await expect(page.locator('[data-fps-counter]')).toHaveText('1 FPS');
+  await page.evaluate(() => window.__hudTest.flow.updateFrame(3));
+  await expect(page.locator('[data-fps-counter]')).toHaveText('0 FPS');
+  await page.evaluate(() => window.__hudTest.settings.setShowFPS(false));
   await page.screenshot({ path: testInfo.outputPath('hud-visible.png') });
 
   // Normal health comes from the actual damage/regeneration system. UI time

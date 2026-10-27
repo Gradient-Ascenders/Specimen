@@ -40,6 +40,7 @@ export interface SpecimenAttackConfig {
   readonly allowHipFire?: boolean;
   /** Production merged form reserves area damage for a complete charge. */
   readonly splashRequiresFullCharge?: boolean;
+  readonly damageRequiresFullCharge?: boolean;
   /** Zero/omitted disables the direct-hit streak reward. */
   readonly overchargeHitsRequired?: number;
 }
@@ -575,8 +576,8 @@ export class SpecimenProjectileSystem {
     const damageUnits = THREE.MathUtils.lerp(
       this.config.minimumDamageUnits,
       this.config.maximumDamageUnits,
-      power,
-    ) * (overcharged ? 1.6 : 1);
+      this.config.damageRequiresFullCharge && !fullyCharged ? 0 : power,
+    ) * (overcharged && !(this.config.damageRequiresFullCharge && !fullyCharged) ? 1.6 : 1);
     const splashRadiusMetres =
       this.config.splashRequiresFullCharge && !fullyCharged && !overcharged ? 0 :
         this.config.maximumSplashRadiusMetres * power;

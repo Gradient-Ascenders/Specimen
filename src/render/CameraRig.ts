@@ -188,6 +188,9 @@ export class CameraRig {
   private readonly partialUpRotation = new THREE.Quaternion();
   private readonly yawRotation = new THREE.Quaternion();
   private readonly obstructionHit = new CollisionHit();
+  private readonly orbitLookaheadHit = new CollisionHit();
+  private readonly orbitLookaheadDirection = new THREE.Vector3();
+  private readonly orbitLookaheadDisplacement = new THREE.Vector3();
   private readonly orientationGuardHit = new CollisionHit();
   private readonly previousSmoothedUp = new THREE.Vector3();
   private readonly previousPlanarBack = new THREE.Vector3();
@@ -198,6 +201,7 @@ export class CameraRig {
   private effectivePitchRadians: number;
   private queuedYawRadians = 0;
   private queuedPitchRadians = 0;
+  private appliedYawSinceRender = 0;
   private currentDistanceMetres: number;
   private followDistanceScale = 1;
   private clearTimeSeconds = 0;
@@ -301,6 +305,7 @@ export class CameraRig {
     this.effectivePitchRadians = this.pitchRadians;
     this.queuedYawRadians = 0;
     this.queuedPitchRadians = 0;
+    this.appliedYawSinceRender = 0;
     this.planarBack.set(0, 0, 1);
     this.followDistanceScale = 1;
     this.currentDistanceMetres = this.config.followDistanceMetres;
@@ -406,6 +411,7 @@ export class CameraRig {
       .set(Math.sin(yawRadians), 0, Math.cos(yawRadians))
       .normalize();
     this.queuedYawRadians = 0;
+    this.appliedYawSinceRender = 0;
   }
 
   /** Set authored starting pitch without manufacturing sensitivity-dependent input. */
@@ -470,6 +476,7 @@ export class CameraRig {
    */
   applyQueuedLookInput(): void {
     if (this.queuedYawRadians !== 0) {
+      this.appliedYawSinceRender += this.queuedYawRadians;
       this.yawRotation.setFromAxisAngle(
         this.smoothedUp,
         this.queuedYawRadians,
@@ -612,6 +619,7 @@ export class CameraRig {
     this.viewBlend = THREE.MathUtils.clamp(viewTarget, this.viewBlend - viewStep, this.viewBlend + viewStep);
     this.applyQueuedLookInput();
     this.updateCameraDistance(safeAlpha, safeDeltaSeconds);
+    this.appliedYawSinceRender = 0;
     this.writeCameraPose();
   }
 
@@ -1117,6 +1125,8 @@ export class CameraRig {
       this.obstructionName = 'none';
     }
     this.obstructed = hasObstruction;
+    const anticipatedLimit = this.resolveOrbitLookahead(desiredDistanceMetres, deltaSeconds);
+    if (anticipatedLimit !== undefined) obstructionLimitMetres = Math.min(obstructionLimitMetres ?? desiredDistanceMetres, anticipatedLimit);
 
     const recoveryDeltaSeconds =
       hasObstruction ||
@@ -1156,6 +1166,38 @@ export class CameraRig {
       return max - width * t * t * (2 - t);
     }
     return value;
+  }
+
+  private resolveOrbitLookahead(distance: number, deltaSeconds: number): number | undefined {
+    if (!this.obstructionWorld || deltaSeconds <= 0 || Math.abs(this.appliedYawSinceRender) < 1e-7 || this.firstPersonPresentationWeight > .01) return;
+    const horizon = Math.min(.25, Math.PI / 4 * deltaSeconds / Math.abs(this.appliedYawSinceRender));
+    const angle = this.appliedYawSinceRender * horizon / deltaSeconds;
+    let limit = distance, previousFraction = 0, previousDistance = this.obstructed ? this.obstructionHit.distance : distance;
+    for (let i = 1; i <= 4; i++) {
+      const fraction = i / 4, hitDistance = this.probeOrbitLookahead(angle * fraction, distance);
+      if (hitDistance !== undefined) {
+        limit = Math.min(limit, THREE.MathUtils.lerp(hitDistance, distance, fraction));
+        if (hitDistance < previousDistance - .1) {
+          let clear = previousFraction, blocked = fraction, edgeDistance = hitDistance;
+          for (let n = 0; n < 5; n++) {
+            const middle = (clear + blocked) / 2, near = this.probeOrbitLookahead(angle * middle, distance);
+            if (near === undefined || near >= previousDistance - .1) clear = middle;
+            else { blocked = middle; edgeDistance = near; }
+          }
+          limit = Math.min(limit, THREE.MathUtils.lerp(edgeDistance, distance, blocked));
+        }
+      }
+      previousDistance = hitDistance ?? distance; previousFraction = fraction;
+    }
+    return limit < distance ? limit : undefined;
+  }
+
+  private probeOrbitLookahead(angle: number, distance: number): number | undefined {
+    this.orbitLookaheadDirection.copy(this.boomDirection).applyAxisAngle(this.smoothedUp, angle);
+    this.orbitLookaheadDisplacement.copy(this.orbitLookaheadDirection).multiplyScalar(distance);
+    if (!this.obstructionWorld!.sweepSphere(this.framingPivot, this.orbitLookaheadDisplacement,
+      this.obstructionRadiusMetres, this.orbitLookaheadHit, CollisionLayer.CameraObstruction)) return;
+    return Math.max(0, this.orbitLookaheadHit.distance - this.config.obstructionBufferMetres);
   }
 
   private getDesiredDistanceMetres(): number {

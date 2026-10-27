@@ -18,6 +18,8 @@ import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { SentinelSweepLaserAttack, SentinelRotatingLaserAttack } from '../src/boss/attacks/SentinelLaserAttacks.ts';
 import type { SentinelAttackContext } from '../src/boss/SentinelBossTypes.ts';
 import { LevelTwoRoomFourGreybox } from '../src/levels/LevelTwoRoomFourGreybox.ts';
+import { ContainmentLevelScene } from '../src/levels/ContainmentLevelScene.ts';
+import { KinematicBody } from '../src/physics/KinematicBody.ts';
 
 class Playback implements AudioPlayback {
   cues: SoundId[]=[];
@@ -255,4 +257,41 @@ for(const type of ['sweep','rotating'] as const) test(`Sentinel ${type} laser au
     attack.start(context);attack.update(.1,context);audio.update(origin);assert.equal(playback.loops.size,1);
     attack.dispose();audio.update(origin);assert.equal(playback.loops.size,0);
   } finally {audio.dispose();attack.dispose();}
+});
+
+test('Room 5 booster platforms never register the knocking motor layer through traversal, retry or teardown', () => {
+  const scene = new ContainmentLevelScene(() => {}), playback = new Playback();
+  const audio = new WorldAudio(playback, scene.root);
+  const world = new CollisionWorld(), surfaces = new SurfaceRegistry();
+  const listener = new THREE.Vector3(9, 75.21, 94);
+  const body = new KinematicBody({ world, surfaces, initialPosition: listener });
+  scene.lighting.setActiveRoom(5);
+  let heardHover = false, heardLaser = false;
+  const traverse = () => {
+    const platforms = [scene.roomFive.movingPlatformOne, scene.roomFive.movingPlatformTwo];
+    const initial = platforms.map(platform => ({ x: platform.position.x, z: platform.position.z }));
+    const moved = [false, false];
+    for (let step = 0; step < 420; step++) {
+      scene.roomFive.updateTraversal(1 / 60, body, [body]);
+      scene.update(1 / 60, listener);
+      scene.root.updateMatrixWorld(true);
+      audio.update(listener);
+      const sounds = [...playback.loops.values()].map(loop => loop.sound);
+      assert.equal(sounds.includes('world-machinery-loop-01'), false);
+      heardHover ||= sounds.includes('world-platform-hover-loop-01');
+      heardLaser ||= sounds.includes('world-laser-loop-01');
+      platforms.forEach((platform, index) => {
+        moved[index] ||= platform.position.x !== initial[index]!.x || platform.position.z !== initial[index]!.z;
+      });
+    }
+    assert.deepEqual(moved, [true, true], 'the audio choice must not stop either traversal route');
+  };
+  try {
+    traverse();
+    scene.roomFive.reset(); audio.reset(); traverse();
+    assert.equal(heardHover, true, 'the intended booster engine remains audible');
+    assert.equal(heardLaser, true, 'Room 5 hazards retain their audio');
+    scene.dispose(); audio.update(listener);
+    assert.equal(playback.loops.size, 0, 'scene teardown releases every registered source');
+  } finally { audio.dispose(); scene.dispose(); world.clear(); surfaces.clear(); }
 });

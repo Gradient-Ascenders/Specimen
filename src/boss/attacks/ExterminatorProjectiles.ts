@@ -30,7 +30,7 @@ export class ExterminatorProjectiles {
   readonly events=new EventBus<ShotEvents>();
   readonly shots:readonly ExterminatorShot[];
   private readonly slots:Slot[]=[];
-  private readonly options:{world:CollisionWorld;targets:CombatTargetRegistry;weapon:SpecimenProjectileSystem;onPlayerHit:(damage:number,id:number)=>void};
+  private readonly options:{world:CollisionWorld;targets:CombatTargetRegistry;weapon:SpecimenProjectileSystem;onPlayerHit:(damage:number,id:number)=>void;onWorldHit?:(object:THREE.Mesh|null,damage:number,at:THREE.Vector3)=>void};
   private readonly unregister:Array<()=>void>=[];
   private readonly proxyGeometry=new THREE.SphereGeometry(T.orbRadius,12,8);
   private readonly proxyMaterial=new THREE.MeshBasicMaterial({visible:false});
@@ -125,6 +125,7 @@ export class ExterminatorProjectiles {
         const id=slot.id,damage=slot.kind==='gun'?T.gunDamage:T.orbDamage;
         this.finish(slot,kind==='friendly',kind==='world');
         if(kind==='player')this.options.onPlayerHit(damage,-id);
+        else if(kind==='world')this.options.onWorldHit?.(this.hit.object,damage,slot.position);
       } else {
         slot.position.add(this.displacement);slot.age+=step;this.syncCollider(slot);
         if(slot.age>=lifetime-1e-9)this.deactivate(slot);

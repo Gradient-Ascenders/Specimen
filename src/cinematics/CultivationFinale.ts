@@ -1,3 +1,4 @@
+import { CinematicMusic } from '../audio/CinematicMusic.ts';
 import * as THREE from 'three';
 import type {LevelTwoRoomFiveGreybox} from '../levels/LevelTwoRoomFiveGreybox.ts';
 import type {RoomFiveDroneEncounter} from '../hazards/RoomFiveDroneEncounter.ts';
@@ -81,6 +82,7 @@ export class CultivationFinale {
   private readonly voice:TypewriterAudio;
   private readonly flightAudio:WorldAudioSource;
   private readonly voiceModel={text:'',pageIndex:0};
+  private music=new CinematicMusic('rescue',T.duration);
   private previous=0;
   private elapsed=0;
   private playing=false;
@@ -173,6 +175,7 @@ export class CultivationFinale {
     room.root.updateWorldMatrix(true,true);this.boardPivot.attach(room.releaseCover);this.boardPivot.attach(room.releaseCoverCollider);
     set.annex.visible=set.effects.visible=true;
     this.previous=this.elapsed=0;this.skipRequested=false;this.playing=this.played=true;
+    this.music=new CinematicMusic('rescue',T.duration);
     this.updateActors(0,1/60);this.present(camera,1);return true;
   }
   requestSkip():void{if(this.playing)this.skipRequested=true;}
@@ -219,8 +222,10 @@ export class CultivationFinale {
         if(this.previous<time+2.2&&this.elapsed>=time+2.2)gameplayAudioEvents.emit('stop',{key});
       }
       const line=VOLT_FINALE_DIALOGUE.find(line=>this.elapsed>=line.start&&this.elapsed<line.end);
+      // Keep the sustained alarm below the quieter music recording; dramatic
+      // combat/mechanical accents retain their existing independent gains.
       if(this.elapsed>=T.open&&this.elapsed<T.ventCamera) gameplayAudioEvents.emit('loop',{
-        key:'cultivation-finale-alarm',sound:'world-containment-alarm-loop-01',volumeScale:line?.3:.6,
+        key:'cultivation-finale-alarm',sound:'world-containment-alarm-loop-01',volumeScale:line?.125:.25,
       });
       else gameplayAudioEvents.emit('stop',{key:'cultivation-finale-alarm'});
       if(line){
@@ -233,10 +238,11 @@ export class CultivationFinale {
       }
       this.options.acid.update(dt);
     }
-    if(this.elapsed>=T.duration){stopVoltRescueAudio();this.playing=false;this.overlay.present(T.duration);return true;}return false;
+    if(this.elapsed>=T.duration){this.music.stop();stopVoltRescueAudio();this.playing=false;this.overlay.present(T.duration);return true;}return false;
   }
   present(camera:THREE.PerspectiveCamera,alpha:number):void{
     if(!this.playing)return;
+    this.music.update(this.elapsed);
     const t=THREE.MathUtils.lerp(this.previous,this.elapsed,THREE.MathUtils.clamp(alpha,0,1));
     const {room,encounter,set}=this.options;
     for(const actor of this.actors){
@@ -321,7 +327,11 @@ export class CultivationFinale {
       }
     }
     this.boardPivot.position.copy(this.boardStart);
-    if(t<T.coverImpact)this.boardPivot.position.y-=finaleSmooth(T.coverHit,T.coverImpact,t)*.24;
+    if(t<T.coverImpact){
+      const tilt=finaleSmooth(T.coverHit,T.coverImpact,t);
+      // Clear the antenna while rotating, then settle flush on the authored hull.
+      this.boardPivot.position.y-=tilt*(this.boardStart.y-COVER.droneY-COVER.restOffsetY)-Math.sin(tilt*Math.PI)*.35;
+    }
     else{
       // One trajectory for the crushed hull AND the panel resting on its deck.
       sampleVoltFinaleDrone(0,t,this.base);
@@ -435,6 +445,7 @@ export class CultivationFinale {
   }
   private cue(sound:SoundId,position?:THREE.Vector3):void{gameplayAudioEvents.emit('cue',{sound,position,maxDistance:110,volumeScale:.8});}
   reset():void{
+    this.music.stop();
     stopVoltRescueAudio();
     if(this.ventView){for(const entry of this.environment)entry.mesh.visible=entry.visible;this.ventView=false;}
     if(this.played){

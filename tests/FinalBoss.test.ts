@@ -19,6 +19,20 @@ import { FixtureCombatTarget } from '../src/combat/CombatTargetAdapters.ts';
 const target=new THREE.Vector3(0,2.07,finalArenaZ(197));
 const impact=(damageUnits=12):CombatImpact=>({projectileId:1,targetId:'extermination-core',kind:'direct',chargeAmount:1,fullyCharged:true,damageUnits,point:target,direction:target});
 
+test('full charges take 0.75 seconds and accepted charged hits freeze the boss for exactly half a second', () => {
+  assert.equal(FINAL_SPECIMEN_WEAPON.fullChargeSeconds, .75); assert.equal(FINAL_SPECIMEN_WEAPON.minimumDamageUnits, 1);
+  const b = new FinalBossController({ random: () => 0 }); b.start(true); b.update(.2, target);
+  const clock = b.time, elapsed = b.readModel.elapsed;
+  assert.equal(b.applyImpact(impact(18)).accepted, true); assert.equal(b.readModel.stunRemaining, .5);
+  b.update(.2, target); assert.equal(b.time, clock); assert.equal(b.readModel.elapsed, elapsed);
+  assert.equal(b.applyImpact({ ...impact(1), fullyCharged: false, chargeAmount: 0 }).accepted, true);
+  assert.ok(Math.abs(b.readModel.stunRemaining - .3) < 1e-9);
+  b.update(.3, target); assert.equal(b.readModel.stunRemaining, 0); assert.equal(b.time, clock);
+  b.update(.05, target); assert.ok(Math.abs(b.time - clock - .05) < 1e-9);
+  assert.ok(Math.abs(b.readModel.elapsed - elapsed - .05) < 1e-9);
+  b.reset(); assert.equal(b.readModel.stunRemaining, 0); b.dispose();
+});
+
 test('checking whether an attack could hurt the player does not consume health, grace or its attack serial',()=>{
   const b=new FinalBossController();b.start(true);
   try {
@@ -60,7 +74,7 @@ test('boss is vulnerable outside its defensive shield, and complete damage gates
 test('85/70/55 crossings synchronously protect against overkill, heal slowly, and fire once even after healing above a threshold',()=>{
   const b=new FinalBossController({random:()=>.5});b.start(true);
   for(const [i,threshold] of FINAL_BOSS_TUNING.defenseThresholds.entries()) {
-    b.applyImpact(impact(999));assert.equal(b.readModel.health,[425,350,275][i]);
+    b.applyImpact(impact(999));assert.equal(b.readModel.health,[637.5,525,412.5][i]);
     assert.equal(b.readModel.shieldActive,true);assert.equal(b.readModel.defenseThreshold,threshold);
     assert.equal(b.readModel.summonCount,[11,13,18][i]);assert.equal(b.applyImpact(impact(999)).accepted,false);
     until(b,()=>b.readModel.stage==='active');const hp=b.readModel.health;b.update(2,target);
@@ -284,6 +298,29 @@ test('the real camera supports wide fused framing without using its zoom-in-only
   }finally{f.dispose();}
 });
 
+test('wide orbit anticipates cover edges instead of snapping the camera across the ring',()=>{
+  const f=arenaFixture();
+  try {
+    const cover=f.arena.cover[0]!,size=(cover.geometry as THREE.BoxGeometry).parameters;
+    for(const [x,z] of [[size.width/2+1.72,0],[0,size.depth/2+1.72],[-size.width/2-1.72,0],[0,-size.depth/2-1.72]])for(const rate of [60,144])for(const turn of [-1,1]) {
+      f.body.recoverAt(new THREE.Vector3(x,0,z).applyQuaternion(cover.quaternion).add(cover.position).setY(FINAL_MERGE_ANCHOR.y));
+      const rig=new CameraRig();rig.setFollowTarget(f.body,f.world);rig.setGroundOrbitPitchRadians(FINAL_SPECIMEN_START_PITCH);
+      rig.setContextualCamera({profile:FINAL_SPECIMEN_CAMERA,anchor:f.body});
+      for(let n=0;n<60;n++)rig.update(1,1/60);
+      const previous=rig.camera.position.clone(),quaternion=rig.camera.quaternion.clone();let maximumStep=0;
+      for(let n=0;n<rate*5;n++) {
+        const pixels=turn*864/rate;rig.queueLookInput(pixels,0);rig.update(1,1/rate);
+        maximumStep=Math.max(maximumStep,rig.camera.position.distanceTo(previous));
+        assert.ok(quaternion.angleTo(rig.camera.quaternion)<Math.abs(pixels)*.0022+1e-6,'collision smoothing must not delay or accelerate yaw');
+        const d=rig.getDiagnostics();
+        if(d.obstructed)assert.ok(d.currentDistanceMetres<=d.obstructionDistanceMetres!,'look-ahead may never carry the camera through a real obstruction');
+        previous.copy(rig.camera.position);quaternion.copy(rig.camera.quaternion);
+      }
+      assert.ok(maximumStep<1,`orbit snapped ${maximumStep.toFixed(2)}m at ${rate} Hz, side ${x}/${z}, turn ${turn}`);
+    }
+  }finally{f.dispose();}
+});
+
 test('lab cover stops rays, reset clears hazards, and the entry cannot be vaulted',()=>{
   const f=arenaFixture();try {
     const hit=new CollisionHit(),block=f.arena.cover[0]!;
@@ -347,7 +384,7 @@ test('reinforced eight-drone squad fires frequent bounded salvos, survives a tap
 });
 
 const controls=(overrides:Partial<SpecimenAttackControls>={}):SpecimenAttackControls=>({active:true,aimHeld:true,fireHeld:false,firePressed:false,fireReleased:false,gameplayInputEnabled:true,pointerLocked:true,cancelled:false,...overrides});
-test('partial-charge direct hits kill one target, while full charge destroys an occluded-safe cluster',()=>{
+test('partial charges deal one damage without destroying a group, while full charge clears an occluded-safe cluster',()=>{
   for(const charged of [false,true]) {
     const world=new CollisionWorld(),registry=new CombatTargetRegistry(world),body={position:new THREE.Vector3(0,2,0),radiusMetres:1.65};
     const meshes:THREE.Mesh[]=[],targets:FixtureCombatTarget[]=[];
@@ -360,7 +397,8 @@ test('partial-charge direct hits kill one target, while full charge destroys an 
     try {
       weapon.update(charged?1.5:.6,controls({firePressed:true,fireHeld:true}));weapon.update(1/60,controls({fireReleased:true}));
       for(let i=0;i<40;i++)weapon.update(1/60,controls());
-      assert.equal(targets[0]!.destroyed,true);assert.equal(targets[1]!.destroyed,charged);assert.equal(targets[2]!.destroyed,charged);
+      assert.equal(targets[0]!.destroyed,charged);assert.equal(targets[1]!.destroyed,charged);assert.equal(targets[2]!.destroyed,charged);
+      if(!charged)assert.equal(targets[0]!.healthUnits,2);
       assert.equal(weapon.projectileStates.length,32);weapon.reset();assert.equal(weapon.readModel.liveProjectileCount,0);
     } finally {weapon.dispose();registry.dispose();for(const m of meshes){m.geometry.dispose();(m.material as THREE.Material).dispose();}}
   }

@@ -151,6 +151,7 @@ export class FinalBossPresentation {
   }
   update(model:FinalBossReadModel,time:number,body:KinematicBody):void {
     const dt=Math.min(.1,Math.max(0,time-this.lastTime));this.lastTime=time;
+    const motionDt=model.stunRemaining>0?0:dt||1/60;
     this.machine.position.sub(this.appliedEvasion);this.previousBase.copy(this.machine.position);
     this.root.visible=model.state!=='idle';
     this.machine.visible=true;this.finalShot.visible=false;this.explosion.visible=false;
@@ -164,11 +165,11 @@ export class FinalBossPresentation {
       const down=model.stage==='telegraph'?THREE.MathUtils.smoothstep(model.progress,0,.82):model.stage==='active'?1:1-THREE.MathUtils.smoothstep(model.progress,0,1);
       targetY=THREE.MathUtils.lerp(FINAL_BOSS_TUNING.hoverY,FINAL_BOSS_TUNING.beamHeight-this.warDrone.coreMount.y*FINAL_BOSS_TUNING.scale,down);
     }
-    this.machine.position.x=THREE.MathUtils.damp(this.machine.position.x,targetX,5,dt||1/60);
-    this.machine.position.z=THREE.MathUtils.damp(this.machine.position.z,targetZ,5,dt||1/60);
-    this.machine.position.y=beamMove?targetY:THREE.MathUtils.damp(this.machine.position.y,targetY,5,dt||1/60);
+    this.machine.position.x=THREE.MathUtils.damp(this.machine.position.x,targetX,5,motionDt);
+    this.machine.position.z=THREE.MathUtils.damp(this.machine.position.z,targetZ,5,motionDt);
+    this.machine.position.y=beamMove?targetY:THREE.MathUtils.damp(this.machine.position.y,targetY,5,motionDt);
     const wantedYaw=beamMove?this.beamYaw:Math.atan2(this.machine.position.x-body.position.x,this.machine.position.z-body.position.z);
-    this.machine.rotation.y+=Math.atan2(Math.sin(wantedYaw-this.machine.rotation.y),Math.cos(wantedYaw-this.machine.rotation.y))*(1-Math.exp(-7*(dt||1/60)));
+    this.machine.rotation.y+=Math.atan2(Math.sin(wantedYaw-this.machine.rotation.y),Math.cos(wantedYaw-this.machine.rotation.y))*(1-Math.exp(-7*motionDt));
     if(beamMove&&model.stage==='active')this.machine.rotation.y=this.beamYaw+model.beamRotationRadians;
     this.machine.rotation.x=beamMove?0:Math.sin(time*.6)*.02;
     this.machine.rotation.z=beamMove?0:Math.sin(time*.75)*.035;
@@ -179,12 +180,7 @@ export class FinalBossPresentation {
     this.machine.position.add(this.evasionOffset);this.rollRig.rotation.z=this.evasionRoll;
     this.appliedEvasion.copy(this.evasionOffset);
     if(model.state==='intro')this.machine.position.y=THREE.MathUtils.lerp(FINAL_ARENA.ceilingY-9,FINAL_BOSS_TUNING.hoverY,THREE.MathUtils.smoothstep(model.progress,.2,.8));
-    if(model.state==='defeated'||model.state==='escape'||model.state==='complete') {
-      const p=model.state==='defeated'?THREE.MathUtils.smoothstep(model.progress,.25,.85):1;
-      this.machine.position.set(0,THREE.MathUtils.lerp(FINAL_BOSS_TUNING.hoverY,5,p),FINAL_ARENA.centreZ+8*p);
-      this.machine.rotation.set(p*.8,0,p*.5);
-      this.machine.visible=model.state==='defeated'&&model.progress<.68;
-    }
+    if(model.state==='escape'||model.state==='complete')this.machine.visible=false;
     const opening=model.weakPointOpen?1:0;
     this.machine.updateMatrixWorld(true);this.warDrone.update(time,model.weakPointOpen,model.phase,dt,model,body.position);
     this.coreShader.uniforms.uTime!.value=time;this.coreShader.uniforms.uOpen!.value=opening;
@@ -211,19 +207,7 @@ export class FinalBossPresentation {
     const charge=orbMove?(model.stage==='telegraph'?model.progress:(model.elapsed%FINAL_BOSS_TUNING.orbIntervalSeconds)/FINAL_BOSS_TUNING.orbIntervalSeconds):
       (beamMove||ramMove)&&model.stage==='telegraph'?model.progress:0;
     this.eyeCharge.visible=charge>0||this.eyeFlash>0;this.eyeCharge.position.copy(this.eyeMuzzle);this.eyeCharge.scale.setScalar(.2+charge*1.45+this.eyeFlash*5);
-    if(model.state!=='defeated')this.blastMaterial.opacity=.25+charge*.55;
-    if(model.state==='defeated') {
-      const p=model.progress;
-      if(p>.25&&p<.55) {
-        this.finalShot.visible=true;this.finalShot.position.copy(body.position).add(this.direction.set(0,.6,0));
-        this.finalShot.scale.setScalar(.2+THREE.MathUtils.smoothstep(p,.25,.45)*1.2);
-        this.finalShot.position.lerp(this.coreWorld,THREE.MathUtils.smoothstep(p,.45,.55));
-      }
-      if(p>=.55) {
-        this.explosion.visible=true;this.explosion.position.copy(this.coreWorld);
-        const blast=THREE.MathUtils.smoothstep(p,.55,.9);this.explosion.scale.setScalar(1+blast*36);this.blastMaterial.opacity=(1-blast)*.8;
-      }
-    }
+    this.blastMaterial.opacity=.25+charge*.55;
     let count=0;
     for(const slot of this.particleSlots) {
       slot.age+=dt;if(slot.age>=slot.life)continue;
@@ -327,6 +311,12 @@ export class FinalBossPresentation {
   faceSpecimen(yaw:number):void {
     if(this.authoredSpecimen)this.authoredSpecimen.setYaw(yaw);
     else this.specimen.rotation.y=yaw;
+  }
+  presentArrival(time:number,progress:number):void {
+    this.root.visible=true;this.machine.visible=true;
+    this.machine.position.set(0,THREE.MathUtils.lerp(-30,FINAL_BOSS_TUNING.hoverY,progress),FINAL_ARENA.centreZ);
+    this.machine.rotation.set(-.04*(1-progress),0,Math.sin(time*.8)*.012*(1-progress));
+    this.rollRig.rotation.z=0;this.warDrone.update(time,false,1,1/60);this.machine.updateMatrixWorld(true);
   }
   kickGuns():void {this.warDrone.kickGuns();}
   kickEye():void {this.eyeFlash=.12;}

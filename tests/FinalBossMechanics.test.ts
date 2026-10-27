@@ -13,6 +13,7 @@ import { CollisionWorld, CollisionHit, CollisionLayer } from '../src/physics/Col
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { SpecimenDash, SPECIMEN_DASH } from '../src/combat/SpecimenDash.ts';
+import { bossMusicEvents, type BossMusic } from '../src/audio/BossMusic.ts';
 
 const controls=(o:Partial<SpecimenAttackControls>={}):SpecimenAttackControls=>({active:true,aimHeld:false,fireHeld:false,firePressed:false,fireReleased:false,gameplayInputEnabled:true,pointerLocked:true,...o});
 const hit=(damageUnits=999)=>({projectileId:1,targetId:'core',kind:'direct' as const,chargeAmount:1,fullyCharged:true,damageUnits,point:new THREE.Vector3(),direction:new THREE.Vector3()});
@@ -38,6 +39,18 @@ function fixture(random=()=>0,invincible=true,orbitingPlatforms=false) {
   const killSquad=()=>{for(const root of boss.squad.root.children)if(root.visible){const target=targets.getRegistrationForMesh(root.children[0] as THREE.Mesh)!.target;target.applyImpact({...hit(),targetId:target.id});}};
   return {arena,world,targets,body,weapon,aimDirection,presentation,boss,dash,get damageReactions(){return damageReactions;},get dodges(){return dodges;},tick,killSquad,dispose:()=>{boss.dispose();weapon.dispose();targets.dispose();arena.dispose();world.clear();surfaces.clear();}};
 }
+
+test('defeating the boss preserves its damaged hull for the finale without a legacy finishing shot or explosion', () => {
+  const f = fixture(); try {
+    const model = f.boss.controller.readModel;
+    for (const progress of [0, .3, .5, .7, .95]) {
+      f.presentation.update({ ...model, state: 'defeated', progress }, progress * 7, f.body);
+      assert.equal(f.presentation.machine.visible, true);
+      assert.ok(f.presentation.machine.position.y > T.hoverY - 2);
+      assert.equal(f.presentation.finalShot.visible, false); assert.equal(f.presentation.explosion.visible, false);
+    }
+  } finally { f.dispose(); }
+});
 
 for(const end of ['elapsed','cancelled','reset'] as const)test(`dash I-frames reject real orb damage and end immediately when ${end}`,()=>{
   const f=fixture(()=>0,false),movement=new THREE.Vector3(1,0,0),up=new THREE.Vector3(0,1,0);
@@ -75,6 +88,41 @@ test('ordinary damage grace does not award a perfect dodge',()=>{
   }finally{f.dispose();}
 });
 
+test('each cover has five player health bars; real guns and orbs chip only the cover they hit',()=>{
+  const f=fixture();
+  try {
+    const cover=f.arena.cover[0]!,state=f.arena.coverHealth[0]!,other=f.arena.coverHealth[1]!;
+    assert.equal(state.maximumHealth,f.boss.controller.readModel.maximumPlayerHealth*5);
+    const normal=new THREE.Vector3(0,0,1).applyQuaternion(cover.quaternion),origin=cover.position.clone().addScaledVector(normal,8);
+    f.body.recoverAt(cover.position.clone().addScaledVector(normal,-10));
+    f.boss.projectiles.clear();
+    assert.equal(f.boss.projectiles.fireOrb(origin,cover.position),true);f.boss.projectiles.update(.2,f.body);
+    assert.equal(state.health,500-T.orbDamage);assert.equal(other.health,500);assert.equal(cover.visible,true);
+    f.boss.projectiles.fireGunVolley(origin,origin,cover.position,0);f.boss.projectiles.update(.1,f.body);
+    assert.equal(state.health,500-T.orbDamage-T.gunDamage*3);
+    assert.equal(f.arena.damageCover(cover,NaN),false);assert.equal(f.arena.damageCover(cover,-2),false);
+    assert.equal(f.arena.damageCover(cover,state.health),true);
+    assert.equal(state.health,0);assert.equal(cover.visible,false);assert.equal(f.arena.coverAssemblies[0]!.visible,false);
+    const probe=new CollisionHit();
+    assert.equal(f.world.sweepSphere(origin,normal.clone().multiplyScalar(-16),.2,probe),false,'destroyed cover leaves no invisible blocker');
+    f.boss.reset();assert.equal(state.health,500);assert.equal(cover.visible,true);assert.equal(other.health,500);
+  }finally{f.dispose();}
+});
+
+test('a beam damages cover once per sweep, while RAM destroys even undamaged full-health cover',()=>{
+  const f=fixture();
+  try {
+    const cover=f.arena.cover[0]!,state=f.arena.coverHealth[0]!;
+    for(let i=0;i<60;i++)f.arena.damageCover(cover,T.beamDamage,undefined,5);
+    assert.equal(state.health,500-T.beamDamage);
+    f.arena.damageCover(cover,T.beamDamage,undefined,6);assert.equal(state.health,500-T.beamDamage*2);
+    f.boss.reset();assert.equal(state.health,500);
+    assert.equal(f.arena.damageCover(cover,T.beamDamage,undefined,5),true,'retry clears beam-hit history');
+    const start=cover.position.clone().add(new THREE.Vector3(0,0,-2)),end=cover.position.clone().add(new THREE.Vector3(0,0,2));
+    assert.equal(f.arena.breakCoverAlong(start,end,1),1);assert.equal(state.health,0);assert.equal(cover.visible,false);
+  }finally{f.dispose();}
+});
+
 test('powerful accepted core impacts shudder the render without moving any combat anchor',()=>{
   const f=fixture();
   try {
@@ -86,7 +134,10 @@ test('powerful accepted core impacts shudder the render without moving any comba
     assert.equal(core.applyImpact(hit(1)).accepted,true);assert.equal(f.presentation.hitReactionStrength,1);
     f.presentation.refreshWorldAnchors();
     assert.ok(f.presentation.coreWorld.distanceTo(anchor)<1e-9);assert.ok(f.presentation.eyeMuzzle.distanceTo(muzzle)<1e-9);
-    f.tick(24);assert.equal(f.presentation.hitReactionStrength,0,'reaction decays without stunning the boss');
+    const elapsed=f.boss.controller.readModel.elapsed, clock=f.boss.controller.time;
+    f.tick(24);assert.ok(f.boss.controller.readModel.stunRemaining>.09);assert.equal(f.boss.controller.readModel.elapsed,elapsed);
+    assert.equal(f.boss.controller.time,clock);assert.equal(f.presentation.hitReactionStrength,1);
+    f.tick(30);assert.equal(f.boss.controller.readModel.stunRemaining,0);assert.equal(f.presentation.hitReactionStrength,0);
     assert.equal(core.applyImpact({...hit(1),fullyCharged:false,overcharged:true}).accepted,true);assert.equal(f.presentation.hitReactionStrength,1);
     f.boss.reset();assert.equal(f.presentation.hitReactionStrength,0);
     assert.equal(core.applyImpact(hit(1)).accepted,false);assert.equal(f.presentation.hitReactionStrength,0,'rejected hits cannot shudder');
@@ -223,15 +274,15 @@ test('reversing beam sweeps travel three full circles without angle snaps at eit
   }finally{f.dispose();}
 });
 
-test('production hip-fire damage increases through tap, quarter, half and full charge',()=>{
+test('production hip-fire damage stays at one until the charge is complete',()=>{
   const f=fixture(),damage:number[]=[],splash:number[]=[];
   f.weapon.events.on('projectileFired',e=>{damage.push(e.damageUnits);splash.push(e.splashRadiusMetres);});
   try {
-    for(const seconds of [0,.375,.75,1.5]) {
+    for(const seconds of [0,.1875,.375,.75]) {
       f.weapon.reset();f.weapon.update(seconds||.001,controls({firePressed:true,fireHeld:seconds>0,fireReleased:seconds===0}));
       if(seconds>0)f.weapon.update(.001,controls({fireReleased:true}));
     }
-    assert.deepEqual(damage,[2,6,10,18]);assert.deepEqual(splash,[0,0,0,14]);
+    assert.deepEqual(damage,[1,1,1,18]);assert.deepEqual(splash,[0,0,0,14]);
     assert.equal(f.weapon.readModel.aimActive,false);
   }finally{f.dispose();}
 });
@@ -488,4 +539,30 @@ test('opt-in spherical shields match their visible boundary, not an invisible bo
     assert.equal(world.raycast(new THREE.Vector3(27,27,-60),forward,120,ray,CollisionLayer.Projectile),true);assert.equal(ray.object?.uuid,box.uuid);
     world.clear();sphere.geometry.dispose();(sphere.material as THREE.Material).dispose();box.geometry.dispose();(box.material as THREE.Material).dispose();
   }
+});
+
+
+test('boss music begins at combat, spans both phases, fades on defeat and releases each retry attempt',()=>{
+  const starts:BossMusic[]=[],defeats:BossMusic[]=[],stops:BossMusic[]=[];
+  const off=[bossMusicEvents.on('started',cue=>starts.push(cue)),bossMusicEvents.on('defeated',cue=>defeats.push(cue)),bossMusicEvents.on('stopped',cue=>stops.push(cue))];
+  const f=fixture();
+  try {
+    f.boss.reset();starts.length=stops.length=0;
+    assert.equal(f.boss.start(),true);f.boss.update(8);assert.equal(starts.length,0,'the boss introduction retains normal music');
+    f.boss.update(1);assert.equal(starts.length,1);const first=starts[0]!;
+    for(let wave=0;wave<T.defenseThresholds.length;wave++) {
+      assert.equal(f.boss.controller.applyImpact(hit()).accepted,true);
+      f.tick(83);f.killSquad();f.tick();
+    }
+    assert.equal(f.boss.controller.applyImpact(hit()).accepted,true);f.tick();
+    assert.equal(f.boss.controller.readModel.state,'transition');assert.equal(starts.length,1);
+    f.boss.update(1/60,true);assert.equal(f.boss.controller.readModel.phase,2);assert.equal(starts.length,1,'Phase 2 keeps the original music owner');
+    for(let hits=0;hits<10&&f.boss.controller.readModel.health>0;hits++) {f.boss.controller.applyImpact(hit());f.tick();}
+    assert.equal(f.boss.controller.readModel.state,'defeated');assert.deepEqual(defeats,[first]);
+    f.boss.reset();assert.deepEqual(stops,[first],'reset cancels a pending victory fade');
+    assert.equal(f.boss.startPhaseTwo(),true);assert.equal(starts.length,2);assert.notEqual(starts[1],first);
+    f.boss.suspend();assert.equal(stops.at(-1),starts[1]);
+    f.boss.reset();f.boss.start(true);assert.equal(starts.length,3);
+    f.boss.dispose();assert.equal(stops.at(-1),starts[2]);
+  }finally{f.dispose();off.forEach(unsubscribe=>unsubscribe());}
 });

@@ -54,6 +54,12 @@ test('final completion opens the existing credits once and returns to the title,
   assert.equal(flow.completeGame(),false);assert.equal(flow.resume(),false);assert.equal(flow.back(),true);assert.equal(flow.state,'title');
 });
 
+test('skipping the cinematic credits completes directly to the title instead of opening duplicate credits', () => {
+  const flow = new GameFlowStateModel(); flow.completeBoot(); flow.start();
+  assert.equal(flow.completeGame(true), true); assert.equal(flow.state, 'title'); assert.equal(flow.menuOrigin, 'title');
+  assert.equal(flow.completeGame(true), false); assert.equal(flow.resume(), false);
+});
+
 test('level selector belongs to the title and restores it on cancel', () => {
   const flow = new GameFlowStateModel();
   assert.equal(flow.openLevelSelect(), false);
@@ -212,7 +218,7 @@ test('pause ownership defers to a death flow that disabled gameplay input', () =
 });
 
 test('all active story sequences keep native pause when character controls are locked', () => {
-  for (const cinematic of ['cultivation-finale', 'cultivation-clearance', 'blackout-arrival', 'blackout-elevator']) {
+  for (const cinematic of ['cultivation-finale', 'cultivation-clearance', 'blackout-arrival', 'blackout-elevator', 'blackout-research']) {
     const pausable = gameFlowCinematicCanPause(cinematic, 'playing');
     assert.equal(pausable, true, cinematic);
     assert.equal(gameFlowCanPause('playing', false, pausable), true, cinematic);

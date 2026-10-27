@@ -1,3 +1,4 @@
+import { CinematicMusic } from '../audio/CinematicMusic.ts';
 import * as THREE from 'three';
 import type { SoundId } from '../audio/SoundCatalog.ts';
 import { CONTAINMENT_FINALE_AUDIO_CUES, ContainmentFinaleMovementAudio, containmentProjectileImpactSound } from '../audio/ContainmentFinaleAudio.ts';
@@ -37,6 +38,7 @@ export class ContainmentFinalePresentation {
   private savedCamera: { fov: number; far: number; near: number; up: THREE.Vector3 } | undefined;
   private foundation: THREE.HemisphereLight | undefined;
   private foundationIntensity = 0;
+  private music = new CinematicMusic('escape', T.end);
   private started = false;
   private disposed = false;
   private lastRenderedSeconds = 0;
@@ -101,11 +103,13 @@ export class ContainmentFinalePresentation {
     this.actorSeconds = 0; this.updateActors(0, 0);
     this.movementAudio.reset();
     this.movementAudio.update(sampleContainmentFinale(0, this.bobStart), () => {});
+    this.music = new CinematicMusic('escape', T.end);
     this.render(0);
   }
 
   fixedUpdate(seconds: number): void {
     if (!this.started || this.disposed) return;
+    this.music.update(seconds);
     const { cue } = this.options, before = this.lastFixedSeconds;
     for (const [time, sound] of CONTAINMENT_FINALE_AUDIO_CUES) if (time > before && time <= seconds) cue(sound);
     for (const shot of this.visuals.shots) if (shot.t > before && shot.t <= seconds) {
@@ -134,6 +138,7 @@ export class ContainmentFinalePresentation {
 
   render(seconds: number): void {
     if (!this.started || this.disposed) return;
+    this.music.update(seconds);
     const frame = sampleContainmentFinale(seconds, this.bobStart), t = frame.seconds;
     const dt = Math.min(.05, Math.max(0, t - this.lastRenderedSeconds)); this.lastRenderedSeconds = t;
     this.advanceActors(t);
@@ -248,6 +253,7 @@ export class ContainmentFinalePresentation {
   }
 
   reset(): void {
+    this.music.stop();
     this.movementAudio.reset();
     if (!this.started) return;
     const { world, camera } = this.options;

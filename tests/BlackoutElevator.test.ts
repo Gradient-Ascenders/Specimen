@@ -139,7 +139,7 @@ test('all three turn toward the lab as ascent starts, then hold that direction t
 });
 
 test('the ascent borrows real slimes once, keeps rendering non-authoritative, spatialises dialogue and releases a safe lab landing', () => {
-  const s = setup(), parents = Object.values(s.presentations).map(p => p.root.parent), cues: { sound: string; position?: { x: number; y: number; z: number } }[] = [];
+  const s = setup(), parents = Object.values(s.presentations).map(p => p.root.parent), cues: { sound: string; position?: { x: number; y: number; z: number }; volumeScale?: number }[] = [];
   const off = gameplayAudioEvents.on('cue', c => cues.push({ ...c, position: c.position ? { ...c.position } : undefined }));
   try {
     assert.equal(s.movie.begin(s.camera), true); assert.equal(s.movie.begin(s.camera), false);
@@ -165,9 +165,11 @@ test('the ascent borrows real slimes once, keeps rendering non-authoritative, sp
       assert.ok(s.bodies[id].position.distanceTo(V.landing[id]) < 1e-8); assert.equal(s.bodies[id].grounded, true);
     }
     assert.equal(cues.filter(c => c.sound === 'volt-shoot-01').length, 3);
-    assert.equal(cues.filter(c => c.sound === 'world-lift-start-01').length, 1);
-    assert.equal(cues.filter(c => c.sound === 'world-lift-stop-01').length, 1);
-    const voices = cues.filter(c => c.sound === 'bob-contact-01'); assert.ok(voices.length > 20); assert.ok(voices.every(c => c.position && c.position.z > 180 && c.position.z < 182));
+    assert.equal(cues.filter(c => c.sound === 'blackout-lift-start-01').length, 1);
+    assert.equal(cues.filter(c => c.sound === 'blackout-lift-stop-01').length, 1);
+    const voices = cues.filter(c => c.sound === 'bob-contact-01' && (c.volumeScale??0) > .3);
+    assert.ok(voices.length > 20); assert.ok(voices.every(c => c.position && c.position.z > 180 && c.position.z < 182));
+    assert.ok(cues.some(c => c.sound === 'bob-contact-01' && c.volumeScale === .3 && c.position!.z < 180), 'boarding has resolved movement contacts');
     assert.equal(s.movie.begin(s.camera), false);
   } finally { off(); s.dispose(); }
 });

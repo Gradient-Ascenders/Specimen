@@ -78,7 +78,7 @@ const setListenerOrientation = (target: ListenerOrientationTarget, forward: Audi
 };
 
 export interface AudioPlayback {
-  play(sound: SoundId, position?: AudioPosition, varyPitch?: boolean, volumeScale?: number): void;
+  play(sound: SoundId, position?: AudioPosition, varyPitch?: boolean, volumeScale?: number, playbackRate?: number): void;
   startLoop(key: string, sound: SoundId, position?: AudioPosition, volumeScale?: number, playbackRate?: number): void;
   stopLoop(key: string): void;
   stopSound?(sound: SoundId): void;
@@ -233,7 +233,7 @@ export class AudioManager implements AudioPlayback {
     void operation.then(() => { if (shouldRun) this.reconcileLoops(); }).catch(() => {});
   }
 
-  play(sound: SoundId, position?: AudioPosition, varyPitch = false, volumeScale = 1): void {
+  play(sound: SoundId, position?: AudioPosition, varyPitch = false, volumeScale = 1, playbackRate = 1): void {
     // resume() is asynchronous. Schedule a decoded first-frame one-shot on
     // the suspended context's clock rather than dropping it before resume
     // completes. Intentional pause, focus loss and locked audio still reject it.
@@ -244,7 +244,8 @@ export class AudioManager implements AudioPlayback {
     const now = this.context!.currentTime;
     // Per-effect limiter also bounds rapid turrets distributed across the level.
     if (now - (this.recent.get(sound) ?? -Infinity) < 0.035) return;
-    if (this.createVoice(sound, position, undefined, varyPitch, scale)) this.recent.set(sound, now);
+    const rate = Number.isFinite(playbackRate) ? Math.max(.25, Math.min(4, playbackRate)) : 1;
+    if (this.createVoice(sound, position, undefined, varyPitch, scale, false, rate)) this.recent.set(sound, now);
   }
 
   /** Menu one-shots share the effects/master mix, while paused world voices stay muted. */
@@ -360,7 +361,7 @@ export class AudioManager implements AudioPlayback {
       panner.distanceModel = 'inverse';
       const spatial = soundSpatialProfile(sound);
       panner.refDistance = spatial.refDistance;
-      panner.maxDistance = 45;
+      panner.maxDistance = spatial.maxDistance ?? 45;
       panner.rolloffFactor = spatial.rolloffFactor;
       source.connect(gain); gain.connect(panner); panner.connect(bus);
     } else { source.connect(gain); gain.connect(bus); }

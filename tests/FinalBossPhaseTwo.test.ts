@@ -53,16 +53,16 @@ function fixture(invincible=true,random=()=>0) {
   return {arena,world,targets,body,weapon,presentation,boss,tick,killSquad,phaseTwo,aimCore,dispose:()=>{boss.dispose();weapon.dispose();targets.dispose();arena.dispose();world.clear();surfaces.clear();}};
 }
 
-test('phase two starts at exactly 250/500 HP; reinforcement crossings are once-only without shield/healing or attack interruption',()=>{
+test('phase two starts at exactly 375/750 HP; reinforcement crossings are once-only without shield/healing or attack interruption',()=>{
   const c=new FinalBossController({random:()=>0});c.start(true);
   try {
     for(let i=0;i<3;i++){c.applyImpact(hit());c.update(1.35,target);for(let j=0,n=c.readModel.defendersRemaining;j<n;j++)c.droneDestroyed();c.update(1.21,target);}
-    assert.equal(c.readModel.maximumHealth,500);assert.equal(T.phaseTwoHealth,c.readModel.maximumHealth/2);
-    c.applyImpact(hit(c.readModel.health-251));c.update(1/60,target);assert.equal(c.readModel.health,251);assert.equal(c.readModel.phase,1);assert.equal(c.readModel.state,'combat');
+    assert.equal(c.readModel.maximumHealth,750);assert.equal(T.phaseTwoHealth,c.readModel.maximumHealth/2);
+    c.applyImpact(hit(c.readModel.health-376));c.update(1/60,target);assert.equal(c.readModel.health,376);assert.equal(c.readModel.phase,1);assert.equal(c.readModel.state,'combat');
     c.applyImpact(hit(1));assert.equal(c.applyImpact(hit()).accepted,false,'the halfway crossing must close damage synchronously');
-    c.update(1/60,target);assert.equal(c.readModel.health,250);assert.equal(c.readModel.state,'transition');c.skipCinematic(target);
+    c.update(1/60,target);assert.equal(c.readModel.health,375);assert.equal(c.readModel.state,'transition');c.skipCinematic(target);
     const serial=c.readModel.attackSerial;
-    for(const [i,hp] of [175,125,50].entries()) {
+    for(const [i,hp] of [262.5,187.5,75].entries()) {
       c.applyImpact(hit());assert.equal(c.readModel.health,hp);assert.equal(c.readModel.reinforcementIndex,i+1);
       assert.equal(c.readModel.attackSerial,serial);assert.equal(c.readModel.shieldActive,false);assert.equal(c.readModel.weakPointOpen,true);
       c.update(.1,target);assert.equal(c.readModel.health,hp);assert.equal(c.readModel.regenerating,false);
@@ -72,32 +72,32 @@ test('phase two starts at exactly 250/500 HP; reinforcement crossings are once-o
   }finally{c.dispose();}
 });
 
-test('the 500 HP boss shields exactly at 425, 350 and 275 HP, all before the 250 HP phase transition',()=>{
+test('the 750 HP boss shields exactly at 637.5, 525 and 412.5 HP, all before the 375 HP phase transition',()=>{
   const c=new FinalBossController({random:()=>0});c.start(true);
   try {
-    assert.equal(c.readModel.health,500);
-    for(const [i,hp] of [425,350,275].entries()) {
+    assert.equal(c.readModel.health,750);
+    for(const [i,hp] of [637.5,525,412.5].entries()) {
       c.applyImpact(hit(c.readModel.health-hp-1));c.update(1/60,target);
       assert.equal(c.readModel.health,hp+1);assert.equal(c.readModel.shieldActive,false);assert.equal(c.readModel.defenseIndex,i);
       c.applyImpact(hit(1));assert.equal(c.readModel.health,hp);assert.equal(c.readModel.shieldActive,true);assert.equal(c.readModel.defenseIndex,i+1);
       c.update(1.35,target);for(let j=0,n=c.readModel.defendersRemaining;j<n;j++)c.droneDestroyed();c.update(1.21,target);
     }
-    c.applyImpact(hit());c.update(1/60,target);assert.equal(c.readModel.health,250);assert.equal(c.readModel.state,'transition');
+    c.applyImpact(hit());c.update(1/60,target);assert.equal(c.readModel.health,375);assert.equal(c.readModel.state,'transition');
     c.skipCinematic(target);assert.equal(c.readModel.phase,2);assert.equal(c.readModel.shieldActive,false);
   }finally{c.dispose();}
 });
 
-test('phase-two checkpoint entry starts fresh combat at 250 HP without an intro, shield replay or duplicate transition event',()=>{
+test('phase-two checkpoint entry starts fresh combat at 375 HP without an intro, shield replay or duplicate transition event',()=>{
   const c=new FinalBossController({random:()=>.999});
   try {
     assert.equal(c.startPhaseTwo(target),true);const m=c.readModel;
-    assert.equal(m.state,'combat');assert.equal(m.phase,2);assert.equal(m.health,250);assert.equal(m.maximumHealth,500);
+    assert.equal(m.state,'combat');assert.equal(m.phase,2);assert.equal(m.health,375);assert.equal(m.maximumHealth,750);
     assert.equal(m.playerHealth,100);assert.equal(m.defenseIndex,3);assert.equal(m.shieldActive,false);assert.equal(m.regenerating,false);
     assert.equal(m.reinforcementIndex,0);assert.equal(m.defendersRemaining,0);assert.equal(m.stage,'telegraph');assert.equal(m.attack,'ram');
     assert.equal(c.cinematic,false);assert.equal(c.consumeTransition(),false);assert.equal(c.startPhaseTwo(target),false);assert.equal(c.start(true),false);
-    assert.equal(c.damagePlayer(45,-1),true);c.applyImpact(hit());assert.equal(m.health,175);assert.equal(m.reinforcementIndex,1);
+    assert.equal(c.damagePlayer(45,-1),true);c.applyImpact(hit());assert.equal(m.health,262.5);assert.equal(m.reinforcementIndex,1);
     c.suspend();assert.equal(c.startPhaseTwo(target),false);c.reset();assert.equal(c.startPhaseTwo(target),true);
-    assert.equal(m.health,250);assert.equal(m.playerHealth,100);assert.equal(m.invulnerability,0);assert.equal(m.reinforcementIndex,0);assert.equal(c.consumeTransition(),false);
+    assert.equal(m.health,375);assert.equal(m.playerHealth,100);assert.equal(m.invulnerability,0);assert.equal(m.reinforcementIndex,0);assert.equal(c.consumeTransition(),false);
   }finally{c.dispose();}
   assert.equal(c.startPhaseTwo(target),false);
 });
@@ -311,19 +311,18 @@ test('RAM physically crosses the charge path, breaks complete cover assemblies a
   }finally{f.dispose();}
 });
 
-for(const phase of [1,2])test(`phase ${phase} ${phase===1?'takes a full-charge core hit without dodging':'physically evades a full-charge core hit with a spin'}; partial shots still deal damage`,()=>{
+for(const phase of [1,2])test(`phase ${phase} takes full-charge and partial core hits without any evasive roll`,()=>{
   const f=fixture();
   try {
     if(phase===2)f.phaseTwo();const health=f.boss.controller.readModel.health;
     f.tick(90);f.aimCore();f.weapon.update(1.5,controls({firePressed:true,fireHeld:true}));f.aimCore();f.weapon.update(.001,controls({fireReleased:true}));
     let offset=0,roll=0;
-    for(let i=0;i<180;i++){f.tick();offset=Math.max(offset,f.boss.evasion.offset.length());roll=Math.max(roll,Math.abs(f.boss.evasion.roll));}
-    if(phase===2){assert.ok(offset>33);assert.ok(roll>Math.PI*1.9);assert.equal(f.boss.controller.readModel.health,health);}
-    else {assert.equal(offset,0);assert.equal(roll,0);assert.equal(f.boss.controller.readModel.health,health-18);}
+    for(let i=0;i<180;i++){f.tick();offset=Math.max(offset,f.presentation.evasionOffset.length());roll=Math.max(roll,Math.abs(f.presentation.evasionRoll));}
+    assert.equal(offset,0);assert.equal(roll,0);assert.equal(f.boss.controller.readModel.health,health-18);
     const beforePartial=f.boss.controller.readModel.health;
-    f.aimCore();f.weapon.update(.75,controls({firePressed:true,fireHeld:true}));f.aimCore();f.weapon.update(.001,controls({fireReleased:true}));f.tick(120);
+    f.aimCore();f.weapon.update(.375,controls({firePressed:true,fireHeld:true}));f.aimCore();f.weapon.update(.001,controls({fireReleased:true}));f.tick(120);
     assert.ok(f.boss.controller.readModel.health<beforePartial,'partial shots must not be dodged or made invulnerable');
-    f.boss.reset();assert.equal(f.boss.evasion.active,false);assert.equal(f.boss.evasion.offset.length(),0);assert.equal(f.presentation.evasionRoll,0);
+    f.boss.reset();assert.equal(f.presentation.evasionOffset.length(),0);assert.equal(f.presentation.evasionRoll,0);
   }finally{f.dispose();}
 });
 
@@ -339,7 +338,7 @@ for(const stage of ['telegraph','active','recovery'] as const)test(`RAM ${stage}
     f.body.recoverAt(f.presentation.coreWorld.clone().addScaledVector(forward,6).setY(f.presentation.coreWorld.y-.75));
     f.aimCore();f.weapon.update(1.5,controls({firePressed:true,fireHeld:true}));f.aimCore();f.weapon.update(.001,controls({fireReleased:true}));
     const before=m.health;
-    for(let i=0;i<12;i++){f.tick();assert.equal(f.boss.evasion.active,false);assert.equal(f.boss.evasion.offset.length(),0);assert.equal(f.presentation.evasionRoll,0);}
+    for(let i=0;i<12;i++){f.tick();assert.equal(f.presentation.evasionOffset.length(),0);assert.equal(f.presentation.evasionRoll,0);}
     assert.equal(m.health,before-18,'committing to RAM should allow the full charged damage, not merely hide the roll');
   }finally{f.dispose();}
 });
