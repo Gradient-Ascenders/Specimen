@@ -45,11 +45,12 @@ test('Volt exports a compact character hierarchy and continuous embedded materia
   assert.deepEqual(document.meshes.map((mesh: {name: string}) => mesh.name).sort(),['Volt-Body','Volt-Eye-Left','Volt-Eye-Right']);
   assert.equal(document.nodes.length,4);
   assert.equal(document.materials.length,2);
-  assert.equal(document.images.length,2);
+  assert.equal(document.images.length,3);
   for (const mesh of document.meshes) assert.equal(mesh.primitives.length,1);
   for (const image of document.images) { assert.equal(image.mimeType,'image/png'); assert.equal(typeof image.bufferView,'number'); assert.equal(image.uri,undefined); }
   const body = document.materials.find((material: {name: string}) => material.name==='Volt-Golden-Gel');
   assert.equal(typeof body.emissiveTexture.index,'number');
+  assert.equal(typeof body.pbrMetallicRoughness.baseColorTexture.index,'number');
   assert.equal(typeof body.pbrMetallicRoughness.metallicRoughnessTexture.index,'number');
   assert.equal(document.animations,undefined);
   assert.equal(document.skins,undefined);
@@ -71,12 +72,15 @@ test('Every Volt mesh exposes the same named, neutral morph controls with finite
   }
 });
 
-test('Volt retains the approved neutral body, eyes, axes and contact plane',() => {
+test('Volt keeps its contact and animation contract with the revised compact crest',() => {
   assert.equal(report.runtime_up,'+Y'); assert.equal(report.runtime_forward,'-Z');
   assert.equal(report.resting_contact_y_metres,-0.45);
   assert.equal(report.total_triangles,38208);
-  assert.equal(report.preserved_geometry.lower_body_vertices,6817);
-  assert.equal(report.preserved_geometry.lower_body_geometry_sha256,'f2b6621829b0a2117b5d46feb04c842e6edbb368b559a9f7935f28bd760fbd0f');
+  assert.ok(report.design.crest_height_metres<report.design.body_height_metres);
+  assert.equal(report.design.floating_effect_meshes,0);
+  const bounds=report.meshes['Volt-Body'].runtime_bounds_metres;
+  assert.ok(bounds.maximum[0]-bounds.minimum[0]>1.45);
+  assert.ok(bounds.maximum[1]-bounds.minimum[1]<1.5);
   assert.deepEqual(report.morph_names,names);
   for (const mesh of Object.values(report.meshes) as {non_manifold_edges: number; connected_components: number}[]) {
     assert.equal(mesh.non_manifold_edges,0); assert.equal(mesh.connected_components,1);
@@ -85,18 +89,13 @@ test('Volt retains the approved neutral body, eyes, axes and contact plane',() =
 
 test('approved GLB and generator sources retain their hashes independently of editable Blender bytes', () => {
   const hash = (value: Buffer) => createHash('sha256').update(value).digest('hex');
-  assert.equal(hash(bytes), '4e1d5d7d6ea3f368e96cbc0d13ff6b1a232a7d9154e73602ee54f809ec6d2807');
+  assert.equal(hash(bytes), '7784bfef3694150064110026f15722c3f40958ac71995fbaa50a9772b16ceb77');
   for (const [name, digest] of Object.entries(report.sources)) {
     assert.equal(hash(readFileSync(new URL(`../assets/characters/volt/${name}`, import.meta.url))), digest);
   }
-  const body = document.meshes.find((mesh: { name: string }) => mesh.name === 'Volt-Body');
-  const positions = vectorAccessor(body.primitives[0].attributes.POSITION);
-  let preserved = 0;
-  for (let vertex = 0; vertex < positions.length / 3; vertex++) if (positions[vertex * 3 + 1]! <= 0.340001) preserved++;
-  assert.equal(preserved, 6817);
-  // The whole-file GLB identity covers the exact neutral lower-body/eye data;
-  // source geometry signatures are checked by the committed Blender verifier.
   const roundtrip = JSON.parse(readFileSync(new URL('../assets/characters/volt/volt.roundtrip.json', import.meta.url), 'utf8'));
-  assert.equal(roundtrip.preserved_body_geometry_sha256, report.preserved_geometry.lower_body_geometry_sha256);
-  assert.deepEqual(roundtrip.preserved_eyes_geometry_sha256, report.preserved_geometry.eyes_geometry_sha256);
+  assert.equal(roundtrip.glb_sha256,hash(bytes));
+  assert.deepEqual(roundtrip.sculpt_geometry_sha256,Object.fromEntries(
+    Object.entries(report.meshes).map(([name,mesh]:[string,any])=>[name,mesh.geometry_sha256])));
+  assert.equal(roundtrip.floating_electrical_effects,0);
 });

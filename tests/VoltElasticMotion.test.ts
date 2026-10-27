@@ -5,6 +5,7 @@ import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPrese
 import { GoopCharacterPresentation } from '../src/render/goop/GoopCharacterPresentation.ts';
 import { evaluateVoltElasticPosition, voltMotionProtection } from '../src/render/volt/VoltMotionShader.ts';
 import { loadVolt } from './fixtures/VoltAssetFixture.ts';
+import { GelRendering } from '../src/render/slime/GelRendering.ts';
 
 const dt = 1 / 60;
 const state = () => ({ locomotionPositionWorld: new THREE.Vector3(), velocityWorld: new THREE.Vector3(),
@@ -14,6 +15,59 @@ function compile(material: THREE.Material, library: keyof typeof THREE.ShaderLib
     fragmentShader: THREE.ShaderLib[library].fragmentShader };
   material.onBeforeCompile(shader as THREE.WebGLProgramParametersWithUniforms, null as never); return shader;
 }
+
+test('Volt keeps physical gel transparency, camera fades and quality settings on the revised asset', async () => {
+  const rendering = new GelRendering({ transmissionResolutionScale: 1 });
+  const p = new VoltCharacterPresentation(0.45, rendering); await p.prepare(loadVolt);
+  const body = p.root.getObjectByName('Volt-Body') as THREE.Mesh<THREE.BufferGeometry, THREE.MeshPhysicalMaterial>;
+  const eye = p.root.getObjectByName('Volt-Eye-Left') as typeof body;
+  assert.equal(body.material.transmission, 0.55);
+  assert.equal(body.material.opacity, 1, 'refraction retains the gel surface at full opacity');
+  assert.equal(eye.material.transmission, 0);
+  assert.equal(rendering.owns(body.material), true);
+  rendering.setMode('minimum'); assert.equal(body.material.transmission, 0);
+  p.setOpacity(0.4);
+  assert.equal(body.material.opacity, 0.4); assert.equal(eye.material.opacity, 0.4);
+  assert.equal(body.material.depthWrite, false); assert.equal(eye.material.depthWrite, false);
+  rendering.setMode('physical'); p.reset();
+  assert.equal(body.material.transmission, 0.55); assert.equal(body.material.opacity, 1);
+  assert.equal(body.material.depthWrite, true); assert.equal(eye.material.transparent, false);
+  p.dispose(); assert.equal(rendering.materialCount, 0);
+});
+
+test('Volt reacts with seated eyes and bounded crest follow-through, then clears every reaction on recovery', async () => {
+  const p = new VoltCharacterPresentation(); await p.prepare(loadVolt);
+  const body = p.root.getObjectByName('Volt-Body') as THREE.Mesh;
+  const eye = p.root.getObjectByName('Volt-Eye-Left') as THREE.Mesh;
+  const shader = compile(body.material as THREE.Material, 'physical'), s = state();
+  const tick = (frames: number) => { for (let i = 0; i < frames; i++) p.update(dt, s); };
+  tick(1); s.grounded = false; s.velocityWorld.y = 6;
+  p.onLaunch({ directionWorld: new THREE.Vector3(0, 1, 0), speedMetresPerSecond: 6, chargeFraction: 0 });
+  tick(1); assert.ok(p.diagnostics.weights.Blink > 0.1, 'launch effort');
+  tick(230); assert.equal(p.diagnostics.weights.Blink, 0, 'idle blinks wait until grounded');
+  s.grounded = true; s.velocityWorld.y = 0;
+  p.onLanding(new THREE.Vector3(0, 1, 0), 8.5); tick(1);
+  assert.ok(p.diagnostics.weights.Blink > 0.15, 'heavy landing squint');
+  assert.equal(eye.morphTargetInfluences![eye.morphTargetDictionary!.Blink], p.diagnostics.weights.Blink);
+  tick(30); assert.equal(p.diagnostics.weights.Blink, 0);
+  p.onDamage(1); tick(1); assert.ok(p.diagnostics.weights.Blink > 0.25, 'damage squint');
+  tick(30); assert.equal(p.diagnostics.weights.Blink, 0);
+  for (let i = 0; i < 40; i++) { s.locomotionPositionWorld.z -= 5.5 * dt; tick(1); }
+  s.movementIntentWorld.set(1, 0, 0);
+  for (let i = 0; i < 8; i++) { s.locomotionPositionWorld.x += 5.5 * dt; tick(1); }
+  const lag = shader.uniforms.uVoltCrestLag.value as THREE.Vector2;
+  assert.ok(lag.x > 0.001, 'crest trails a right turn');
+  assert.ok(lag.length() <= 0.02 + 1e-9);
+  p.present(0); const previous = lag.clone(); p.present(1); const current = lag.clone();
+  p.present(0.5); assert.ok(lag.distanceTo(previous.lerp(current, 0.5)) < 1e-12);
+  p.setAimDirection(new THREE.Vector3(1, 0, 0)); tick(1);
+  assert.equal(p.diagnostics.weights.Blink, 0.1, 'electrical focus');
+  p.finishDeath(p.placement.position);
+  assert.equal(p.diagnostics.weights.Blink, 0); assert.equal(lag.length(), 0);
+  s.movementIntentWorld.set(0, 0, 0); tick(230);
+  assert.ok(p.diagnostics.weights.Blink > 0.5, 'idle blink resumes after recovery');
+  p.dispose();
+});
 
 test('Volt matches Goop movement lean, reverse counterlean, trailing gel and jump/landing timing', () => {
   const volt = new VoltCharacterPresentation(), goop = new GoopCharacterPresentation(), s = state();

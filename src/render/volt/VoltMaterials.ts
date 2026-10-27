@@ -12,21 +12,22 @@ export class VoltMaterialSet extends GelMaterialSet {
   private readonly crestLag: THREE.IUniform<THREE.Vector2> = { value: new THREE.Vector2() };
   private readonly landingRipple: THREE.IUniform<THREE.Vector2> = { value: new THREE.Vector2(0, GEL_LANDING_RIPPLE_SECONDS) };
 
-  constructor(emission: THREE.Texture, roughness: THREE.Texture, rendering?: GelRendering) {
+  constructor(emission: THREE.Texture, roughness: THREE.Texture, colour: THREE.Texture, rendering?: GelRendering) {
     super({
       name: 'Volt',
-      body: { name: 'Volt-Golden-Gel', color: VOLT_BASE_COLOR, attenuationColor: VOLT_BASE_COLOR,
+      body: { name: 'Volt-Golden-Gel', color: 0xffffff, map: colour, attenuationColor: VOLT_BASE_COLOR,
         metalness: 0, ior: 1.38, roughness: 1, roughnessMap: roughness,
-        clearcoat: 0.32, clearcoatRoughness: 0.12, transmission: 0.55,
+        clearcoat: 0.26, clearcoatRoughness: 0.20, transmission: 0.55,
         emissive: new THREE.Color(1, 1, 1), emissiveIntensity: 0.95, emissiveMap: emission },
       eyes: { name: 'Volt-Obsidian-Eyes', color: new THREE.Color().setRGB(0.004, 0.0025, 0.001, THREE.LinearSRGBColorSpace),
-        roughness: 0.16, clearcoat: 0.35, clearcoatRoughness: 0.12 },
+        roughness: 0.23, clearcoat: 0.22, clearcoatRoughness: 0.18 },
       secondaryMotion: {
         wobbleAmplitudeMetres: 0.0015, impactAmplitudeMetres: 0.003,
         protectionShader: VOLT_SECONDARY_PROTECTION_SHADER,
       },
     }, rendering);
     emission.colorSpace = THREE.SRGBColorSpace;
+    colour.colorSpace = THREE.SRGBColorSpace;
     roughness.colorSpace = THREE.NoColorSpace;
     for (const material of [this.body, this.bodyDepth, this.bodyDistance]) {
       const hook = material.onBeforeCompile;
@@ -42,11 +43,11 @@ export class VoltMaterialSet extends GelMaterialSet {
     }
   }
 
-  setMotion(baseOffsetWorld: THREE.Vector3, yaw: number, crestLag: number, rippleStrength: number, rippleAge: number): void {
+  setMotion(baseOffsetWorld: THREE.Vector3, yaw: number, crestLag: THREE.Vector2, rippleStrength: number, rippleAge: number): void {
     const sine = Math.sin(yaw), cosine = Math.cos(yaw);
     this.baseOffset.value.set(cosine * baseOffsetWorld.x - sine * baseOffsetWorld.z, baseOffsetWorld.y,
       sine * baseOffsetWorld.x + cosine * baseOffsetWorld.z);
-    this.crestLag.value.set(0, crestLag);
+    this.crestLag.value.copy(crestLag);
     this.landingRipple.value.set(rippleStrength, rippleAge);
   }
 

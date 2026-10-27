@@ -1960,6 +1960,11 @@ export class BlackoutLevelRuntime {
       if (transit) {
         scene.root.add(transit.root);
         rollback(() => transit.dispose());
+        rollback(transit.damage.events.on('damaged', ({ slimeId }) => {
+          if (slimeId === 'bob') bobPresentation.onDamage(1);
+          else if (slimeId === 'goop') goopPresentation.onDamage(1);
+          else voltPresentation.onDamage(1);
+        }));
       }
       const unregisterTransitCheckpointParticipant = transit ? checkpoints.registerParticipant(transit) : undefined;
       if (unregisterTransitCheckpointParticipant) rollback(unregisterTransitCheckpointParticipant);

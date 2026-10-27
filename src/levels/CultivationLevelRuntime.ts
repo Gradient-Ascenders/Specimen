@@ -1556,6 +1556,7 @@ export class CultivationLevelRuntime {
             ({ slimeId }) => {
               if (slimeId === 'bob') bobPresentation.onDamage(1);
               else if (slimeId === 'goop') goopPresentation.onDamage(1);
+              else if (slimeId === 'volt') voltPresentation.onDamage(1);
             },
           )),
       ];
