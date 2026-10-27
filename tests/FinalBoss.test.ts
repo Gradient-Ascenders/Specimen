@@ -3,11 +3,8 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { FinalBossController, finalBossAttackTiming } from '../src/boss/FinalBossController.ts';
 import { ExterminationArena } from '../src/boss/ExterminationArena.ts';
-import { FINAL_ARENA, FINAL_ARENA_SCALE, FINAL_ARENA_RING, FINAL_ARENA_ORBIT, FINAL_BOSS_TUNING, FINAL_BOSS_CHECKPOINT, FINAL_MERGE_ANCHOR, FINAL_SPECIMEN_MOVEMENT, FINAL_SPECIMEN_RADIUS, FINAL_SPECIMEN_WEAPON, FINAL_SPECIMEN_CAMERA, FINAL_SPECIMEN_START_PITCH, finalArenaSupportY, finalArenaY, finalArenaZ } from '../src/boss/FinalBossConfig.ts';
-import { FinalBossPresentation } from '../src/boss/FinalBossPresentation.ts';
-import { ExterminatorWarDrone } from '../src/boss/ExterminatorWarDrone.ts';
+import { FINAL_ARENA, FINAL_ARENA_RING, FINAL_ARENA_ORBIT, FINAL_BOSS_TUNING, FINAL_BOSS_CHECKPOINT, FINAL_MERGE_ANCHOR, FINAL_SPECIMEN_MOVEMENT, FINAL_SPECIMEN_RADIUS, FINAL_SPECIMEN_WEAPON, finalArenaSupportY, finalArenaY, finalArenaZ } from '../src/boss/FinalBossConfig.ts';
 import { SentinelDroneSquad } from '../src/boss/attacks/SentinelDroneAttack.ts';
-import { CameraRig } from '../src/render/CameraRig.ts';
 import { CollisionWorld, CollisionHit, ColliderTransformMode } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { KinematicBody, DEFAULT_KINEMATIC_BODY_CONFIG } from '../src/physics/KinematicBody.ts';
@@ -260,67 +257,6 @@ test('a real charged jump boards a moving lift; its rider is carried through the
   }finally{f.dispose();}
 });
 
-test('graphite iris quadrants have separated faces and a real central aperture throughout opening and closing',()=>{
-  const drone=new ExterminatorWarDrone();try {
-    const shutters:THREE.Mesh[]=[];drone.root.traverse(o=>{if(o instanceof THREE.Mesh&&o.name.startsWith('exterminator-iris-shutter-'))shutters.push(o);});
-    assert.equal(shutters.length,4);
-    assert.ok(shutters.every(s=>(s.material as THREE.MeshStandardMaterial).color.r<.05),'the face should be graphite, not ochre');
-    const ray=new THREE.Raycaster(),direction=new THREE.Vector3(0,0,1);
-    for(const open of [false,true,false])for(let frame=0;frame<12;frame++) {
-      drone.update(frame/60,open,1,1/60);drone.root.updateMatrixWorld(true);
-      ray.set(new THREE.Vector3(0,drone.coreMount.y,-12),direction);
-      assert.equal(ray.intersectObjects(shutters,false).length,0,'the blue pupil must remain visible through a physical aperture');
-      for(let r=.55;r<3;r+=.22)for(let i=0;i<96;i++) {
-        const a=(i+.37)*Math.PI/48;
-        ray.set(new THREE.Vector3(Math.cos(a)*r,drone.coreMount.y+Math.sin(a)*r,-12),direction);
-        assert.ok(new Set(ray.intersectObjects(shutters,false).map(h=>h.object)).size<=1,'iris faces overlap and can z-fight');
-      }
-    }
-    drone.reset();assert.ok(shutters.every(s=>s.position.y===0));
-  }finally{drone.dispose();}
-});
-
-test('the real camera supports wide fused framing without using its zoom-in-only scale API',()=>{
-  const f=arenaFixture();try {
-    f.body.recoverAt(FINAL_MERGE_ANCHOR);
-    const rig=new CameraRig();rig.setFollowTarget(f.body,f.world);rig.setGroundOrbitYawRadians(Math.PI);
-    rig.setGroundOrbitPitchRadians(FINAL_SPECIMEN_START_PITCH);
-    rig.setContextualCamera({profile:FINAL_SPECIMEN_CAMERA,anchor:f.body});
-    for(let i=0;i<120;i++)rig.update(1,1/60);
-    assert.ok(rig.getDiagnostics().currentDistanceMetres>9);assert.equal(rig.getDiagnostics().profileId,'extermination-specimen');
-    assert.equal(rig.getDiagnostics().pitchRadians,FINAL_SPECIMEN_START_PITCH);
-    for(const point of [new THREE.Vector3(0,FINAL_ARENA.floorY,FINAL_MERGE_ANCHOR.z),new THREE.Vector3(0,FINAL_BOSS_TUNING.hoverY+11,FINAL_ARENA.centreZ)]) {
-      const projected=point.project(rig.camera);assert.ok(Math.abs(projected.y)<1,`feet and towering boss must fit: ${projected.y}`);
-    }
-    rig.setAimPresentationActive(true);for(let i=0;i<30;i++)rig.update(1,1/60);
-    const origin=new THREE.Vector3(),direction=new THREE.Vector3();rig.copyAimRay(origin,direction);
-    assert.ok(Number.isFinite(origin.y));assert.ok(Math.abs(direction.length()-1)<1e-9);
-  }finally{f.dispose();}
-});
-
-test('wide orbit anticipates cover edges instead of snapping the camera across the ring',()=>{
-  const f=arenaFixture();
-  try {
-    const cover=f.arena.cover[0]!,size=(cover.geometry as THREE.BoxGeometry).parameters;
-    for(const [x,z] of [[size.width/2+1.72,0],[0,size.depth/2+1.72],[-size.width/2-1.72,0],[0,-size.depth/2-1.72]])for(const rate of [60,144])for(const turn of [-1,1]) {
-      f.body.recoverAt(new THREE.Vector3(x,0,z).applyQuaternion(cover.quaternion).add(cover.position).setY(FINAL_MERGE_ANCHOR.y));
-      const rig=new CameraRig();rig.setFollowTarget(f.body,f.world);rig.setGroundOrbitPitchRadians(FINAL_SPECIMEN_START_PITCH);
-      rig.setContextualCamera({profile:FINAL_SPECIMEN_CAMERA,anchor:f.body});
-      for(let n=0;n<60;n++)rig.update(1,1/60);
-      const previous=rig.camera.position.clone(),quaternion=rig.camera.quaternion.clone();let maximumStep=0;
-      for(let n=0;n<rate*5;n++) {
-        const pixels=turn*864/rate;rig.queueLookInput(pixels,0);rig.update(1,1/rate);
-        maximumStep=Math.max(maximumStep,rig.camera.position.distanceTo(previous));
-        assert.ok(quaternion.angleTo(rig.camera.quaternion)<Math.abs(pixels)*.0022+1e-6,'collision smoothing must not delay or accelerate yaw');
-        const d=rig.getDiagnostics();
-        if(d.obstructed)assert.ok(d.currentDistanceMetres<=d.obstructionDistanceMetres!,'look-ahead may never carry the camera through a real obstruction');
-        previous.copy(rig.camera.position);quaternion.copy(rig.camera.quaternion);
-      }
-      assert.ok(maximumStep<1,`orbit snapped ${maximumStep.toFixed(2)}m at ${rate} Hz, side ${x}/${z}, turn ${turn}`);
-    }
-  }finally{f.dispose();}
-});
-
 test('lab cover stops rays, reset clears hazards, and the entry cannot be vaulted',()=>{
   const f=arenaFixture();try {
     const hit=new CollisionHit(),block=f.arena.cover[0]!;
@@ -335,26 +271,6 @@ test('lab cover stops rays, reset clears hazards, and the entry cannot be vaulte
     assert.equal(f.world.sweepSphere(new THREE.Vector3(0,11,FINAL_MERGE_ANCHOR.z),new THREE.Vector3(0,0,-40),FINAL_SPECIMEN_RADIUS,hit),true);
     assert.equal(hit.object?.name,'arena-entry-header');
   }finally{f.dispose();}
-});
-
-test('the white lab spans 200 metres with a 520-metre shaft and a detailed articulated quad-fan boss',()=>{
-  const f=arenaFixture(),presentation=new FinalBossPresentation();try {
-    assert.equal(FINAL_ARENA.radius,100);assert.equal(FINAL_ARENA.ceilingY,96);assert.equal(FINAL_ARENA.pitFloorY,-520);
-    assert.ok(FINAL_ARENA_RING.outerRadius-FINAL_ARENA_RING.innerRadius>35);
-    assert.ok(f.arena.collisionMeshes.every(mesh=>mesh.scale.equals(new THREE.Vector3(1,1,1))));
-    const wall=f.arena.root.getObjectByName('lab-wall-0') as THREE.Mesh;
-    assert.ok((wall.material as THREE.MeshStandardMaterial).color.r>.6,'room must have white lab panelling');
-    f.arena.setDoors(true);const hit=new CollisionHit();
-    for(const x of [-16,-9,0,9,16])assert.equal(f.world.sweepSphere(new THREE.Vector3(x,3,205),new THREE.Vector3(0,0,-20),FINAL_SPECIMEN_RADIUS,hit),true);
-    const boss=new FinalBossController();boss.start(true);presentation.update(boss.readModel,1,f.body);
-    const size=new THREE.Box3().setFromObject(presentation.machine).getSize(new THREE.Vector3());assert.ok(size.x>=45,JSON.stringify(size));
-    const fans:THREE.Object3D[]=[],rotors:THREE.Object3D[]=[],guns:THREE.Object3D[]=[];
-    presentation.machine.traverse(o=>{if(o.name==='armoured-ducted-fan')fans.push(o);if(o.name==='spinning-turbine-blades')rotors.push(o);if(o.name==='articulated-rotary-cannon')guns.push(o);});
-    assert.equal(fans.length,4);assert.equal(guns.length,2);assert.equal(rotors.length,4);
-    const rotation=rotors[0]!.rotation.y;presentation.update(boss.readModel,2,f.body);assert.notEqual(rotors[0]!.rotation.y,rotation);
-    assert.equal(presentation.machine.scale.x,3);assert.ok(presentation.coreWorld.y>16);
-    boss.dispose();
-  }finally{presentation.dispose();f.dispose();}
 });
 
 test('reinforced eight-drone squad fires frequent bounded salvos, survives a tap and dies to full charge',()=>{

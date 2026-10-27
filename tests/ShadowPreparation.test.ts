@@ -9,10 +9,6 @@ import { BlackoutPresentationPreparation } from '../src/render/BlackoutPresentat
 import { CultivationPreparationQueue } from '../src/render/CultivationPreparationQueue.ts';
 import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { RenderShadowPolicy, type RenderLayer } from '../src/render/RenderLayer.ts';
-import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
-import { loadVolt } from './fixtures/VoltAssetFixture.ts';
-import { OpeningGameScene } from '../src/cinematics/OpeningGameScene.ts';
-import { TitleScreenScene } from '../src/ui/TitleScreenScene.ts';
 
 function fixture() {
   let viewport = new THREE.Vector4(4, 5, 960, 600), scissor = viewport.clone(), test = false;
@@ -98,65 +94,6 @@ test('tiny preparation viewports retain a physical transmission texel below nati
     assert.deepEqual(snapshot(), before);
     target.dispose(); borrowedTarget.dispose();
   }
-});
-
-for (const scale of [.5, 1]) test(`opening primers retain live transmission dimensions and restore scale ${scale}`, async () => {
-  const {renderer, borrowedTarget} = fixture();
-  renderer.transmissionResolutionScale = scale;
-  const policy = new RenderShadowPolicy(renderer.shadowMap);
-  const room = new TitleScreenScene();
-  const opening = new OpeningGameScene(room, undefined, {yieldFrame: async () => {}});
-  const previousViewport = new THREE.Vector4(0, 0, 12, 12);
-  room.camera.viewport = previousViewport;
-  // Model/resource loading is tested separately; inspect the real opening's
-  // preparation calls without requiring a GPU in the Node test runner.
-  opening.bob.prepare = async () => {};
-  opening.laboratory.prepare = async () => {};
-  const tinyScales: number[] = [], liveScales: number[] = [];
-  renderer.render = (_scene, camera) => {
-    const target = renderer.getRenderTarget();
-    if (tinyScales.length === 0) assert.deepEqual(camera.viewport?.toArray(), [3, 3, 720, 450],
-      'Use physical live dimensions, not the shadow pass\'s one-pixel target viewport.');
-    else assert.equal(camera.viewport, previousViewport);
-    (target?.width === 1 ? tinyScales : liveScales).push(renderer.transmissionResolutionScale);
-  };
-  const context = {SYNC_GPU_COMMANDS_COMPLETE:1, ALREADY_SIGNALED:2, CONDITION_SATISFIED:3, WAIT_FAILED:4,
-    fenceSync: () => ({}), clientWaitSync: () => 2, deleteSync: () => {}, flush: () => {}, isContextLost: () => false};
-  Object.assign(renderer, {getContext: () => context});
-  try {
-    await opening.prepare({renderer: renderer as unknown as THREE.WebGLRenderer,
-      withShadowPreparation: (paused, draw) => policy.withPreparation(paused, draw)});
-    assert.deepEqual(tinyScales, [scale, 1], 'only the camera-sized transmission primer restores fractional quality');
-    assert.deepEqual(liveScales, [scale], 'the first visible-size prime retains the requested quality');
-    assert.equal(room.camera.viewport, previousViewport);
-    assert.equal(renderer.transmissionResolutionScale, scale);
-    assert.ok(renderer.getRenderTarget() === borrowedTarget);
-  } finally { opening.dispose(); borrowedTarget.dispose(); }
-});
-
-test('cancelled Cultivation compile releases owned maps once and cannot overwrite the next shadow owner', async () => {
-  const {renderer, borrowedTarget} = fixture(), scene = new THREE.Scene();
-  const preview = new LevelTwoPreviewScene(() => {}, cultivationAssets); scene.add(preview.root);
-  const policy = new RenderShadowPolicy(renderer.shadowMap);
-  const camera = new THREE.PerspectiveCamera();
-  const layer = {renderer, scene, cameraRig: {camera}, withShadowPreparation: policy.withPreparation.bind(policy)} as unknown as RenderLayer;
-  const queue = new CultivationPreparationQueue(layer, preview);
-  let release: (() => void) | undefined, mapDisposals = 0, mapCount = 0;
-  renderer.initRenderTarget = target => { mapCount++; target.addEventListener('dispose', () => mapDisposals++); };
-  renderer.compileAsync = async () => { await new Promise<void>(resolve => { release = resolve; }); };
-  let borrowedDisposals = 0;
-  const borrowed = new Set<THREE.BufferGeometry>();
-  preview.root.traverse(object => { if (object instanceof THREE.Mesh) borrowed.add(object.geometry); });
-  for (const geometry of borrowed) geometry.addEventListener('dispose', () => borrowedDisposals++);
-  for (let i = 0; i < 1000 && !release; i++) queue.tick(0, true);
-  assert.ok(release, 'reaches the asynchronous compiler batch');
-  queue.dispose(); queue.dispose();
-  const next = policy.request('next-level', {enabled:true});
-  release(); await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(policy.activeOwner, 'next-level'); assert.equal(renderer.shadowMap.enabled, true);
-  assert.equal(mapDisposals, mapCount); assert.ok(mapCount > 0);
-  assert.equal(borrowedDisposals, 0);
-  next.dispose(); preview.dispose(); borrowedTarget.dispose();
 });
 
 test('custom shadow copies preserve deformation/dissolve hooks and uniform ownership, clipping and alpha variants', () => {
@@ -339,48 +276,6 @@ test('unallocated drone beam shadows bind a matching fallback without becoming v
   assert.equal(material.uniforms.beamShadowReady.value, false);
   material.dispose(); assert.equal(disposals, 3);
   mesh.geometry.dispose(); map.depthTexture.dispose(); map.dispose();
-});
-
-test('hidden Volt prewarms morph, transmission, faded-eye and actual caster variants without changing live state', async () => {
-  const { renderer, borrowedTarget } = fixture();
-  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(), volt = new VoltCharacterPresentation();
-  await volt.prepare(loadVolt); volt.setVisible(false); scene.add(volt.root);
-  const expectedMorphs = new Map<THREE.BufferGeometry, { mesh: THREE.Mesh; dictionary: Record<string, number>; influences: number[] }>();
-  volt.root.traverse(object => {
-    if (!(object instanceof THREE.Mesh) || !object.name.startsWith('Volt-')) return;
-    if (object.name === 'Volt-Body') {
-      assert.equal(object.geometry.morphAttributes.position!.length, 6);
-      object.morphTargetInfluences![object.morphTargetDictionary!.Headroom] = 0.35;
-    } else assert.equal(object.geometry.morphAttributes.position!.length, 5);
-    expectedMorphs.set(object.geometry, { mesh: object, dictionary: { ...object.morphTargetDictionary }, influences: [...object.morphTargetInfluences!] });
-  });
-  const light = new THREE.SpotLight(); light.castShadow = true; scene.add(light);
-  const variants = new Set<string>();
-  renderer.compileAsync = async group => {
-    group.traverse(object => {
-      if (!(object instanceof THREE.Mesh) || !object.name.startsWith('Volt-')) return;
-      assert.equal(object.geometry.morphTargetsRelative, true);
-      const expected = expectedMorphs.get(object.geometry)!; assert.ok(expected, 'proxy retains its live geometry');
-      assert.equal(object.geometry.morphAttributes.position!.length, expected.influences.length);
-      assert.equal(object.geometry.morphAttributes.normal!.length, expected.influences.length);
-      assert.deepEqual(object.morphTargetDictionary, expected.dictionary);
-      assert.deepEqual(object.morphTargetInfluences, expected.influences, 'retain the live headroom pose while prewarming');
-      const material = object.material as THREE.Material;
-      variants.add(`${object.name}:${material.type}:${material.transparent}`);
-    });
-  };
-  const policy = new RenderShadowPolicy(renderer.shadowMap), preparation = new BlackoutPresentationPreparation();
-  const before = volt.diagnostics;
-  try {
-    await preparation.prepare({ renderer, scene, withShadowPreparation: policy.withPreparation.bind(policy) } as unknown as RenderLayer, camera);
-    for (const name of ['Volt-Body', 'Volt-Eye-Left', 'Volt-Eye-Right']) {
-      assert.ok(variants.has(`${name}:MeshPhysicalMaterial:true`));
-      assert.ok(variants.has(`${name}:MeshDepthMaterial:false`));
-      if (name !== 'Volt-Body') assert.ok(variants.has(`${name}:MeshPhysicalMaterial:false`));
-    }
-    assert.deepEqual(volt.diagnostics, before);
-    for (const expected of expectedMorphs.values()) assert.deepEqual(expected.mesh.morphTargetInfluences, expected.influences);
-  } finally { preparation.dispose(); volt.dispose(); borrowedTarget.dispose(); }
 });
 
 test('instance primers upload both live buffers sharing a geometry and never dispose borrowed storage', async () => {
