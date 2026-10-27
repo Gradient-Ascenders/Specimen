@@ -52,7 +52,7 @@ export type GameFlowState =
   | 'transitioning'
   | 'transitionFailed';
 
-export type PreviewCutsceneId = 'intro' | 'escape' | 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival' | 'blackout-elevator' | 'blackout-research';
+export type PreviewCutsceneId = 'intro' | 'escape' | 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival' | 'blackout-elevator' | 'blackout-research' | 'boss-defeat';
 
 type MenuReturnState = 'title' | 'paused';
 export type GameFlowStateListener = (state: GameFlowState) => void;
@@ -68,7 +68,7 @@ export const gameFlowCinematicCanPause = (
   cinematic: string | undefined,
   gameState: string | undefined,
 ): boolean => cinematic === 'cultivation-finale' || cinematic === 'cultivation-clearance' ||
-  cinematic === 'blackout-arrival' || cinematic === 'blackout-elevator' || cinematic === 'blackout-research' || cinematic === 'containment-finale' && gameState === 'level-completing';
+  cinematic === 'blackout-arrival' || cinematic === 'blackout-elevator' || cinematic === 'blackout-research' || cinematic === 'boss-defeat' || cinematic === 'containment-finale' && gameState === 'level-completing';
 
 export type GameFlowKeyboardAction = 'pause' | 'resume' | 'back';
 
@@ -351,9 +351,9 @@ export class GameFlowStateModel {
     return this.openSubmenu('credits');
   }
 
-  completeGame():boolean {
+  completeGame(returnToTitle = false):boolean {
     if(this.currentState!=='playing')return false;
-    this.menuReturnState='title';this.setState('credits');return true;
+    this.menuReturnState='title';this.setState(returnToTitle ? 'title' : 'credits');return true;
   }
 
   back(): boolean {
@@ -637,9 +637,10 @@ export class GameFlowUI {
 
   private gameFinished=false;
   /** Existing Level 3 completion is the sole authority for the final credits. */
-  completeGame():void {
-    if(this.disposed||!this.model.completeGame())return;
+  completeGame(returnToTitle = false):void {
+    if(this.disposed||!this.model.completeGame(returnToTitle))return;
     this.gameFinished=true;this.actions.stopGameplay();this.syncState();
+    if(returnToTitle)this.actions.restartGame?.();
   }
   private backToMenu():void {
     if(this.gameFinished&&this.model.state==='credits'&&this.actions.restartGame) {this.actions.restartGame();return;}
@@ -873,6 +874,9 @@ export class GameFlowUI {
             </button>
             <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="blackout-research">
               ${icon('Play')}<span><small>Level 3 · Research &amp; escape</small>The Specimen</span>
+            </button>
+            <button type="button" class="menu-action" data-action="select-cutscene" data-cutscene="boss-defeat">
+              ${icon('Play')}<span><small>Ending · Last stand &amp; escape</small>First sunlight</span>
             </button>
           </nav>
           <footer class="credits-footer">
@@ -1238,7 +1242,7 @@ export class GameFlowUI {
         break;
       case 'select-cutscene': {
         const cutscene = target.dataset.cutscene;
-        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival' || cutscene === 'blackout-elevator' || cutscene === 'blackout-research') && this.model.beginSelectedCutscene(cutscene)) {
+        if (this.actions.previewCutscene && (cutscene === 'intro' || cutscene === 'escape' || cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival' || cutscene === 'blackout-elevator' || cutscene === 'blackout-research' || cutscene === 'boss-defeat') && this.model.beginSelectedCutscene(cutscene)) {
           this.syncState();
           this.actions.previewCutscene(cutscene);
         }

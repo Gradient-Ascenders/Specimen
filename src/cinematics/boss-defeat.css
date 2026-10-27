@@ -1,0 +1,17 @@
+.boss-defeat-finale .ending-flash { position:absolute; inset:0; z-index:3; pointer-events:none; opacity:0; }
+.boss-defeat-finale .finale-subtitle { z-index:4; }
+.boss-defeat-finale .finale-skip { z-index:6; }
+.boss-defeat-finale .finale-subtitle { left:7%; right:7%; width:auto; bottom:max(14%,64px); font:500 clamp(14px,1.35vw,23px)/1.5 var(--ui-font-body); }
+.boss-defeat-finale .finale-subtitle[data-speaker="goop"] { color:#a4ed73; }
+.boss-defeat-finale .finale-subtitle[data-speaker="volt"] { color:#ffdb6b; }
+#app[data-cinematic="boss-defeat"] > :not([data-gameplay-canvas]):not(.game-flow):not(.boss-defeat-finale),
+#app[data-cinematic="boss-defeat"] > .game-flow[data-state="playing"] { visibility:hidden!important; }
+#app[data-cinematic="boss-defeat"] > .game-flow[data-state="playing"] .game-hud { display:none!important; }
+.ending-credits { position:absolute; inset:7% 0; overflow:hidden; z-index:4; background:linear-gradient(0deg,#11212bc9,#132b415e); color:#f5f7ec; text-align:center; mask-image:linear-gradient(transparent,#000 8%,#000 91%,transparent); }
+.ending-credits[hidden] { display:none; }
+.ending-credits-roll { will-change:transform; padding:0 8%; }
+.ending-credits h1 { font-family:Michroma,sans-serif; font-size:clamp(30px,6vw,76px); letter-spacing:.32em; margin:0 0 30px; padding-left:.32em; }
+.ending-credits h2 { font-family:Michroma,sans-serif; font-size:clamp(13px,1.5vw,20px); color:#b6e1da; letter-spacing:.14em; margin:60px 0 22px; }
+.ending-credits p { font-size:clamp(15px,1.8vw,25px); line-height:1.7; margin:8px 0; text-shadow:0 2px 14px #0b2639; }
+.ending-credits .ending-dedication { font-style:italic; margin-bottom:85px; color:#d5e3db; }
+.ending-credits .ending-thanks { font-family:Michroma,sans-serif; letter-spacing:.1em; margin:100px 0 40px; }
