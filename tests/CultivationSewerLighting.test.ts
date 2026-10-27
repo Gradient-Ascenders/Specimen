@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { CultivationSewerLighting } from '../src/render/environment/cultivation/CultivationSewerLighting.ts';
 import { auditOpaqueSurfaces } from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 
-test('sewer lamp flicker stays dim, preserves light slots, and leaves the ambush unlit', () => {
+test('sewer lamp flicker preserves readable light pools and stable slots while leaving the ambush unlit', () => {
   const root = new THREE.Group(), lighting = new CultivationSewerLighting(root);
   const lights: THREE.PointLight[] = [];
   root.traverse(o => { if (o instanceof THREE.PointLight) lights.push(o); });
@@ -22,8 +22,8 @@ test('sewer lamp flicker stays dim, preserves light slots, and leaves the ambush
       lighting.update(1 / 60);
       lights.forEach((light, i) => {
         assert.ok(light.visible && light.parent?.visible, 'flicker never removes a shader light slot');
-        assert.ok(light.intensity > .2 && light.intensity < 2.8);
-        assert.ok(Math.abs(light.intensity - initial[i]) < 2.1);
+        assert.ok(light.intensity > initial[i] * .1 && light.intensity < initial[i] * 1.04);
+        assert.ok(Math.abs(light.intensity - initial[i]) < initial[i] * .88);
         min[i] = Math.min(min[i], light.intensity); max[i] = Math.max(max[i], light.intensity);
       });
     }

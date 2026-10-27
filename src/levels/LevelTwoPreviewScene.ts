@@ -321,6 +321,11 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.goopSpeech=new CultivationGoopSpeech();this.root.add(this.goopSpeech.root);
     this.platformSplashes=new CultivationPlatformSplashes(this.roomOne.platformDrops,this.labArt.acid,this.roomOne.radiationHazard.mesh);
     this.roomOne.root.add(this.platformSplashes.root);
+    // Match Level 1 Room 3's green acid bounce without extra shadow maps.
+    // Append after authored bank paths have been resolved. These natural
+    // reflections stay lit independently of the security circuits.
+    this.roomFive.builder.addLight('room-5-acid-reflected-light-entry', [-7, 5.5, 34], 0x87d62e, 42, 30);
+    this.roomFive.builder.addLight('room-5-acid-reflected-light-rear', [6, 5.5, 64], 0x87d62e, 42, 30);
     // Cache world-space bounds only after all authored room offsets are applied.
     this.acidInteractions = [this.roomOne.radiationHazard.mesh, this.roomTwo.radiationHazard.mesh, this.roomThree.radiationHazard.mesh, ...this.maintenanceArt.acidSurfaces].map(
       surface => new AcidLiquidInteractions(this.labArt.acid, surface),

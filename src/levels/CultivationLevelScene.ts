@@ -176,9 +176,12 @@ export class CultivationLevelScene {
     ambient.color.setHex(weatheredRooms ? 0xc6ccca : 0xbdd8c8);
     ambient.groundColor.setHex(weatheredRooms ? 0x1d201f : 0x18221d);
     key.color.setHex(weatheredRooms ? 0xddd9d0 : 0xe4f2df);
-    ambient.intensity = THREE.MathUtils.lerp(weatheredRooms ? .62 : .9, .008, blend);
-    key.intensity = THREE.MathUtils.lerp(weatheredRooms ? .82 : 1.35, 0, blend);
+    const baked = this.root.userData.bakedIndirectLighting === true;
+    ambient.intensity = THREE.MathUtils.lerp(baked ? .22 : weatheredRooms ? .62 : .9, baked ? .045 : .008, blend);
+    key.intensity = THREE.MathUtils.lerp(baked ? .35 : weatheredRooms ? .82 : 1.35, 0, blend);
   }
+
+  setBakedIndirectLighting(enabled: boolean): void { this.root.userData.bakedIndirectLighting = enabled; }
 }
 
 function validateStructuralAssemblyAuthoring(

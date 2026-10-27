@@ -77,7 +77,8 @@ import {
   BobCharacterPresentation,
   type BobCharacterPresentationState,
 } from '../render/bob/BobCharacterPresentation.ts';
-import { BobReflectionEnvironment } from '../render/bob/BobReflectionEnvironment.ts';
+import { CultivationRadiance } from '../render/environment/cultivation/CultivationRadiance.ts';
+import { CultivationLightingPass } from '../render/environment/cultivation/CultivationLightingPass.ts';
 import type { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
 import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
 import { ventEntranceLightingWeight } from '../render/slime/VentEntranceLighting.ts';
@@ -134,6 +135,7 @@ export interface CultivationLevelRuntimeOptions {
 }
 
 interface CultivationRuntimeResources {
+  readonly lightingPass: CultivationLightingPass;
   readonly roomFiveFinale: CultivationFinale | undefined;
   readonly roomFiveEncounter: RoomFiveDroneEncounter | undefined;
   readonly roomFiveDamage: SlimeDamageVignette | undefined;
@@ -191,7 +193,7 @@ interface CultivationRuntimeResources {
   readonly goopMovementEvents: EventBus<MovementEvents>;
   readonly goopPresentation: GoopCharacterPresentation;
   readonly goopPresentationState: GoopCharacterPresentationState;
-  readonly bobReflectionEnvironment: BobReflectionEnvironment;
+  readonly bobReflectionEnvironment: CultivationRadiance;
   readonly bobPresentation: BobCharacterPresentation;
   readonly pairPresentation: SlimePairPresentation;
   readonly deathSequence: DeathSequence;
@@ -362,7 +364,7 @@ export class CultivationLevelRuntime {
       resources.voltPresentation.prepare(),
       ...(resources.authoredPreview ? [resources.authoredPreview.roomFive.captiveVoltPresentation.prepare()] : []),
     ])
-      .then(() => {
+      .then(async () => {
         if (this.resources !== resources) return;
         if (!resources.authoredPreview) return;
         // Keep compact light loops and contribution guards. Early-zero guards
@@ -373,6 +375,12 @@ export class CultivationLevelRuntime {
             if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material);
           }
         });
+        await resources.lightingPass.prepare(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.graphicsConfiguration);
+        if (this.resources !== resources) return;
+        resources.scene.setBakedIndirectLighting(true);
+        for (const presentation of [resources.bobPresentation, resources.goopPresentation, resources.voltPresentation,
+          resources.authoredPreview.roomFive.captiveVoltPresentation])
+          presentation.setReflectionEnvironment(resources.bobReflectionEnvironment.texture);
         // Match the first gameplay draw before cloning preparation layouts or
         // priming live PCF receivers. Newly built room roots are all visible.
         this.renderLayer.cameraRig.update(1, 0);
@@ -424,7 +432,7 @@ export class CultivationLevelRuntime {
     if (this.lifecycle.state === 'unloaded') this.presentationPreparation = undefined;
     const started = performance.now();
     this.lifecycle.load();
-    this.shadowRequest ??= this.renderLayer.requestShadowConfiguration('cultivation', { enabled: true });
+    this.shadowRequest ??= this.renderLayer.requestShadowConfiguration('cultivation', { enabled: true, contactHardening: true });
     this.constructionMs = performance.now() - started;
   }
   start(): void { this.lifecycle.start(); }
@@ -865,6 +873,8 @@ export class CultivationLevelRuntime {
       this.preparationQueue?.anticipateLiftExit();
     }
     const darkRoom = this.isDarkRoom(resources, lightingRoom);
+    resources.lightingPass.setQuality(this.renderLayer.graphicsConfiguration, this.renderLayer.renderer.shadowMap.type);
+    resources.lightingPass.update(this.lifecycle.state === 'running' ? stats.frameDeltaSeconds : 0);
     resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds,
       lightingRoom !== undefined && lightingRoom <= 3);
     const bobLightingRoom = resources.authoredPreview?.resolveRoomId(
@@ -1410,9 +1420,7 @@ export class CultivationLevelRuntime {
         },
       ];
 
-      const bobReflectionEnvironment = new BobReflectionEnvironment(
-        this.renderLayer.renderer,
-      );
+      const bobReflectionEnvironment = new CultivationRadiance(authoredPreview.root.getWorldPosition(new THREE.Vector3()));
       rollback(() => bobReflectionEnvironment.dispose());
       voltPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
       authoredPreview?.roomFive.captiveVoltPresentation.setReflectionEnvironment(bobReflectionEnvironment.texture);
@@ -1594,7 +1602,10 @@ export class CultivationLevelRuntime {
         for (const unsubscribe of unsubscribeManager) unsubscribe();
       });
 
+      const lightingPass = new CultivationLightingPass(authoredPreview, bobReflectionEnvironment);
+      rollback(() => lightingPass.dispose());
       this.resources = {
+        lightingPass,
         roomFiveFinale,
         roomFiveEncounter, roomFiveDamage, roomFiveView, voltBody, voltPresentation, voltPresentationState, voltMovementEvents, renderedVoltPosition: new THREE.Vector3(),
         scene, authoredPreview, collisionWorld, surfaceRegistry,
@@ -1735,6 +1746,7 @@ export class CultivationLevelRuntime {
     this.gameplayAudio = undefined;
     const resources = this.requireResources();
     this.cameraShadowCulling = undefined;
+    resources.lightingPass.dispose();
     this.preparationQueue?.dispose(); this.preparationQueue = undefined;
     this.lightLayout?.dispose(); this.lightLayout = undefined;
     this.lightLayoutKey = ''; this.lastShadowLayoutKey = '';

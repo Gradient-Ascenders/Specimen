@@ -307,7 +307,7 @@ export class CultivationPreparationQueue {
       if (++visited % 32 === 0) yield {label:'collect-scene', run: () => {}};
     }
     const padding = new CultivationLightLayout(scene);
-    // Only the bounded layout needs comparison samplers, including dormant
+    // Only the bounded layout needs shadow samplers, including dormant
     // filler slots. Do not allocate nine unused searchlight maps for a primer.
     scene.traverseVisible(light => {
       if (!(light instanceof THREE.SpotLight || light instanceof THREE.PointLight || light instanceof THREE.DirectionalLight) ||
@@ -315,8 +315,9 @@ export class CultivationPreparationQueue {
       const depth = light instanceof THREE.PointLight
         ? new THREE.CubeDepthTexture(1, THREE.UnsignedIntType)
         : new THREE.DepthTexture(1, 1, THREE.UnsignedIntType);
-      depth.compareFunction = THREE.LessEqualCompare;
-      depth.minFilter = depth.magFilter = THREE.LinearFilter;
+      const compare = this.layer.renderer.shadowMap.type === THREE.PCFShadowMap;
+      depth.compareFunction = compare ? THREE.LessEqualCompare : null;
+      depth.minFilter = depth.magFilter = compare ? THREE.LinearFilter : THREE.NearestFilter;
       const target = light instanceof THREE.PointLight
         ? new THREE.WebGLCubeRenderTarget(1)
         : new THREE.WebGLRenderTarget(1, 1);

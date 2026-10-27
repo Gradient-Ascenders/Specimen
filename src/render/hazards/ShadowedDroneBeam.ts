@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
  * the volume rather than shortening the entire cone to a flat midair cap. */
 export class ShadowedDroneBeam {
   readonly mesh: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
+  private readonly configureSampler: (type: THREE.ShadowMapType) => void;
 
   constructor(light: THREE.SpotLight, range: number, angle: number,
     options:{readonly colour?:THREE.ColorRepresentation;readonly opacity?:number;readonly soft?:boolean}={}) {
@@ -88,19 +89,30 @@ export class ShadowedDroneBeam {
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.renderOrder = 2;
     this.mesh.castShadow = false;
-    this.mesh.onBeforeRender = renderer => {
-      const compare = renderer.shadowMap.type === THREE.PCFShadowMap;
+    this.configureSampler = type => {
+      const compare = type === THREE.PCFShadowMap;
       if (Boolean(material.defines.SHADOW_COMPARE) !== compare) {
         material.defines = compare ? {SHADOW_COMPARE:1} : {};
         material.needsUpdate = true;
       }
       const comparison = compare ? THREE.LessEqualCompare : null;
       if (fallbackDepth.compareFunction !== comparison) {
+        // Three r185 does not reset TEXTURE_COMPARE_MODE when this becomes
+        // null. Recreate the tiny GPU allocation before changing sampler type.
+        fallbackDepth.dispose();
         fallbackDepth.compareFunction = comparison;
         fallbackDepth.needsUpdate = true;
       }
-      material.uniforms.beamShadow.value = light.shadow.map?.depthTexture ?? fallbackDepth;
-      material.uniforms.beamShadowReady.value = Boolean(light.shadow.map?.depthTexture);
+      const depth = light.shadow.map?.depthTexture;
+      const ready = !!depth && depth.compareFunction === comparison;
+      material.uniforms.beamShadow.value = ready ? depth : fallbackDepth;
+      material.uniforms.beamShadowReady.value = ready;
+    };
+    this.mesh.onBeforeRender = renderer => {
+      this.setShadowType(renderer.shadowMap.type);
     };
   }
+
+  /** Preparation clones share uniforms but do not run this mesh's draw hook. */
+  setShadowType(type: THREE.ShadowMapType): void { this.configureSampler(type); }
 }

@@ -19,8 +19,8 @@ export class CultivationSewerLighting {
     // The entry and far bank get small pools of light. Neither reaches the
     // dormant drone at z=70; the existing controls guide the final approach.
     for (const [i, spec] of [
-      { x: 48.1, z: 34, color: 0xa6b68a, intensity: 2.6, reach: 25 },
-      { x: 31.9, z: 102, color: 0xb9aa7d, intensity: 2.1, reach: 26 },
+      { x: 48.1, z: 34, color: 0xd6b783, intensity: 8, reach: 25 },
+      { x: 31.9, z: 102, color: 0xdfc29a, intensity: 6.5, reach: 26 },
     ].entries()) {
       const fixture = new THREE.Group(); fixture.name = `room-5-sewer-caged-lamp-${i}`;
       fixture.position.set(spec.x, -6.8, spec.z);
@@ -33,7 +33,7 @@ export class CultivationSewerLighting {
       for (const y of [-.22, 0, .22]) pieces.push(new THREE.BoxGeometry(.55, .035, .04).translate(0, y, .23));
       const cage = mergeGeometries(pieces)!; pieces.forEach(g => g.dispose()); this.geometries.push(cage);
       fixture.add(new THREE.Mesh(cage, iron));
-      const bulb = new THREE.MeshStandardMaterial({ color: 0x90917d, emissive: spec.color, emissiveIntensity: .55, roughness: .65 });
+      const bulb = new THREE.MeshStandardMaterial({ color: 0xb9a582, emissive: spec.color, emissiveIntensity: .8, roughness: .65 });
       this.materials.push(bulb);
       const glass = new THREE.BoxGeometry(.52, .79, .07); this.geometries.push(glass);
       const lens = new THREE.Mesh(glass, bulb); lens.position.z = .105; fixture.add(lens);
@@ -53,7 +53,7 @@ export class CultivationSewerLighting {
       const tremor = .035 * Math.sin(this.elapsed * 2.1 + i) * Math.sin(this.elapsed * 3.7 + 2 * i);
       const power = 1 - (i === 1 ? .82 : .24) * sag + tremor;
       lamp.light.intensity = lamp.intensity * power;
-      lamp.bulb.emissiveIntensity = .55 * power;
+      lamp.bulb.emissiveIntensity = .8 * power;
     }
   }
 

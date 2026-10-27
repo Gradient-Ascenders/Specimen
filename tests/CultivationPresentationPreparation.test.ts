@@ -116,7 +116,8 @@ for (const variant of ['jump', 'lift', 'failure', 'startup', 'startup-minimum', 
         const texture = object.shadow.map?.depthTexture;
         assert.ok(texture, 'shadow-enabled preparation must provide depth textures for its samplers');
         assert.ok(initializedShadowTargets.has(object.shadow.map!), 'depth attachments must be initialized before drawing receivers');
-        assert.equal(texture.compareFunction, THREE.LessEqualCompare, 'PCF samplers need comparison-enabled depth textures');
+        assert.equal(texture.compareFunction, renderer.shadowMap.type === THREE.PCFShadowMap ? THREE.LessEqualCompare : null,
+          'preparation depth textures must match the active shadow sampler type');
         assert.equal(!!texture.isCubeTexture, object instanceof THREE.PointLight, 'point-light shadows need cube depth textures');
       });
     },

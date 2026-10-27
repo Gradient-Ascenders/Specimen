@@ -269,7 +269,7 @@ test('Blackout allocates PCF maps before isolated receiver draws', async () => {
 
 test('unallocated drone beam shadows bind a matching fallback without becoming visible', () => {
   const light = new THREE.SpotLight();
-  const { mesh } = new ShadowedDroneBeam(light, 10, .34);
+  const beam = new ShadowedDroneBeam(light, 10, .34), { mesh } = beam;
   const material = mesh.material;
   const fallback = material.uniforms.beamShadow.value as THREE.DepthTexture;
   assert.ok(fallback.version > 0, 'fallback must upload before its first draw');
@@ -279,14 +279,22 @@ test('unallocated drone beam shadows bind a matching fallback without becoming v
   draw();
   assert.equal(fallback.compareFunction, THREE.LessEqualCompare);
   assert.equal(material.uniforms.beamShadowReady.value, false);
-  renderer.shadowMap.type = THREE.BasicShadowMap; draw();
+  renderer.shadowMap.type = THREE.BasicShadowMap;
+  beam.setShadowType(renderer.shadowMap.type);
+  assert.equal(fallback.compareFunction, null, 'hidden preparation copies must already have a raw-depth fallback');
+  draw();
+  assert.equal(disposals, 1, 'switching to raw sampling releases the comparison-mode GPU allocation');
   assert.equal(fallback.compareFunction, null);
   assert.equal(material.defines.SHADOW_COMPARE, undefined);
   const map = new THREE.WebGLRenderTarget(1, 1);
   map.depthTexture = new THREE.DepthTexture(1, 1); light.shadow.map = map; draw();
   assert.equal(material.uniforms.beamShadow.value, map.depthTexture);
   assert.equal(material.uniforms.beamShadowReady.value, true);
-  material.dispose(); assert.equal(disposals, 1);
+  renderer.shadowMap.type = THREE.PCFShadowMap; draw();
+  assert.equal(disposals, 2, 'switching back recreates the comparison texture');
+  assert.equal(material.uniforms.beamShadow.value, fallback, 'a raw light map cannot survive in a hidden comparison-sampler copy');
+  assert.equal(material.uniforms.beamShadowReady.value, false);
+  material.dispose(); assert.equal(disposals, 3);
   mesh.geometry.dispose(); map.depthTexture.dispose(); map.dispose();
 });
 
