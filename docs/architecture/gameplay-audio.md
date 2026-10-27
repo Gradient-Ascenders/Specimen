@@ -416,8 +416,8 @@ component measurements do not replace a human listening review of the mix.
 
 ### Research drone and Exterminator laser mix
 
-Research's `boss-drone-shot-01` cues use a local 0.30 scale instead of 0.60
-(about 6 dB lower). Its shared catalog gain stays 0.9, so actual boss drones
+Research's `boss-drone-shot-01` cues use a local 0.15 scale instead of 0.30
+(50% / about 6 dB lower). Its shared catalog gain stays 0.9, so actual boss drones
 and other turret callers keep their existing levels. All authored firing
 events still reach the mixer. The existing 35 ms per-effect limiter, six-voice
 drone budget, 24-voice total budget and SFX compressor already bound overlap;

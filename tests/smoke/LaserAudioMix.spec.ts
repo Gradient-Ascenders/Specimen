@@ -32,7 +32,7 @@ test('production laser mix retains audible telegraphs with lower beam levels and
       const effects = [];
       for (const clip of clips) {
         const buffer = await decode(clip.path), raw = measure(buffer);
-        const scale = clip.id === 'boss-drone-shot-01' ? .3 : 1;
+        const scale = clip.id === 'boss-drone-shot-01' ? .15 : 1;
         // Full sliders, before distance attenuation and the existing SFX compressor.
         effects.push({ id: clip.id, gain: clip.volume, voices: clip.maxVoices, duration: buffer.duration,
           raw, mixedRms: raw.rms * clip.volume * scale, mixedPeak: raw.peak * clip.volume * scale });

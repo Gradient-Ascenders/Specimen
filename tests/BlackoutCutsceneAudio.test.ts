@@ -69,7 +69,7 @@ test('research sound follows the authored light, transformation, door impact, fa
     assert.equal(c.count('specimen-heavy-blast-01'),2); assert.equal(c.count('research-drone-destroy-01'),12);
     c.cues.filter(c=>c.sound==='research-drone-destroy-01').forEach((cue,i)=>assert.ok(Math.abs(cue.time-researchDroneDeathTime(i))<.02));
     assert.ok(c.count('boss-drone-shot-01')>20); assert.equal(c.count('boss-emergence-01'),1);
-    assert.ok(c.cues.filter(c=>c.sound==='boss-drone-shot-01').every(c=>c.volume===.3),
+    assert.ok(c.cues.filter(c=>c.sound==='boss-drone-shot-01').every(c=>c.volume===.15),
       'only research firing uses the quieter cinematic mix; every authored shot is still emitted');
     assert.ok(!c.cues.some(c=>c.sound==='world-vent-break-01' || c.sound==='world-platform-land-01'));
     assert.deepEqual([...c.loops.keys()],['research-boss-hover']);
