@@ -21,6 +21,21 @@ Unix zip/unzip installation is required.
 There must be no enclosing `dist/`, source tree, dependency tree, documentation,
 or development configuration. Keep the archive and its SHA-256 outside Git.
 
+Submission builds omit the optional opening MP4 and the README-only brand
+lockup. Start still plays the complete live 3D opening; `?opening=mp4` also
+uses the live opening when the backup is absent. Music, sound effects, models,
+and baked textures retain their quality. The Unix packager uses maximum ZIP
+compression and still verifies every extracted file against `dist/`.
+
+For an explicit build containing the video backup, run:
+
+```bash
+npm run build -- --mode opening-backup
+node scripts/create-production-archive.mjs
+```
+
+`npm run archive` rebuilds the smaller submission variant.
+
 ## Test the package
 
 Run the repository launcher after creating the archive:

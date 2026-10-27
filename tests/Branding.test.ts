@@ -13,7 +13,7 @@ const repositoryRoot = new URL('../', import.meta.url);
 test('canonical brand assets and external lockups are checked in', async () => {
   const canonicalFiles = [
     ...Object.values(BRAND_ASSETS).map((asset) => `public/${asset.slice(2)}`),
-    'public/brand/specimen-lockup-full.png',
+    'assets/branding/specimen-lockup-full.png',
     'public/brand/specimen-app-icon.png',
   ];
 
@@ -70,5 +70,5 @@ test('document metadata and README use deployment-safe brand paths', async () =>
   assert.match(indexHtml, /rel="icon" type="image\/png" href="\.\/brand\/specimen-app-icon\.png"/);
   assert.match(indexHtml, /href="\.\/brand\/specimen-app-icon\.png"/);
   assert.doesNotMatch(indexHtml, /data:image\/svg\+xml/);
-  assert.match(readme, /src="public\/brand\/specimen-lockup-full\.png"/);
+  assert.match(readme, /src="assets\/branding\/specimen-lockup-full\.png"/);
 });

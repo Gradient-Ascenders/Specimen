@@ -1,6 +1,6 @@
 <h1 align="center">
   <img
-    src="public/brand/specimen-lockup-full.png"
+    src="assets/branding/specimen-lockup-full.png"
     alt="Specimen — Explore, Adapt, Transcend"
     width="360"
   />

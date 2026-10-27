@@ -26,6 +26,7 @@ import { TitleScreenScene } from './ui/TitleScreenScene.ts';
 import { OpeningGameScene } from './cinematics/OpeningGameScene.ts';
 import { OpeningGamePresentation } from './cinematics/OpeningGamePresentation.ts';
 import { OpeningMoviePresentation } from './cinematics/OpeningMoviePresentation.ts';
+import backupOpeningMovieUrl from './assets/cinematics/opening.mp4?url';
 import { getOpeningPlaybackMode } from './cinematics/OpeningPlaybackMode.ts';
 import { OPENING_GAME_TIMING } from './cinematics/OpeningGameTimeline.ts';
 import { CleanGameplayMode } from './ui/CleanGameplayMode.ts';
@@ -276,8 +277,8 @@ function startGame(): void {
       onFade: (opacity: number) => gameFlow.setOpeningFade(opacity),
     };
     // Ordinary Start uses live 3D with low-priority downloads/idle data prep.
-    // Preserve the existing MP4 player/export as an explicit backup.
-    if (getOpeningPlaybackMode(window.location.search) === 'live') {
+    // Submissions omit the MP4; old backup URLs also use the live opening.
+    if (!backupOpeningMovieUrl || getOpeningPlaybackMode(window.location.search) === 'live') {
       const scene = new OpeningGameScene(titleRoom, renderLayer, { deferConstruction: true });
       titleRoom = undefined;
       openingPresentation = new OpeningGamePresentation({
@@ -290,7 +291,7 @@ function startGame(): void {
       if (!videoHost) throw new Error('Missing opening video panel.');
       openingPresentation = new OpeningMoviePresentation({
         ...shared, videoHost,
-        source: new URL('./assets/cinematics/opening.mp4', import.meta.url).href,
+        source: backupOpeningMovieUrl,
         sourceStartSeconds: OPENING_GAME_TIMING.blackoutEnd,
         onBlackout: () => {
           // No live cinematic scene, duplicate WebGL context or video

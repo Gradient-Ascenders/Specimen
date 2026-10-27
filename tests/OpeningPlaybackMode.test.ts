@@ -8,7 +8,7 @@ test('ordinary, debug, legacy live and unknown entry URLs always select the live
   }
 });
 
-test('the preserved MP4 player requires an explicit opt-in in either build', () => {
+test('requesting the optional MP4 player requires an explicit opt-in', () => {
   assert.equal(getOpeningPlaybackMode('?opening=mp4'), 'mp4');
   assert.equal(getOpeningPlaybackMode('?debug=1&opening=mp4'), 'mp4');
 });

@@ -5,11 +5,13 @@ The complete editable scene, laboratory, fracture animation and timeline remain
 in `src/cinematics/`. `?opening=live` also explicitly selects this default.
 
 The committed `src/assets/cinematics/opening.mp4` and its native HTML video
-player remain an **opt-in backup**: open `?opening=mp4` and press Start in either
-build. It does not render the live cinematic or upload video frames into WebGL.
-Vite copies the movie into production assets with a relative, hashed URL,
-including subdirectory hosting, but ordinary Start does not request the file.
-The main menu remains live 3D in both modes.
+player remain an **opt-in backup** in development: open `?opening=mp4` and press
+Start. Submission builds omit this video to reduce the ZIP size; an old
+`?opening=mp4` link uses the live opening instead. To include the backup in a
+production build, run `npm run build -- --mode opening-backup`. Vite then emits
+the movie with a relative, hashed URL for subdirectory hosting. Ordinary Start
+does not request the file. The backup does not render the live cinematic or
+upload video frames into WebGL. The main menu remains live 3D in both modes.
 
 ## Loading and handoff
 
@@ -89,7 +91,7 @@ with its normal static-file/range support; there is no external video service.
 
 ```sh
 npm test
-npm run build
+npm run build -- --mode opening-backup
 npm run validate:production
 npx playwright test tests/smoke/OpeningMovie.spec.ts tests/smoke/OpeningGame.spec.ts --config playwright.smoke.config.ts
 ```
