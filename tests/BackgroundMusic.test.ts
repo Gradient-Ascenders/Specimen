@@ -160,6 +160,8 @@ test('all cinematic tracks preempt level music without overlap, loop or duplicat
     ['awakening', '04-opening-tension.ogg', 1],
     ['escape', '05-containment-escape-high-tech-lab.ogg', .60],
     ['rescue', '06-cultivation-volt-rescue-digital-slash.ogg', 1.75],
+    ['ascent', '08-blackout-elevator-quiet-ascent.ogg', 1.1],
+    ['research', '09-blackout-research-the-specimen.ogg', 1.4],
   ] as const) {
     const cue = new CinematicMusic(track, 129);
     cue.update(0);
@@ -186,7 +188,7 @@ test('all cinematic tracks preempt level music without overlap, loop or duplicat
   assert.equal(f.players.length, 2);
 });
 
-for (const [track, duration, halfVolume] of [['awakening', 53.2, .14], ['rescue', 129, .245]] as const) {
+for (const [track, duration, halfVolume] of [['awakening', 53.2, .14], ['rescue', 129, .245], ['ascent', 70, .154], ['research', 277, .196]] as const) {
 test(`${track} media clock seeks, stalls, pause/focus, settings and resume retain ownership through natural completion`, context => {
   const f = cinematicFixture(context);
   f.music.setScene(null, true);

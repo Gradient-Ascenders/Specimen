@@ -336,6 +336,18 @@ runtime playback remains once-only, at normal speed, without extra repetitions.
 See the Music table in `CREDITS.md` for attribution. No long music enters the
 decoded SFX bank.
 
+Blackout adds two unchanged recordings from the supplied cinematic music kit:
+`08-blackout-elevator-quiet-ascent.ogg` and
+`09-blackout-research-the-specimen.ogg`. The ascent owns its cue from boarding
+through the live boarding duration plus the authored 55 seconds. Its 85.068-second
+recording is stopped at handback. Research owns a fixed 277-second cue; its five
+compositions and 123.5–134s blackout silence are baked into one stream. The
+existing 208s fusion, 222s blast and 236s overlook remain unchanged. Playback
+gain is 1.1× for ascent and 1.4× for research, on top of the shared 0.28 gain
+and master/music controls. Both use the existing pause/focus, skip, reset and
+disposal paths. Every original composition is separately credited in
+`CREDITS.md`; the source edits/rebuild script remain in the supplied kit.
+
 `CinematicMusic` publishes discrete ownership start/stop notifications. The shared
 music owner reads its continuous clock at 20 Hz only while a targeted cinematic
 owns music. Live opening starts on its first prepared cinematic frame, with time
@@ -375,7 +387,8 @@ URL. The supplied recording is stereo/44.1 kHz and decodes to 169.838 seconds.
 
 `FinalBossEncounter` owns one `BossMusic` token per attempt. It publishes a
 start only upon entering combat, including CP8/CP9 retries; staging and the
-boss introduction keep normal level music. The first combat start preempts
+boss introduction retain their current route (the research score during The
+Specimen). The first combat start preempts
 other music using `BackgroundMusic`'s existing two media elements. Native
 `HTMLAudioElement.loop` plays the whole recording repeatedly at normal speed;
 no combat update polls or seeks music. The token spans the Phase 2 transition,

@@ -62,7 +62,8 @@ test('cinematic recordings decode at the nested URL and credits use the existing
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('./', { waitUntil: 'domcontentloaded' });
-  const files = ['04-opening-tension.ogg', '05-containment-escape-high-tech-lab.ogg', '06-cultivation-volt-rescue-digital-slash.ogg'];
+  const files = ['04-opening-tension.ogg', '05-containment-escape-high-tech-lab.ogg', '06-cultivation-volt-rescue-digital-slash.ogg',
+    '08-blackout-elevator-quiet-ascent.ogg', '09-blackout-research-the-specimen.ogg'];
   const decoded = await page.evaluate(async files => {
     const context = new AudioContext();
     try {
@@ -71,16 +72,23 @@ test('cinematic recordings decode at the nested URL and credits use the existing
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
         const buffer = await context.decodeAudioData(await response.arrayBuffer());
-        return { path: url.pathname, duration: buffer.duration, channels: buffer.numberOfChannels, rate: buffer.sampleRate };
+        let blackoutPeak = 0;
+        if (file.startsWith('09-')) for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+          const samples = buffer.getChannelData(channel);
+          for (let frame = Math.ceil(124 * buffer.sampleRate); frame < 133 * buffer.sampleRate; frame++)
+            blackoutPeak = Math.max(blackoutPeak, Math.abs(samples[frame]!));
+        }
+        return { path: url.pathname, duration: buffer.duration, channels: buffer.numberOfChannels, rate: buffer.sampleRate, blackoutPeak };
       }));
     } finally { await context.close(); }
   }, files);
   for (let index = 0; index < decoded.length; index++) {
     expect(decoded[index]!.path).toBe('/group-folder/assets/audio/music/' + files[index]);
     expect(decoded[index]!.channels).toBe(2);
-    expect(decoded[index]!.duration).toBeCloseTo([99.1, 152.92, 129.023][index]!, 0);
+    expect(decoded[index]!.duration).toBeCloseTo([99.1, 152.92, 129.023, 85.068, 277][index]!, 0);
   }
   expect(decoded[2]!.duration).toBeGreaterThanOrEqual(VOLT_FINALE.duration);
+  expect(decoded[4]!.blackoutPeak).toBe(0);
   await expect(page.locator('[data-flow-panel="title"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-flow-panel="title"] [data-action="credits"]').click();
   for (const [title, creator] of [['Tension', 'Tsorthan Grove'], ['High Tech Lab', 'remaxim']]) {
@@ -99,6 +107,21 @@ test('cinematic recordings decode at the nested URL and credits use the existing
   await expect(voltCredit.locator('.credits-use')).toContainText('plays from file 0:00');
   await expect(voltCredit.locator('.credits-use')).toContainText('edited for use in Specimen, including trimming and a repeated musical section');
   await expect(page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: /^The Way Out$/ }) })).toHaveCount(0);
+  for (const [title, creator, slug, licence] of [
+    ['Soundscape - Synthwave Horror J60 - Loop', 'Tri-Tachyon (Ellary)', 'soundscape-synthwave-horror-j60-loop', 'licenses/by/4.0/'],
+    ['Sci-Fi Textures', 'Marcelo Fernandez', 'sci-fi-textures', 'licenses/by/3.0/'],
+    ['Article 160 Section 2', 'Zander Noriega', 'article-160-section-2', 'licenses/by/3.0/'],
+    ['Perpetual Tension', 'Zander Noriega', 'perpetual-tension', 'licenses/by/3.0/'],
+    ['Inevitable', 'vitalezzz', 'inevitable', 'publicdomain/zero/1.0/'],
+    ['Derelict Spaceship', 'vitalezzz', 'derelict-spaceship', 'publicdomain/zero/1.0/'],
+  ]) {
+    const row = page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: new RegExp(`^${title}$`) }) });
+    await expect(row).toHaveCount(1);
+    await expect(row.locator('.credits-creator')).toHaveText(creator!);
+    await expect(row.locator('h3 a')).toHaveAttribute('href', `https://opengameart.org/content/${slug}`);
+    await expect(row.locator('.credits-licence a')).toHaveAttribute('href', `https://creativecommons.org/${licence}`);
+  }
+  await expect(page.locator('.credits-use').filter({ hasText: 'Music by Tri-Tachyon - https://soundcloud.com/tri-tachyon/albums' })).toHaveCount(1);
   await page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: /^High Tech Lab$/ }) }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('cinematic-music-credits.png') });
   expect(errors).toEqual([]);
