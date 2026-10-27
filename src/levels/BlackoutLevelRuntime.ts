@@ -25,6 +25,7 @@ import { MaintenanceDronePresentation } from '../render/environment/blackout/Mai
 import {BlackoutVentArrival} from '../cinematics/BlackoutVentArrival.ts';
 import { BlackoutElevatorAscent } from '../cinematics/BlackoutElevatorAscent.ts';
 import { BlackoutResearchFinale } from '../cinematics/BlackoutResearchFinale.ts';
+import { BossDefeatFinale } from '../cinematics/BossDefeatFinale.ts';
 import { RESEARCH_TIMING } from '../cinematics/BlackoutResearchTimeline.ts';
 import { FinalBossEncounter } from '../boss/FinalBossEncounter.ts';
 import { FinalBossPresentation } from '../boss/FinalBossPresentation.ts';
@@ -168,6 +169,7 @@ const BLACKOUT_TRANSIT_VOLT_RANGES = Object.freeze({
 
 export interface BlackoutLevelRuntimeOptions {
   readonly audio?: AudioPlayback;
+  readonly creditsMarkdown?: string;
   readonly authoredRoomOne?: boolean;
   /** Story arrival defaults on for the authored bay; deterministic tools may opt out. */
   readonly playArrival?:boolean;
@@ -184,6 +186,7 @@ interface BlackoutRuntimeResources {
   readonly ventArrival?:BlackoutVentArrival;
   readonly elevatorAscent?: BlackoutElevatorAscent;
   readonly researchFinale?: BlackoutResearchFinale;
+  readonly defeatFinale?: BossDefeatFinale;
   readonly dissolveSystem: DissolveSystem;
   readonly acidProjectileSystem: AcidProjectileSystem<KinematicBody>;
   readonly goopAcidPresentation: GoopAcidPresentation;
@@ -284,6 +287,7 @@ export class BlackoutLevelRuntime {
   private readonly authoredRoomOne: boolean;
   private readonly playArrival:boolean;
   private readonly debugAvailable: boolean;
+  private readonly creditsMarkdown: string;
   private maintenanceMaps: BlackoutMaintenanceMapData | undefined;
   private bayComplete = false;
   private roomTwoInitialized = false;
@@ -291,6 +295,7 @@ export class BlackoutLevelRuntime {
   private transitObjective = '';
 
   constructor(options: BlackoutLevelRuntimeOptions) {
+    this.creditsMarkdown = options.creditsMarkdown ?? '';
     this.authoredRoomOne = options.authoredRoomOne ?? false;
     this.playArrival=options.playArrival??this.authoredRoomOne;
     this.debugAvailable = options.debugAvailable ?? import.meta.env?.DEV ?? false;
@@ -503,7 +508,7 @@ export class BlackoutLevelRuntime {
         const current = () => this.resources === resources;
         const visibility = layer.canvas.style.visibility;
         layer.canvas.style.visibility = 'hidden';
-        try { await resources.researchFinale?.primePresentationFrames(layer.scene, async camera => {
+        try { const warmFrame = async (camera: THREE.PerspectiveCamera) => {
           await yieldFrame(); if (!current()) return;
           const shadows = renderer.shadowMap.enabled;
           await layer.withShadowPreparation(shadows, () => renderer.compileAsync(layer.scene, camera));
@@ -514,7 +519,10 @@ export class BlackoutLevelRuntime {
             layer.withShadowPreparation(shadows, () => renderer.render(layer.scene, camera));
           });
           await waitForGpuPreparation(renderer.getContext(), yieldFrame, current);
-        }, current); } finally {
+        };
+          await resources.researchFinale?.primePresentationFrames(layer.scene, warmFrame, current);
+          await resources.defeatFinale?.primePresentationFrames(warmFrame, current);
+        } finally {
           const clearColor = renderer.getClearColor(new THREE.Color()), clearAlpha = renderer.getClearAlpha();
           withIsolatedPrewarmState(renderer, () => {
             renderer.setRenderTarget(null); renderer.setScissorTest(false); renderer.setClearColor(0x000000, 1); renderer.clear(true, true, true);
@@ -668,7 +676,7 @@ export class BlackoutLevelRuntime {
   /** Shared failure hook for hazards authored by later Blackout room issues. */
   requestFailure(): boolean {
     const resources = this.requireResources();
-    if(resources.finalBoss?.cinematic || resources.elevatorAscent?.active || resources.researchFinale?.active)return false;
+    if(resources.finalBoss?.cinematic || resources.elevatorAscent?.active || resources.researchFinale?.active || resources.defeatFinale?.active)return false;
     if(resources.phase.phase==='boss'&&resources.finalBoss?.controller.devInvincible)return false;
     if (this.lifecycle.state !== 'running' || resources.phase.terminal) return false;
     if (!resources.deathSequence.requestDeath(
@@ -967,6 +975,14 @@ export class BlackoutLevelRuntime {
       this.gameplayAudio?.update();
       this.input.endFixedUpdate();
       return;
+    }
+
+    if (resources.defeatFinale?.active) {
+      if (resources.defeatFinale.update(deltaSeconds, this.input.wasPressed('skipCinematic'))) {
+        this.host.dataset.endingCreditsSkipped = resources.defeatFinale.skippedCredits ? 'true' : 'false';
+        if (!this.beginSplit() || !this.completeSplit() || !this.transitionPhase('complete')) throw new Error('Boss finale could not commit the ending.');
+      }
+      this.gameplayAudio?.update(); this.input.endFixedUpdate(); return;
     }
 
     if (resources.researchFinale?.active) {
@@ -1560,11 +1576,11 @@ export class BlackoutLevelRuntime {
       interpolateBodyPosition(resources.group.goopBody, interpolationAlpha, resources.renderedGoopPosition);
       interpolateBodyPosition(resources.group.voltBody, interpolationAlpha, resources.renderedVoltPosition);
       }
-      if(!resources.researchFinale?.active) {
+      if(!resources.researchFinale?.active && !resources.defeatFinale?.active) {
         interpolateBodyPosition(resources.specimenBody, interpolationAlpha, resources.renderedSpecimenPosition);
         resources.specimenCharacter.setPosition(resources.renderedSpecimenPosition); resources.specimenCharacter.present(interpolationAlpha);
       }
-      if(!resources.ventArrival?.active && !resources.elevatorAscent?.active && !resources.researchFinale?.active){
+      if(!resources.ventArrival?.active && !resources.elevatorAscent?.active && !resources.researchFinale?.active && !resources.defeatFinale?.active){
         if(!mergePresentation) {
           resources.bobPresentation.setPosition(resources.renderedBobPosition);
           resources.goopPresentation.setPosition(resources.renderedGoopPosition);
@@ -1639,12 +1655,13 @@ export class BlackoutLevelRuntime {
     resources?.elevatorAscent?.present(this.renderLayer.cameraRig.camera,interpolationAlpha);
     resources?.researchFinale?.present(this.renderLayer.cameraRig.camera,interpolationAlpha);
     resources?.finalBoss?.presentCamera(this.renderLayer.cameraRig.camera);
+    resources?.defeatFinale?.present(this.renderLayer.cameraRig.camera, interpolationAlpha);
     if(resources?.finalBoss&&resources.phase.phase==='merging') {
       const camera=this.renderLayer.cameraRig.camera;
       camera.position.set(-7,4.5,191);camera.lookAt(FINAL_MERGE_ANCHOR);camera.updateMatrixWorld(true);
     }
     this.gameplayAudio?.updateListener();
-    if (resources && !resources.researchFinale?.active) {
+    if (resources && !resources.researchFinale?.active && !resources.defeatFinale?.active) {
       resources.goopPresentation.updateDetail(this.renderLayer.cameraRig.camera);
       resources.voltPresentation.updateDetail(this.renderLayer.cameraRig.camera);
       resources.goopPresentation.setOpacity(resources.phase.phase!=='merging'&&!resources.ventArrival?.active&&!resources.elevatorAscent?.active&&resources.group.activeSlimeId === 'goop' && !this.renderLayer.cameraRig.isFirstPersonForTarget(resources.group.goopBody)
@@ -1691,7 +1708,7 @@ export class BlackoutLevelRuntime {
     target.room = this.currentRoom.roomId;
     target.gameplayState = resources && !resources.deathSequence.isPlaying
       ? resources.deathSequence.state : resources?.phase.phase ?? this.lifecycle.state;
-    target.cutsceneState = resources?.ventArrival?.active ? 'blackout-vent-arrival' : resources?.elevatorAscent?.active ? 'blackout-elevator' : resources?.researchFinale?.active ? 'blackout-research' : 'none';
+    target.cutsceneState = resources?.defeatFinale?.active ? 'boss-defeat' : resources?.ventArrival?.active ? 'blackout-vent-arrival' : resources?.elevatorAscent?.active ? 'blackout-elevator' : resources?.researchFinale?.active ? 'blackout-research' : 'none';
     target.activeSlime =
       resources?.specimenForm.readModel.controlledForm === 'specimen'
         ? 'specimen'
@@ -1750,6 +1767,13 @@ export class BlackoutLevelRuntime {
     if (!this.debugAvailable || !resources?.researchFinale || (this.state !== 'running' && this.state !== 'stopped')) return false;
     this.restartResources(); this.activateCheckpoint('cp6'); this.restoreActiveCheckpoint(resources, true);
     this.input.releasePointerLock(); return this.beginResearchFinale(resources);
+  }
+
+  previewBossDefeatForDebug(): boolean {
+    if (!this.debugAvailable || !this.resources?.defeatFinale || (this.state !== 'running' && this.state !== 'stopped')) return false;
+    this.teleportToFinalBoss();
+    const resources = this.requireResources(); this.commitBossDefeat(resources); this.input.releasePointerLock();
+    return resources.defeatFinale?.active === true;
   }
 
   private beginResearchFinale(resources: BlackoutRuntimeResources): boolean {
@@ -2223,12 +2247,19 @@ export class BlackoutLevelRuntime {
         specimen: specimenCharacter, specimenBody, boss: finalPresentation, arena: scene.finalArena,
       }) : undefined;
       if (researchFinale) rollback(() => researchFinale.dispose());
+      const defeatFinale = finalPresentation && scene.finalArena ? new BossDefeatFinale({
+        root: scene.root, host: this.host, arena: scene.finalArena, boss: finalPresentation, specimen: specimenCharacter, creditsMarkdown: this.creditsMarkdown,
+        bodies: { bob: group.bobBody, goop: group.goopBody, volt: group.voltBody },
+        presentations: { bob: bobPresentation, goop: goopPresentation, volt: voltPresentation },
+      }) : undefined;
+      if (defeatFinale) rollback(() => defeatFinale.dispose());
 
       this.resources = {
         finalBoss,
         ventArrival,
         elevatorAscent,
         researchFinale,
+        defeatFinale,
         transit,
         unregisterTransitCheckpointParticipant,
         dissolveSystem,
@@ -2381,6 +2412,7 @@ export class BlackoutLevelRuntime {
   private readonly restartResources = (): void => {
     this.gameplayAudio?.reset();
     const resources = this.requireResources();
+    resources.defeatFinale?.reset();
     resources.finalBoss?.restoreCamera(this.renderLayer.cameraRig.camera);resources.finalBoss?.reset();
     resources.ventArrival?.cancel();this.clearArrivalUi();
     resources.elevatorAscent?.reset();
@@ -2457,6 +2489,7 @@ export class BlackoutLevelRuntime {
     this.gameplayAudio?.dispose();
     this.gameplayAudio = undefined;
     const resources = this.requireResources();
+    resources.defeatFinale?.dispose();
     resources.finalBoss?.restoreCamera(this.renderLayer.cameraRig.camera);resources.finalBoss?.dispose();
     resources.ventArrival?.dispose();this.clearArrivalUi();
     resources.elevatorAscent?.dispose();
@@ -2605,6 +2638,7 @@ export class BlackoutLevelRuntime {
     resumeInput: boolean,
   ): void {
     this.resetCompanions();
+    resources.defeatFinale?.reset();
     resources.finalBoss?.restoreCamera(this.renderLayer.cameraRig.camera);resources.finalBoss?.reset();
     resources.ventArrival?.cancel();this.clearArrivalUi();
     resources.elevatorAscent?.reset();
@@ -2803,7 +2837,7 @@ export class BlackoutLevelRuntime {
   }
 
   private syncVisuals(resources: BlackoutRuntimeResources): void {
-    if (resources.researchFinale?.active) return;
+    if (resources.researchFinale?.active || resources.defeatFinale?.active) return;
     // The arrival borrows the models beneath local slide poses. Writing world
     // body coordinates here would double-transform them and query false ceilings.
     if(!resources.ventArrival?.active && !resources.elevatorAscent?.active){
@@ -2931,6 +2965,15 @@ export class BlackoutLevelRuntime {
         sentinelDefeated: true,
       },
     };
+    if (resources.defeatFinale) {
+      this.resetCompanions(); resources.transit?.setActive(false);
+      resources.electricalSystem.disconnect('target-invalid'); resources.electricalSystem.cancelAim();
+      resources.acidProjectileSystem.reset(); resources.goopAcidPresentation.reset();
+      resources.maintenanceDrone.suspendInput();
+      resources.finalBoss?.suspend();
+      resources.defeatFinale.begin(this.renderLayer.cameraRig.camera);
+      this.input.releasePointerLock();
+    }
     this.events.emit('objectiveChanged', {
       roomId: this.currentRoom.roomId,
       objective: objectiveFor(this.currentRoom),

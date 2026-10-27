@@ -36,6 +36,7 @@ import { graphicsPreparationKey, graphicsTransmissionResourceKey } from './rende
 import '@fontsource/michroma/400.css';
 import '@fontsource-variable/space-grotesk';
 import './style.css';
+import './cinematics/boss-defeat.css';
 import './ui/ui-theme.css';
 
 const trailerShot = new URLSearchParams(window.location.search).get('trailer');
@@ -115,7 +116,7 @@ function startGame(): void {
   let levelOneRuntime = createLevelOneRuntime();
   let levelTwoRuntime: import('./levels/CultivationLevelRuntime.ts').CultivationLevelRuntime | undefined;
   let levelThreeRuntime: import('./levels/BlackoutLevelRuntime.ts').BlackoutLevelRuntime | undefined;
-  let levelPreviewRequested: 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival' | 'blackout-elevator' | 'blackout-research' | undefined;
+  let levelPreviewRequested: 'cultivation-arrival' | 'sentry-clearance' | 'volt-rescue' | 'blackout-arrival' | 'blackout-elevator' | 'blackout-research' | 'boss-defeat' | undefined;
   const gameSession = new GameSessionCoordinator({
     initialRuntime: levelOneRuntime,
     createLevelTwo: async (progression) => {
@@ -151,6 +152,7 @@ function startGame(): void {
       ]);
       levelThreeRuntime = new runtimeModule.BlackoutLevelRuntime({
         host: app,
+        creditsMarkdown,
         audio,
         input,
         renderLayer,
@@ -322,10 +324,10 @@ function startGame(): void {
     actions: {
       previewCutscene: import.meta.env.DEV ? (cutscene) => {
         if (cutscene === 'escape') void previewEscape();
-        else if (cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival' || cutscene === 'blackout-elevator' || cutscene === 'blackout-research') {
+        else if (cutscene === 'cultivation-arrival' || cutscene === 'sentry-clearance' || cutscene === 'volt-rescue' || cutscene === 'blackout-arrival' || cutscene === 'blackout-elevator' || cutscene === 'blackout-research' || cutscene === 'boss-defeat') {
           levelPreviewRequested = cutscene;
-          const levelId = cutscene === 'blackout-arrival' || cutscene === 'blackout-elevator' || cutscene === 'blackout-research' ? 'level-3' : 'level-2';
-          const message = cutscene === 'blackout-research' ? 'Preparing the research wing…' : cutscene === 'blackout-elevator' ? 'Preparing the service elevator…' : cutscene === 'blackout-arrival' ? 'Preparing Blackout arrival…'
+          const levelId = cutscene === 'blackout-arrival' || cutscene === 'blackout-elevator' || cutscene === 'blackout-research' || cutscene === 'boss-defeat' ? 'level-3' : 'level-2';
+          const message = cutscene === 'boss-defeat' ? 'Preparing the final escape…' : cutscene === 'blackout-research' ? 'Preparing the research wing…' : cutscene === 'blackout-elevator' ? 'Preparing the service elevator…' : cutscene === 'blackout-arrival' ? 'Preparing Blackout arrival…'
             : cutscene === 'cultivation-arrival' ? 'Preparing Cultivation arrival…'
             : cutscene === 'volt-rescue' ? 'Preparing Volt rescue cutscene…' : 'Preparing sentry cutscene…';
           gameFlow.beginLevelTransition(message, levelId);
@@ -377,10 +379,10 @@ function startGame(): void {
       setGameplayInputEnabled: (enabled) => input.setEnabled(enabled),
       setDebugInteractionEnabled: (enabled) =>
         gameSession.setDebugInteractionEnabled(enabled),
-      requestPointerLock: () => input.requestPointerLock(),
+      requestPointerLock: () => { if (app.dataset.cinematic !== 'boss-defeat') input.requestPointerLock(); },
       releasePointerLock: () => input.releasePointerLock(),
       isPointerLocked: () => input.pointerLocked,
-      isGameplayInputEnabled: () => input.enabled,
+      isGameplayInputEnabled: () => input.enabled && app.dataset.cinematic !== 'boss-defeat',
       isCinematicPlaying: () => gameFlowCinematicCanPause(app.dataset.cinematic, app.dataset.gameState),
       restartLevel: () => lifecycleCoordinator.restartLevel(),
       restartGame:()=>window.location.reload(),
@@ -451,14 +453,15 @@ function startGame(): void {
     if (state === 'title' || state === 'paused') menuOrigin = state;
     if (gameCompleted) return;
     const scene = musicForFlow(state, menuOrigin, musicLevel);
-    music.setScene(scene.track, scene.play);
+    music.setScene(app.dataset.cinematic === 'boss-defeat' ? null : scene.track, scene.play);
   });
   const unsubscribeGameCompleted = gameSession.events.on('gameCompleted', () => {
     if(gameCompleted)return;
     gameCompleted = true;
     music.cancelBoss();
     music.setScene(null, true);
-    gameFlow.completeGame();
+    const returnToTitle = app.dataset.endingCreditsSkipped === 'true'; delete app.dataset.endingCreditsSkipped;
+    gameFlow.completeGame(returnToTitle);
   });
   const unsubscribeTitlePresentation = gameFlow.subscribe((state) => {
     if (state !== 'playing' || warmedLevelOneProgramBaseline !== undefined) return;
@@ -491,13 +494,13 @@ function startGame(): void {
   const unsubscribeTransitionCompleted = gameSession.events.on(
     'transitionCompleted',
     ({ levelId }) => {
-      if (import.meta.env.DEV && levelPreviewRequested && levelId === (levelPreviewRequested === 'blackout-arrival' || levelPreviewRequested === 'blackout-elevator' || levelPreviewRequested === 'blackout-research' ? 'level-3' : 'level-2')) {
+      if (import.meta.env.DEV && levelPreviewRequested && levelId === (levelPreviewRequested === 'blackout-arrival' || levelPreviewRequested === 'blackout-elevator' || levelPreviewRequested === 'blackout-research' || levelPreviewRequested === 'boss-defeat' ? 'level-3' : 'level-2')) {
         const preview = levelPreviewRequested;
         levelPreviewRequested = undefined;
         try {
           // Normal level entry already stages both real vent arrivals.
           const ready = preview === 'blackout-arrival' || preview === 'cultivation-arrival' || (preview === 'blackout-elevator'
-            ? levelThreeRuntime?.previewElevatorForDebug() : preview === 'blackout-research' ? levelThreeRuntime?.previewResearchForDebug() : preview === 'volt-rescue'
+            ? levelThreeRuntime?.previewElevatorForDebug() : preview === 'blackout-research' ? levelThreeRuntime?.previewResearchForDebug() : preview === 'boss-defeat' ? levelThreeRuntime?.previewBossDefeatForDebug() : preview === 'volt-rescue'
               ? levelTwoRuntime?.previewVoltRescueForDebug() : levelTwoRuntime?.previewSentryClearanceForDebug());
           if (!ready) throw new Error('Cutscene preview is not ready.');
           gameFlow.finishLevelTransition(levelId);

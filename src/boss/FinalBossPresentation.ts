@@ -180,12 +180,7 @@ export class FinalBossPresentation {
     this.machine.position.add(this.evasionOffset);this.rollRig.rotation.z=this.evasionRoll;
     this.appliedEvasion.copy(this.evasionOffset);
     if(model.state==='intro')this.machine.position.y=THREE.MathUtils.lerp(FINAL_ARENA.ceilingY-9,FINAL_BOSS_TUNING.hoverY,THREE.MathUtils.smoothstep(model.progress,.2,.8));
-    if(model.state==='defeated'||model.state==='escape'||model.state==='complete') {
-      const p=model.state==='defeated'?THREE.MathUtils.smoothstep(model.progress,.25,.85):1;
-      this.machine.position.set(0,THREE.MathUtils.lerp(FINAL_BOSS_TUNING.hoverY,5,p),FINAL_ARENA.centreZ+8*p);
-      this.machine.rotation.set(p*.8,0,p*.5);
-      this.machine.visible=model.state==='defeated'&&model.progress<.68;
-    }
+    if(model.state==='escape'||model.state==='complete')this.machine.visible=false;
     const opening=model.weakPointOpen?1:0;
     this.machine.updateMatrixWorld(true);this.warDrone.update(time,model.weakPointOpen,model.phase,dt,model,body.position);
     this.coreShader.uniforms.uTime!.value=time;this.coreShader.uniforms.uOpen!.value=opening;
@@ -212,19 +207,7 @@ export class FinalBossPresentation {
     const charge=orbMove?(model.stage==='telegraph'?model.progress:(model.elapsed%FINAL_BOSS_TUNING.orbIntervalSeconds)/FINAL_BOSS_TUNING.orbIntervalSeconds):
       (beamMove||ramMove)&&model.stage==='telegraph'?model.progress:0;
     this.eyeCharge.visible=charge>0||this.eyeFlash>0;this.eyeCharge.position.copy(this.eyeMuzzle);this.eyeCharge.scale.setScalar(.2+charge*1.45+this.eyeFlash*5);
-    if(model.state!=='defeated')this.blastMaterial.opacity=.25+charge*.55;
-    if(model.state==='defeated') {
-      const p=model.progress;
-      if(p>.25&&p<.55) {
-        this.finalShot.visible=true;this.finalShot.position.copy(body.position).add(this.direction.set(0,.6,0));
-        this.finalShot.scale.setScalar(.2+THREE.MathUtils.smoothstep(p,.25,.45)*1.2);
-        this.finalShot.position.lerp(this.coreWorld,THREE.MathUtils.smoothstep(p,.45,.55));
-      }
-      if(p>=.55) {
-        this.explosion.visible=true;this.explosion.position.copy(this.coreWorld);
-        const blast=THREE.MathUtils.smoothstep(p,.55,.9);this.explosion.scale.setScalar(1+blast*36);this.blastMaterial.opacity=(1-blast)*.8;
-      }
-    }
+    this.blastMaterial.opacity=.25+charge*.55;
     let count=0;
     for(const slot of this.particleSlots) {
       slot.age+=dt;if(slot.age>=slot.life)continue;
