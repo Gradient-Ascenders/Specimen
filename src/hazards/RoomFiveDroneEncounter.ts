@@ -7,6 +7,8 @@ import { applyCultivationShadowRoles } from '../render/environment/cultivation/C
 import { CultivationPlatformBoosters } from '../render/environment/cultivation/CultivationPlatformBoosters.ts';
 import * as THREE from 'three';
 import { ScannerBeamPresentation } from '../render/hazards/ScannerBeamPresentation.ts';
+import { ShadowedDroneBeam } from '../render/hazards/ShadowedDroneBeam.ts';
+import type { GraphicsSettings } from '../render/GraphicsProfiles.ts';
 import { RoomFivePatrol } from './RoomFivePatrol.ts';
 import { ROOM_FIVE_JUMPS } from '../levels/RoomFiveParkour.ts';
 import { createRustedSewerDrone } from '../levels/RustedSewerDrone.ts';
@@ -42,6 +44,9 @@ export class RoomFiveDroneEncounter {
   private readonly targets: readonly SecurityDroneTarget[];
   private readonly projectileTargets: readonly DroneProjectileTarget[];
   private readonly beams: THREE.Mesh[] = [];
+  private readonly beamVolumes: ShadowedDroneBeam[] = [];
+  private contactHardening = false;
+  private readonly lampPosition = new THREE.Vector3();
   private readonly scannerBeams: ScannerBeamPresentation;
   private readonly searchLights: THREE.SpotLight[] = [];
   private readonly sewerLight = new THREE.PointLight(0xff7935, 0, 8);
@@ -138,15 +143,15 @@ export class RoomFiveDroneEncounter {
       this.flightAudio.push(new WorldAudioSource({ root: drone.root, kind: 'drone', enabled: () => !this.cinematic }));
       // Saturated blue, with stronger opacity so it stays readable without whitening it.
       const beamColour = network === 'blue' ? 0x165dff : ROOM_FIVE_NETWORK_COLOURS[network];
-      const beam = new THREE.Mesh(new THREE.ConeGeometry(Math.tan(ROOM_FIVE_DRONE_VIEW_HALF_ANGLE) * ROOM_FIVE_DRONE_VIEW_RANGE, ROOM_FIVE_DRONE_VIEW_RANGE, 24, 1, true),
-        new THREE.MeshBasicMaterial({ color: beamColour, transparent: true, opacity: network === 'blue' ? .09 : .02, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true }));
-      beam.geometry.translate(0, -ROOM_FIVE_DRONE_VIEW_RANGE / 2, 0); beam.name = `room-5-${network}-scanner-${index}`;
-      beam.position.copy(position); room.root.add(beam); this.beams.push(beam);
-      const search = new THREE.SpotLight(beamColour, network === 'blue' ? 65 : 45, ROOM_FIVE_DRONE_VIEW_RANGE, ROOM_FIVE_DRONE_VIEW_HALF_ANGLE, .2, 2);
+      const search = new THREE.SpotLight(beamColour, 65, ROOM_FIVE_DRONE_VIEW_RANGE, ROOM_FIVE_DRONE_VIEW_HALF_ANGLE, .2, 2);
       search.name = `${drone.id}-search-light`; search.castShadow = true;
-      search.shadow.mapSize.set(512, 512); search.shadow.bias = -.0002; search.shadow.normalBias = .025;
-      search.shadow.camera.near = .2;
+      search.shadow.mapSize.set(512, 512); search.shadow.bias = -.00015; search.shadow.normalBias = .012;
+      search.shadow.camera.near = .35;
       room.root.add(search, search.target); this.searchLights.push(search);
+      const volume = new ShadowedDroneBeam(search, ROOM_FIVE_DRONE_VIEW_RANGE, ROOM_FIVE_DRONE_VIEW_HALF_ANGLE,
+        { colour: beamColour, opacity: network === 'blue' ? .09 : .075, soft: true, occlusionFallback: true });
+      const beam = volume.mesh; beam.name = `room-5-${network}-scanner-${index}`;
+      beam.position.copy(position); room.root.add(beam); this.beams.push(beam); this.beamVolumes.push(volume);
       return drone;
     };
     const drones = ROOM_FIVE_ROUTE_NETWORKS.map((network, index) => makePatrol(network, index));
@@ -193,7 +198,7 @@ export class RoomFiveDroneEncounter {
       this.direction.copy(drone.readModel.scanDirection);
       if(!this.flyers[i].authored)this.flyers[i].body.quaternion.setFromUnitVectors(this.sewerForward, this.direction);
       this.flyers[i].eye.material.color.copy(drone.frontIndicator.material.color);
-      const search = this.searchLights[i]; search.intensity = enabled ? (network === 'blue' ? 65 : 45) : 0;
+      const search = this.searchLights[i]; search.intensity = enabled ? 65 : 0;
       search.shadow.autoUpdate = enabled;
       search.shadow.needsUpdate = enabled || search.shadow.map === null;
       // Shadow maps now handle partial occlusion without cutting all illumination short.
@@ -222,14 +227,29 @@ export class RoomFiveDroneEncounter {
   /** Cosmetic queries run once per presented frame, after room/camera selection. */
   updatePresentation(deltaSeconds: number, camera: THREE.Camera): void {
     if (this.disposed) return;
+    let hero = -1, nearest = Infinity;
+    for (let i = 0; this.contactHardening && i < this.searchLights.length; i++) {
+      const light = this.searchLights[i];
+      const distance = light.getWorldPosition(this.lampPosition).distanceToSquared(camera.position);
+      if (light.intensity > 0 && distance < nearest) { nearest = distance; hero = i; }
+    }
     for (let i = 0; i < this.drones.length; i++) {
       const drone = this.drones[i], beam = this.beams[i];
+      this.searchLights[i].shadow.radius = i === hero ? -ROOM_FIVE_DRONE_VIEW_RANGE : 1.25;
       drone.presentation.updateDetail(camera);
       beam.position.copy(drone.root.position).addScaledVector(drone.readModel.scanDirection, 1.4);
       this.direction.copy(drone.readModel.scanDirection).negate();
       beam.quaternion.setFromUnitVectors(this.up, this.direction);
     }
     this.scannerBeams.update(deltaSeconds, camera);
+  }
+  setLightingQuality(settings: GraphicsSettings, type: THREE.ShadowMapType): void {
+    this.contactHardening = type === THREE.BasicShadowMap;
+    for (let i = 0; i < this.beamVolumes.length; i++) {
+      const volume = this.beamVolumes[i]; volume.setShadowType(type);
+      const base = this.networks[i] === 'blue' ? .09 : .075;
+      volume.mesh.material.uniforms.beamOpacity.value = base * (.7 + .3 * settings.effectsDensity);
+    }
   }
   private updateSewerLightPosition(): void {
     const shell = this.room.brokenCore;

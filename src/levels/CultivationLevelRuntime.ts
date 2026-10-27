@@ -375,6 +375,7 @@ export class CultivationLevelRuntime {
             if (material instanceof THREE.MeshStandardMaterial) optimizeFiniteLightEvaluation(material);
           }
         });
+        resources.roomFiveEncounter?.setLightingQuality(this.renderLayer.graphicsConfiguration, this.renderLayer.renderer.shadowMap.type);
         await resources.lightingPass.prepare(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.graphicsConfiguration);
         if (this.resources !== resources) return;
         resources.scene.setBakedIndirectLighting(true);
@@ -873,6 +874,7 @@ export class CultivationLevelRuntime {
       this.preparationQueue?.anticipateLiftExit();
     }
     const darkRoom = this.isDarkRoom(resources, lightingRoom);
+    resources.roomFiveEncounter?.setLightingQuality(this.renderLayer.graphicsConfiguration, this.renderLayer.renderer.shadowMap.type);
     resources.lightingPass.setQuality(this.renderLayer.graphicsConfiguration, this.renderLayer.renderer.shadowMap.type);
     resources.lightingPass.update(this.lifecycle.state === 'running' ? stats.frameDeltaSeconds : 0);
     resources.scene.setDarkRoomLighting(darkRoom, stats.frameDeltaSeconds,

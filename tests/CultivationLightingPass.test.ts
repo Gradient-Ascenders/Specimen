@@ -12,14 +12,15 @@ import { CultivationLightingPass } from '../src/render/environment/cultivation/C
 import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import { GRAPHICS_PROFILES } from '../src/render/GraphicsProfiles.ts';
+import { CultivationSewerLighting } from '../src/render/environment/cultivation/CultivationSewerLighting.ts';
 
 test('the actual two-state bake retains spatial bounce, validity weights and distinct local reflections', async () => {
   const packed = await readFile(new URL('../assets/environments/cultivation-lighting/radiance.bin', import.meta.url));
   const bytes = gunzipSync(packed), buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   const bank = readCultivationRadiance(buffer);
-  assert.equal(bank.probes, 3829); assert.equal(bank.captures.length, 26);
+  assert.equal(bank.probes, 4109); assert.equal(bank.captures.length, 30);
   assert.ok(packed.length < 1_500_000); assert.ok(bank.invalidProbes > 0 && bank.invalidProbes < bank.probes);
-  assert.equal(new Set(bank.captures.map(p => Buffer.from(p).toString('base64'))).size, 26);
+  assert.equal(new Set(bank.captures.map(p => Buffer.from(p).toString('base64'))).size, 30);
   assert.ok(bank.captures.every(p => p.some((n, i) => i % 4 === 3 && n > 0)));
   const stride = CULTIVATION_ATLAS_WIDTH * CULTIVATION_ATLAS_HEIGHT * 4;
   let offset = 0;
@@ -42,7 +43,7 @@ test('room selection distinguishes the elevated duct, recycled lift heights, cha
   for (const [point, zone] of [
     [[0, 1, 25], 0], [[0, 2, 64], 1], [[0, 10, 100], 2], [[0, 2, 137], 3], [[8, 19.8, 137], 4],
     [[0, 15, 188], 5], [[0, 4, 237], 6], [[0, 26, 237], 7], [[0, 1, 246], 8], [[32, 1, 255], 9],
-    [[0, 20, 287], 10], [[40, -7, 304], 11],
+    [[0, 20, 287], 10], [[40, -7, 278], 11], [[40, -7, 318], 13], [[40, -7, 365], 14],
     [[23.1, -4, 335], 12], [[24.9, -4, 335], 12], [[26.8, -4, 335], 12],
   ] as const) assert.equal(cultivationRadianceZone(new THREE.Vector3(...point)), zone);
 });
@@ -53,7 +54,7 @@ test('bounce, liquid response and PCSS compose with authored deformation using u
   material.customProgramCacheKey = () => 'original-gel';
   installContainmentSoftShadows(material);
   const uniforms = { cvVolume: { value: volume }, cvOrigin: { value: new THREE.Vector3(64, 0, 0) }, cvPower: { value: CULTIVATION_RADIANCE_LAYOUT.map(() => 1) },
-    cvDirectional: { value: 1 }, cvTime: { value: 0 }, cvLift: { value: 0 }, cvLiquidStrength: { value: .5 } };
+    cvDirectional: { value: 1 }, cvTime: { value: 0 }, cvLift: { value: 0 }, cvLiquidStrength: { value: .5 }, cvAtmosphere: { value: .5 } };
   installCultivationRadianceShader(material, uniforms, 336, 128);
   const shader = { vertexShader: THREE.ShaderLib.physical.vertexShader, fragmentShader: THREE.ShaderLib.physical.fragmentShader, uniforms: {} };
   material.onBeforeCompile(shader as never, null as never);
@@ -79,6 +80,7 @@ test('bounce, liquid response and PCSS compose with authored deformation using u
 
 test('real machinery drives coordinated lighting without changing physics or allocating lights, and unload restores borrowers', () => {
   const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets);
+  const sewer = new CultivationSewerLighting(scene.roomFive.root);
   const colliders = scene.collisionMeshes.map(mesh => ({ mesh, geometry: mesh.geometry, position: mesh.position.toArray() }));
   const lights: THREE.Light[] = []; scene.root.traverse(o => { if (o instanceof THREE.Light) lights.push(o); });
   const before = lights.map(light => ({ light, colour: light.color.clone(), intensity: light.intensity }));
@@ -86,10 +88,10 @@ test('real machinery drives coordinated lighting without changing physics or all
   try {
     const after: THREE.Light[] = []; scene.root.traverse(o => { if (o instanceof THREE.Light) after.push(o); });
     assert.deepEqual(after, lights); assert.equal(pass.diagnostics.additionalLights, 0); assert.equal(pass.diagnostics.additionalShadowMaps, 0);
-    assert.equal(pass.diagnostics.shafts, 7); assert.equal(pass.diagnostics.heroShadows, 4);
+    assert.equal(pass.diagnostics.shafts, 9); assert.equal(pass.diagnostics.heroShadows, 6);
     pass.setQuality(GRAPHICS_PROFILES.high.settings, THREE.BasicShadowMap);
     const heroes = lights.filter((light): light is THREE.SpotLight => light instanceof THREE.SpotLight && light.shadow.radius < 0);
-    assert.equal(heroes.length, 4);
+    assert.equal(heroes.length, 6);
     assert.ok(heroes.every(light => light.shadow.mapSize.x === 1024 && light.shadow.camera.near === .35));
     pass.setQuality(GRAPHICS_PROFILES.minimum.settings, THREE.PCFShadowMap);
     assert.ok(heroes.every(light => light.shadow.radius === 1.5 && light.shadow.mapSize.x === 512));
@@ -105,5 +107,5 @@ test('real machinery drives coordinated lighting without changing physics or all
     for (const item of colliders) { assert.equal(item.mesh.geometry, item.geometry); assert.deepEqual(item.mesh.position.toArray(), item.position); }
     pass.dispose(); pass.dispose();
     for (const item of before) { assert.ok(item.light.color.equals(item.colour)); assert.equal(item.light.intensity, item.intensity); }
-  } finally { pass.dispose(); scene.dispose(); }
+  } finally { pass.dispose(); sewer.dispose(); scene.dispose(); }
 });

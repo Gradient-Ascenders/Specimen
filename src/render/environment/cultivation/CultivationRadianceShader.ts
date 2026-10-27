@@ -19,6 +19,7 @@ export interface CultivationRadianceUniforms {
   cvTime: THREE.IUniform<number>;
   cvLift: THREE.IUniform<number>;
   cvLiquidStrength: THREE.IUniform<number>;
+  cvAtmosphere: THREE.IUniform<number>;
 }
 
 const probes = /* glsl */`
@@ -26,9 +27,13 @@ vec3 cvWorld;
 uniform highp sampler3D cvVolume;
 uniform vec3 cvOrigin;
 uniform float cvPower[${ZONES.length}];
-uniform float cvDirectional, cvTime, cvLift, cvLiquidStrength;
+uniform float cvDirectional, cvTime, cvLift, cvLiquidStrength, cvAtmosphere;
 uniform vec3 cvMin[${ZONES.length}], cvMax[${ZONES.length}], cvGrid[${ZONES.length}], cvCapture[${ZONES.length}];
 uniform float cvOffset[${ZONES.length}];
+void cultivationSewerZones(vec3 p,out int a,out int b,out float f){
+  if(p.z<302.0){a=11;b=13;f=smoothstep(294.0,302.0,p.z);}
+  else{a=13;b=14;f=smoothstep(336.0,344.0,p.z);}
+}
 void cultivationZones(inout vec3 p,out int a,out int b,out float f){
   a=10;b=10;f=0.0;
   if(p.z<51.0){a=0;b=1;f=smoothstep(49.0,51.0,p.z);return;}
@@ -45,9 +50,9 @@ void cultivationZones(inout vec3 p,out int a,out int b,out float f){
   // through both the walkway and characters. Give the whole passage its
   // own volume, blending only across the doorway into the sewer.
   if(p.z>303.0&&p.z<370.0&&p.x>22.0&&p.x<30.5&&p.y<7.0){
-    a=12;b=11;f=smoothstep(28.5,30.5,p.x);return;
+    a=12;b=p.z<340.0?13:14;f=smoothstep(28.5,30.5,p.x);return;
   }
-  if(p.x>29.5&&p.y<-.5){a=11;b=11;return;}
+  if(p.x>29.5&&p.y<-.5){cultivationSewerZones(p,a,b,f);return;}
   // Service Junction: blend the lift-exit duct into the fork over the
   // physical entrance. A hard z=250.5 cutoff sliced floors and characters.
   // Fade sideways too, so the entrance lighting stays near its doorway.
@@ -114,6 +119,26 @@ vec3 cultivationProjected(vec3 direction,int zone,vec3 p){
   float travel=max(0.0,min(distances.x,min(distances.y,distances.z)));
   return p+direction*travel-cvCapture[zone];
 }
+float cultivationMistLength(vec3 eye,vec3 p,vec3 lo,vec3 hi){
+  vec3 delta=p-eye;float distance=length(delta);
+  vec3 direction=delta/max(distance,.0001);
+  vec3 inverse=mix(vec3(-1.0),vec3(1.0),step(vec3(0.0),direction))/max(abs(direction),vec3(.00001));
+  vec3 first=(lo-eye)*inverse,last=(hi-eye)*inverse;
+  vec3 entry=min(first,last),exit=max(first,last);
+  float near=max(0.0,max(entry.x,max(entry.y,entry.z)));
+  float far=min(distance,min(exit.x,min(exit.y,exit.z)));
+  return max(0.0,far-near);
+}
+vec3 cultivationAtmosphere(vec3 colour){
+  if(cvAtmosphere<=0.0)return colour;
+  vec3 eye=cameraPosition-cvOrigin;
+  float sewer=cultivationMistLength(eye,cvWorld,vec3(30.0,-12.0,258.0),vec3(50.0,-1.5,382.0));
+  float chamber=cultivationMistLength(eye,cvWorld,vec3(-20.0,0.0,260.0),vec3(20.0,38.0,322.0));
+  float sewerFog=1.0-exp(-sewer*.008*cvAtmosphere);
+  float chamberFog=1.0-exp(-chamber*.004*cvAtmosphere);
+  colour=mix(colour,vec3(.011,.009,.005),sewerFog);
+  return mix(colour,vec3(.008,.012,.015)*(.65+.35*cvPower[10]),chamberFog);
+}
 `;
 
 function reflections(tileWidth: number, tileHeight: number): string {
@@ -170,8 +195,9 @@ export function installCultivationRadianceShader(material: THREE.MeshStandardMat
         #if defined(RE_IndirectDiffuse)
         vec3 cvNormal=transformNormalByInverseViewMatrix(geometryNormal,viewMatrix);
         irradiance+=cultivationIndirect(cvNormal)+cultivationLiquidBounce(cvNormal);
-        #endif`);
+        #endif`)
+      .replace('#include <tonemapping_fragment>', 'gl_FragColor.rgb=cultivationAtmosphere(gl_FragColor.rgb);\n#include <tonemapping_fragment>');
   };
-  material.customProgramCacheKey = () => `${key}:cultivation-radiance-v3`;
+  material.customProgramCacheKey = () => `${key}:cultivation-radiance-v4`;
   material.needsUpdate = true;
 }

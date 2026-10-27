@@ -60,8 +60,8 @@ export class CultivationLightingPass {
       light.getWorldPosition(this.point).sub(origin);
       const zone = cultivationRadianceZone(this.point), colour = light.color.clone();
       const tint = /volt-glow/.test(name) ? new THREE.Color(1, 1, 1) : TINTS[zone];
-      this.fixtures.push({ light, name, zone, colour, intensity: light.intensity, tint, dynamic: /sewer-maintenance-spill/.test(name) });
-      if (light instanceof THREE.SpotLight && /fixture-shadow-|room-4-lift-light/.test(light.name)) {
+      this.fixtures.push({ light, name, zone, colour, intensity: light.intensity, tint, dynamic: /sewer-maintenance-(spill|key)/.test(name) });
+      if (light instanceof THREE.SpotLight && /fixture-shadow-|room-4-lift-light|service-junction-key|sewer-maintenance-key/.test(light.name)) {
         const range = Math.min(light.distance, zone >= 6 ? 8 : zone === 5 ? 22 : 15);
         const beam = new ShadowedDroneBeam(light, range, Math.min(.48, light.angle * .45),
           { colour: light.color, opacity: .012, soft: true });
@@ -70,7 +70,7 @@ export class CultivationLightingPass {
         beam.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0),
           light.worldToLocal(light.target.getWorldPosition(new THREE.Vector3())).normalize());
         light.add(beam.mesh); this.shafts.push({ light, beam, intensity: light.intensity });
-        if (/fixture-shadow-1$|room-4-lift-light/.test(light.name)) {
+        if (/fixture-shadow-1$|room-4-lift-light|service-junction-key|sewer-maintenance-key/.test(light.name)) {
           this.heroes.push({ light, radius: light.shadow.radius, near: light.shadow.camera.near, size: light.shadow.mapSize.clone() });
           light.shadow.mapSize.set(1024, 1024);
         }
@@ -133,6 +133,7 @@ export class CultivationLightingPass {
     target[6] = target[7] = roomFour.controller.running && lift > .85 ? .72 : 1;
     target[10] = roomFive.controller.rescued ? .85 : .35 + .65 * enabled / 3;
     target[11] = roomFive.controller.brokenDroneState === 'active' ? .65 : roomFive.controller.brokenDroneState === 'rebooting' ? .8 : 1;
+    target[13] = target[14] = target[11];
     for (let i = 0; i < this.powers.length; i++) this.powers[i] = this.seeded ? THREE.MathUtils.damp(this.powers[i], target[i], 5, dt) : target[i];
     this.seeded = true;
     for (const fixture of this.fixtures) {

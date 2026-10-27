@@ -17,6 +17,7 @@ import { CultivationCoverEquipmentArt } from '../render/environment/cultivation/
 import { CultivationChamberMaterials } from '../render/environment/cultivation/CultivationChamberMaterials.ts';
 import {CultivationSecurityDroneModels} from '../render/environment/cultivation/CultivationSecurityDroneModels.ts';
 import * as THREE from 'three';
+import { CultivationDarkAreaLighting } from '../render/environment/cultivation/CultivationDarkAreaLighting.ts';
 import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import { CultivationRoomOneObservation } from '../render/environment/cultivation/CultivationRoomOneObservation.ts';
 import { CultivationRoomTwoObservation } from '../render/environment/cultivation/CultivationRoomTwoObservation.ts';
@@ -135,6 +136,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
   readonly roomFourEntranceGeometry = new THREE.Group();
   readonly roomFourLighting = new THREE.Group();
   readonly roomFive: LevelTwoRoomFiveGreybox;
+  readonly darkAreaLighting: CultivationDarkAreaLighting;
   readonly maintenanceArt: CultivationMaintenanceArt;
   readonly passageArt: CultivationPassageArt;
   readonly filtrationArt: CultivationFiltrationPassageArt;
@@ -321,6 +323,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.goopSpeech=new CultivationGoopSpeech();this.root.add(this.goopSpeech.root);
     this.platformSplashes=new CultivationPlatformSplashes(this.roomOne.platformDrops,this.labArt.acid,this.roomOne.radiationHazard.mesh);
     this.roomOne.root.add(this.platformSplashes.root);
+    this.darkAreaLighting = new CultivationDarkAreaLighting(this.roomFive.root);
     // Match Level 1 Room 3's green acid bounce without extra shadow maps.
     // Append after authored bank paths have been resolved. These natural
     // reflections stay lit independently of the security circuits.
@@ -589,6 +592,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.roomTwoButtonArt.dispose();
     this.goopSpeech.dispose();
     this.platformSplashes.dispose();
+    this.darkAreaLighting.dispose();
     this.blenderArt.dispose();
     this.securityDroneModels.dispose();
     this.surfaceCleanup.dispose();

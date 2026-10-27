@@ -4,9 +4,9 @@
     "authoredAssetsSha256": "6a05ed535d5891de54fdd2eee7d1b7952ee11d8a82b7255a9827001407cf361a",
     "generatorSha256": "af9ce7520e4440085ef1b407e347ac2298c38e446553661de5779ed56d364c97"
   },
-  "geometrySha256": "2719764babe43d5efbe886e2539fa4ceddda40ea31324ef317a3ce6f05e08020",
-  "triangles": 787005,
-  "meshCount": 328,
+  "geometrySha256": "b481c2c90f388add3b6a1e76d8d7518b8822453b00ae0880f1f217573c8e34ac",
+  "triangles": 787245,
+  "meshCount": 331,
   "lights": [
     {
       "name": "cultivation-room-1-radiation-light-near",
@@ -666,52 +666,123 @@
       "decay": 2
     },
     {
-      "name": "",
+      "name": "room-5-service-junction-key",
       "position": [
         0,
         2,
         251.8
       ],
       "colour": [
-        0.6724431569510133,
-        0.508881320845802,
-        0.24228112245478564
+        0.6795424696265424,
+        0.6172065624120635,
+        0.4396571738310091
       ],
-      "intensity": 6.4,
-      "range": 32,
-      "decay": 1
+      "intensity": 10,
+      "range": 10,
+      "decay": 1,
+      "target": [
+        0,
+        0.19999999999999973,
+        251.10000000000002
+      ],
+      "angle": 1.05,
+      "penumbra": 0.65
     },
     {
-      "name": "",
+      "name": "room-5-bob-branch-fill",
       "position": [
         -12.82,
         1.95,
         259.3
       ],
       "colour": [
-        0.3277780980458375,
         0.4910208498384856,
-        0.3515325994898463
+        0.6172065624120635,
+        0.7304607400847158
       ],
-      "intensity": 4.8,
+      "intensity": 5.6,
       "range": 28,
       "decay": 1
     },
     {
-      "name": "",
+      "name": "room-5-sewer-branch-fill",
       "position": [
         40,
         2,
         260.4
       ],
       "colour": [
-        0.4793201830913402,
-        0.4969329950515914,
-        0.1912016827303171
+        0.6653872982754769,
+        0.4178850708380236,
+        0.16826940017946088
       ],
-      "intensity": 4.8,
+      "intensity": 5.2,
       "range": 28,
       "decay": 1
+    },
+    {
+      "name": "room-5-chamber-service-rim-0",
+      "position": [
+        -19.25,
+        12,
+        279
+      ],
+      "colour": [
+        0.5457244613615395,
+        0.6375968739867731,
+        0.7083757798856457
+      ],
+      "intensity": 16,
+      "range": 14,
+      "decay": 2
+    },
+    {
+      "name": "room-5-chamber-service-rim-1",
+      "position": [
+        19.25,
+        18,
+        299
+      ],
+      "colour": [
+        0.5457244613615395,
+        0.6375968739867731,
+        0.7083757798856457
+      ],
+      "intensity": 16,
+      "range": 14,
+      "decay": 2
+    },
+    {
+      "name": "room-5-chamber-service-rim-2",
+      "position": [
+        -19.25,
+        26,
+        292
+      ],
+      "colour": [
+        0.5457244613615395,
+        0.6375968739867731,
+        0.7083757798856457
+      ],
+      "intensity": 24,
+      "range": 21,
+      "decay": 2
+    },
+    {
+      "name": "room-5-chamber-service-rim-3",
+      "position": [
+        0,
+        37.25,
+        279
+      ],
+      "colour": [
+        0.5457244613615395,
+        0.6375968739867731,
+        0.7083757798856457
+      ],
+      "intensity": 16,
+      "range": 14,
+      "decay": 2
     },
     {
       "name": "room-5-acid-reflected-light-entry",
@@ -746,11 +817,11 @@
       "decay": 2
     },
     {
-      "name": "room-5-sewer-maintenance-spill-0",
+      "name": "room-5-sewer-maintenance-key-0",
       "position": [
-        47.78035217935691,
-        -7.0054878846991295,
-        276
+        47.49371422822283,
+        -6.189755138999606,
+        276.5407575913135
       ],
       "colour": [
         0.6724431569510133,
@@ -759,7 +830,14 @@
       ],
       "intensity": 8,
       "range": 25,
-      "decay": 1
+      "decay": 1,
+      "target": [
+        45,
+        -11.1,
+        278.5
+      ],
+      "angle": 0.95,
+      "penumbra": 0.65
     },
     {
       "name": "room-5-sewer-maintenance-spill-1",
@@ -1044,7 +1122,7 @@
       ]
     },
     {
-      "name": "sewer",
+      "name": "sewer-entry",
       "room": 5,
       "min": [
         29,
@@ -1054,17 +1132,17 @@
       "max": [
         51,
         -2,
-        382
+        302
       ],
       "grid": [
         7,
         5,
-        13
+        7
       ],
       "capture": [
         40,
         -7,
-        304
+        278
       ]
     },
     {
@@ -1089,6 +1167,54 @@
         25,
         -5.2,
         335
+      ]
+    },
+    {
+      "name": "sewer-middle",
+      "room": 5,
+      "min": [
+        29,
+        -15,
+        294
+      ],
+      "max": [
+        51,
+        -2,
+        344
+      ],
+      "grid": [
+        7,
+        5,
+        7
+      ],
+      "capture": [
+        40,
+        -7,
+        318
+      ]
+    },
+    {
+      "name": "sewer-controls",
+      "room": 5,
+      "min": [
+        29,
+        -15,
+        336
+      ],
+      "max": [
+        51,
+        -2,
+        382
+      ],
+      "grid": [
+        7,
+        5,
+        7
+      ],
+      "capture": [
+        40,
+        -7,
+        365
       ]
     }
   ],
@@ -1157,6 +1283,16 @@
       0.92,
       0.94,
       0.88
+    ],
+    [
+      1,
+      0.73,
+      0.38
+    ],
+    [
+      1,
+      0.73,
+      0.38
     ]
   ],
   "rays": 64,
@@ -1167,7 +1303,7 @@
   "atlas": [
     11,
     36,
-    266
+    290
   ],
   "geometryFile": "../../../artifacts/evidence/cultivation-lighting/bake-geometry.bin",
   "liquids": [

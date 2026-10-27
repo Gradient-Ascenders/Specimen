@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { disposeShadowLight } from '../../ShadowLightResources.ts';
+import { configureCultivationTraversalLight } from './CultivationShadowCoverage.ts';
 import type { CultivationLabMaterials } from './CultivationLabMaterials.ts';
 import type { CultivationContaminationArt } from './CultivationContaminationArt.ts';
 
@@ -123,14 +125,22 @@ export class CultivationAccessTunnelArt {
     // Broad, gently fading light approximates spill through the low corridor.
     // The existing three lights overlap along the branches without extra shadow passes.
     for (const [x, y, z, colour, intensity, reach] of [
-      [0, 2.2, 9.8, 0xd6bd87, 6.4, 32], [-12.82, 2.15, 17.3, 0x9bbaa0, 4.8, 28], [40, 2.2, 18.4, 0xb8bb79, 4.8, 28],
+      [0, 2.2, 9.8, 0xd7ceb1, 10, 10], [-12.82, 2.15, 17.3, 0xbacede, 5.6, 28], [40, 2.2, 18.4, 0xd5ad72, 5.2, 28],
     ]) {
       if (x < 0) box(this.iron, [.2, .18, .24], [-13.08, y + .03, z]);
       else box(this.iron, [.08, .18, .08], [x, 2.35, z]);
       box(this.iron, [.55, .12, .24], [x, y + .03, z]);
       box(lamp, [.39, .05, .16], [x, y - .055, z]);
       for (const dx of [-.15, 0, .15]) box(this.iron, [.024, .025, .18], [x + dx, y - .0925, z]);
-      const light = new THREE.PointLight(colour, intensity, reach, 1);
+      const light = x === 0 ? new THREE.SpotLight(colour, intensity, reach, 1.05, .65, 1)
+        : new THREE.PointLight(colour, intensity, reach, 1);
+      light.name = x === 0 ? 'room-5-service-junction-key' : x < 0 ? 'room-5-bob-branch-fill' : 'room-5-sewer-branch-fill';
+      if (light instanceof THREE.SpotLight) {
+        // Keep authored mesh index paths stable: the target belongs to the
+        // light rather than inserting another child into the art batch root.
+        light.target.position.set(0, .4 - y, 9.1 - z); light.add(light.target);
+        configureCultivationTraversalLight(light);
+      }
       light.position.set(x, y - .2, z); this.root.add(light);
     }
     // Map detail geometry in metres after placement so adjacent fittings differ.
@@ -156,6 +166,7 @@ export class CultivationAccessTunnelArt {
     if (this.disposed) return;
     this.disposed = true;
     this.root.removeFromParent();
+    this.root.traverse(object => { if (object instanceof THREE.Light) disposeShadowLight(object); });
     for (const geometry of this.geometries) geometry.dispose();
     for (const material of this.materials) material.dispose();
   }

@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { disposeShadowLight } from '../../ShadowLightResources.ts';
+import { configureCultivationTraversalLight } from './CultivationShadowCoverage.ts';
 
-/** Sparse maintenance lamps; stable light slots and no additional shadow maps. */
+/** Two maintenance lamps; the entry fitting also casts a bounded bank shadow. */
 export class CultivationSewerLighting {
   readonly root = new THREE.Group();
-  private readonly lamps: { light: THREE.PointLight; bulb: THREE.MeshStandardMaterial; intensity: number }[] = [];
+  private readonly lamps: { light: THREE.PointLight | THREE.SpotLight; bulb: THREE.MeshStandardMaterial; intensity: number }[] = [];
   private readonly geometries: THREE.BufferGeometry[] = [];
   private readonly materials: THREE.Material[] = [];
   private elapsed = 0;
@@ -32,14 +34,21 @@ export class CultivationSewerLighting {
       for (const y of [-.46, .46]) pieces.push(new THREE.BoxGeometry(.55, .1, .18).translate(0, y, .165));
       for (const y of [-.22, 0, .22]) pieces.push(new THREE.BoxGeometry(.55, .035, .04).translate(0, y, .23));
       const cage = mergeGeometries(pieces)!; pieces.forEach(g => g.dispose()); this.geometries.push(cage);
-      fixture.add(new THREE.Mesh(cage, iron));
+      const cageMesh = new THREE.Mesh(cage, iron);
+      cageMesh.name = `room-5-sewer-caged-lamp-${i}-cage`;
+      cageMesh.castShadow = cageMesh.receiveShadow = true; fixture.add(cageMesh);
       const bulb = new THREE.MeshStandardMaterial({ color: 0xb9a582, emissive: spec.color, emissiveIntensity: .8, roughness: .65 });
       this.materials.push(bulb);
       const glass = new THREE.BoxGeometry(.52, .79, .07); this.geometries.push(glass);
       const lens = new THREE.Mesh(glass, bulb); lens.position.z = .105; fixture.add(lens);
-      const light = new THREE.PointLight(spec.color, spec.intensity, spec.reach, 1);
-      light.name = `room-5-sewer-maintenance-spill-${i}`;
-      light.position.z = .38; light.castShadow = false; fixture.add(light);
+      const light = i === 0 ? new THREE.SpotLight(spec.color, spec.intensity, spec.reach, .95, .65, 1)
+        : new THREE.PointLight(spec.color, spec.intensity, spec.reach, 1);
+      light.name = `room-5-sewer-maintenance-${i === 0 ? 'key' : 'spill'}-${i}`;
+      light.position.z = i === 0 ? .18 : .38; fixture.add(light);
+      if (light instanceof THREE.SpotLight) {
+        light.target.position.set(45, -11.1, spec.z + 2.5); this.root.add(light.target);
+        configureCultivationTraversalLight(light);
+      }
       this.lamps.push({light, bulb, intensity: spec.intensity});
     }
     parent.add(this.root); this.update(0);
@@ -61,7 +70,7 @@ export class CultivationSewerLighting {
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
     this.root.removeFromParent();
-    for (const lamp of this.lamps) lamp.light.dispose();
+    for (const lamp of this.lamps) disposeShadowLight(lamp.light);
     for (const geometry of this.geometries) geometry.dispose();
     for (const material of this.materials) material.dispose();
   }

@@ -57,7 +57,7 @@ export class CultivationRadiance {
   private readonly uniforms: CultivationRadianceUniforms = {
     cvVolume: { value: null as unknown as THREE.Data3DTexture }, cvOrigin: { value: new THREE.Vector3() },
     cvPower: { value: ZONES.map(() => 1) }, cvDirectional: { value: 0 }, cvTime: { value: 0 },
-    cvLift: { value: 0 }, cvLiquidStrength: { value: .5 },
+    cvLift: { value: 0 }, cvLiquidStrength: { value: .5 }, cvAtmosphere: { value: .5 },
   };
 
   constructor(origin: THREE.Vector3) { this.uniforms.cvOrigin.value.copy(origin); }
@@ -71,7 +71,8 @@ export class CultivationRadiance {
       for (const material of [object.material].flat()) {
         if (!(material instanceof THREE.MeshStandardMaterial) || !material.visible || this.bindings.has(material)) continue;
         this.bindings.set(material, { material, compile: material.onBeforeCompile, key: material.customProgramCacheKey, environment: material.envMap });
-        if (material.envMap || material instanceof THREE.MeshPhysicalMaterial || material.transparent || material.metalness >= .2 || material.roughness < .5)
+        if (material.envMap || material.userData.cultivationLocalReflection || material instanceof THREE.MeshPhysicalMaterial ||
+            material.transparent || material.metalness >= .2 || material.roughness < .5)
           material.envMap = this.reflections!.texture;
         installContainmentSoftShadows(material);
         installCultivationRadianceShader(material, this.uniforms, this.tileWidth, this.tileHeight);
@@ -84,6 +85,7 @@ export class CultivationRadiance {
   setQuality(settings: GraphicsSettings): void {
     this.uniforms.cvDirectional.value = settings.shadowMapSizeCap > 512 ? 1 : 0;
     this.uniforms.cvLiquidStrength.value = settings.effectsDensity;
+    this.uniforms.cvAtmosphere.value = settings.effectsDensity;
   }
   setState(power: readonly number[], liftProgress: number, elapsed: number): void {
     if (power.length !== ZONES.length) throw Error('Incorrect Cultivation lighting zone count.');
