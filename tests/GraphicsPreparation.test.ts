@@ -9,7 +9,7 @@ test('resolution, shadow size and capture scale do not change shader features; t
   assert.equal(graphicsShaderKey(standard), graphicsShaderKey({...standard,gelRenderingMode:'physical'}));
   assert.notEqual(graphicsShaderKey(minimum), graphicsShaderKey(standard));
   assert.notEqual(graphicsTransmissionResourceKey(standard), graphicsTransmissionResourceKey({...standard,gelRenderingMode:'physical'}));
-  assert.equal(graphicsTransmissionResourceKey({...standard,graphicsPreset:'performance'}),
+  assert.notEqual(graphicsTransmissionResourceKey({...standard,graphicsPreset:'performance'}),
     graphicsTransmissionResourceKey({...standard,graphicsPreset:'performance',gelRenderingMode:'physical'}));
   assert.equal(graphicsTransmissionResourceKey(minimum),graphicsTransmissionResourceKey({...minimum,renderScale:.5}));
   assert.notEqual(graphicsTransmissionResourceKey(standard),graphicsTransmissionResourceKey({...standard,renderScale:.5}));

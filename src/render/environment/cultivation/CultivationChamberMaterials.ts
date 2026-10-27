@@ -6,7 +6,7 @@ import {optimizeFiniteLightEvaluation} from './FiniteLightEvaluation.ts';
 
 /** Owns the chamber-specific cables and safe-floor boundary resources. */
 export class CultivationChamberMaterials {
-  readonly textures: THREE.DataTexture[] = [];
+  readonly textures: import('./CultivationBakedAssets.ts').CultivationTexture[] = [];
   readonly cable = new THREE.MeshStandardMaterial({ name: 'cultivation-reinforced-soluble-cable', color: 0x302922, roughness: 0.67, metalness: 0.22 });
   readonly warning: THREE.MeshStandardMaterial;
   private landing?:THREE.MeshStandardMaterial;
@@ -68,7 +68,7 @@ export class CultivationChamberMaterials {
 
   get diagnostics() {
     return { materialCount: 2, textureCount: this.textures.length,
-      textureBytes: this.textures.reduce((sum, texture) => sum + (texture.image.data?.byteLength ?? 0), 0), addedDrawCalls: this.decorations.length };
+      textureBytes: this.textures.reduce((sum, texture) => sum + (texture instanceof THREE.DataTexture ? texture.image.data?.byteLength??0 : texture.mipmaps.reduce((n,m)=>n+m.data.byteLength,0)), 0), addedDrawCalls: this.decorations.length };
   }
 
   dispose(): void {

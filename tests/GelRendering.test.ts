@@ -25,6 +25,20 @@ test('preset transmission cap composes with gel mode in either setting order', (
   assert.equal(renderer.transmissionResolutionScale, 1);
 });
 
+test('level capture budgets compose, preserve full gel mode and release independently across handoffs',()=>{
+  const renderer={transmissionResolutionScale:1},rendering=new GelRendering(renderer);
+  rendering.setTransmissionResolutionScaleCap(.5);rendering.setMode('reduced-transmission');
+  const first=rendering.requestReducedTransmissionCap(.25),second=rendering.requestReducedTransmissionCap(.35);
+  assert.equal(renderer.transmissionResolutionScale,.25);
+  rendering.setMode('physical');assert.equal(renderer.transmissionResolutionScale,.5);
+  rendering.setMode('minimum');assert.equal(renderer.transmissionResolutionScale,.5);
+  rendering.setMode('reduced-transmission');assert.equal(renderer.transmissionResolutionScale,.25);
+  rendering.setTransmissionResolutionScaleCap(.2);assert.equal(renderer.transmissionResolutionScale,.2);
+  rendering.setTransmissionResolutionScaleCap(.5);first();first();assert.equal(renderer.transmissionResolutionScale,.35);
+  second();assert.equal(renderer.transmissionResolutionScale,.5);
+  for(const cap of [0,-1,Infinity,NaN,1.1])assert.throws(()=>rendering.requestReducedTransmissionCap(cap),RangeError);
+});
+
 test('minimum gel removes transmission from every identity while preserving surface and fade state', () => {
   const renderer = { transmissionResolutionScale: 1 };
   const rendering = new GelRendering(renderer);

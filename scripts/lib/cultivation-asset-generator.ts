@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import {readFileSync} from 'node:fs';
-import {readRoomOneMaps} from '../../src/render/environment/containment/RoomOneShell.ts';
+import {createHash} from 'node:crypto';
+import {readRoomOneCompressedMaps} from '../../src/render/environment/containment/RoomOneShell.ts';
 import {
   type BakedArray, type BakedGeometry, type BakedTexture,
-  type CultivationAssetManifest, type CultivationAssetSource, type SurfaceRepairStep,
+  type CultivationAssetManifest, type CultivationAssetSource, type CultivationTexture, type SurfaceRepairStep,
 } from '../../src/render/environment/cultivation/CultivationBakedAssets.ts';
 import type { LevelTwoPreviewScene } from '../../src/levels/LevelTwoPreviewScene.ts';
 import { createCultivationEquipmentWear } from './CultivationEquipmentWear.ts';
@@ -66,52 +67,67 @@ for(const asset of CULTIVATION_BLENDER_ASSETS){
 export class CultivationAssetGenerator implements CultivationAssetSource {
   private readonly chunks: Uint8Array[] = [];
   private byteLength = 0;
+  private readonly arrays = new Map<string, BakedArray>();
   private readonly textureData: Record<string, Record<string, BakedTexture>> = {};
   private readonly geometryData: Record<string, BakedGeometry> = {};
   private readonly geometrySets: Record<string, string[]> = {};
   private readonly boundData: Record<string, Record<string, readonly number[]>> = {};
   private readonly repairs: SurfaceRepairStep[] = [];
-  private readonly textureCache = new Map<string, Record<string, THREE.DataTexture>>();
+  private readonly textureCache = new Map<string, Record<string, CultivationTexture>>();
 
-  private array(array: THREE.TypedArray): BakedArray {
+  private array(array: THREE.TypedArray, delta = 0): BakedArray {
     const type = array.constructor.name as BakedArray['type'];
-    if (!['Float32Array', 'Uint32Array', 'Uint16Array', 'Uint8Array'].includes(type)) throw new Error(`Unsupported bake array: ${type}`);
+    if (!['Float32Array', 'Int16Array', 'Uint32Array', 'Uint16Array', 'Uint8Array'].includes(type)) throw new Error(`Unsupported bake array: ${type}`);
+    const input = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+    const key = type + ':' + delta + ':' + createHash('sha256').update(input).digest('hex');
+    const existing = this.arrays.get(key);
+    if (existing) return existing;
     const padding = (4 - this.byteLength % 4) % 4;
     if (padding) { this.chunks.push(new Uint8Array(padding)); this.byteLength += padding; }
     const offset = this.byteLength;
-    const bytes = new Uint8Array(array.buffer, array.byteOffset, array.byteLength).slice();
+    const bytes = input.slice();
+    if(delta){
+      const Words=array.BYTES_PER_ELEMENT===4?Uint32Array:Uint16Array;
+      const words=new Words(bytes.buffer,bytes.byteOffset,bytes.byteLength/Words.BYTES_PER_ELEMENT);
+      for(let i=words.length-1;i>=delta;i--)words[i]-=words[i-delta];
+    }
     this.chunks.push(bytes); this.byteLength += bytes.byteLength;
-    return { offset, length: array.length, type };
+    const spec = { offset, length: array.length, type, ...(delta?{delta}:{}) };
+    this.arrays.set(key, spec); return spec;
   }
 
-  textures(key: string): Record<string, THREE.DataTexture> {
+  textures(key: string): Record<string, CultivationTexture> {
     const cached = this.textureCache.get(key);
     if (cached) return Object.fromEntries(Object.entries(cached).map(([role, map]) => [role, map.clone()]));
     const maps = this.generateTextures(key);
     this.textureCache.set(key, maps);
-    this.textureData[key] = Object.fromEntries(Object.entries(maps).map(([role, map]) => [role, {
-      pixels: this.array(map.image.data as Uint8Array), width: map.image.width, height: map.image.height,
+    this.textureData[key] = Object.fromEntries(Object.entries(maps).map(([role, map]) => {
+      const bc7 = map instanceof THREE.CompressedTexture ? map.mipmaps.map(mip => ({pixels:this.array(mip.data),width:mip.width,height:mip.height})) : undefined;
+      return [role, {
+      pixels: bc7 ? bc7[0].pixels : this.array(map.image.data as Uint8Array), ...(bc7 ? {bc7} : {}), width: map.image.width, height: map.image.height,
       name: map.name, colorSpace: map.colorSpace, wrapS: map.wrapS, wrapT: map.wrapT,
       magFilter: map.magFilter, minFilter: map.minFilter, generateMipmaps: map.generateMipmaps,
       anisotropy: map.anisotropy, repeat: map.repeat.toArray(), offset: map.offset.toArray(),
-    }]));
+    }];}));
     // Owners can change sampler state without changing the generation inputs.
     return Object.fromEntries(Object.entries(maps).map(([role, map]) => [role, map.clone()]));
   }
 
-  private generateTextures(key: string): Record<string, THREE.DataTexture> {
+  private generateTextures(key: string): Record<string, CultivationTexture> {
     switch (key) {
       case 'blender-finishes': {
         // Reuse the accepted Level 1 diffuse/normal/ORM bakes unchanged. One
         // shared bank serves every Cultivation room, rather than per-room maps.
-        const bytes=gunzipSync(readFileSync(new URL('../../assets/environments/containment-room-one/room-one-maps.bin',import.meta.url)));
-        const maps=readRoomOneMaps(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
+        const bytes=gunzipSync(readFileSync(new URL('../../assets/environments/containment-room-one/room-one-maps-bc7.bin',import.meta.url)));
+        const needsResin=CULTIVATION_BLENDER_ASSETS.some(asset=>asset.id!=='room-1'&&asset.id!=='escape-duct'&&
+          asset.batches.some(batch=>batch.finish==='Resin'||batch.finish==='Oxide'));
+        const maps=readRoomOneCompressedMaps(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)).filter((_,i)=>i<3||needsResin);
         const names=['ceramicColour','ceramicNormal','ceramicOrm','resinColour','resinNormal','resinOrm'];
         return Object.fromEntries(maps.map((map,index)=>{
-          const texture=new THREE.DataTexture(map.pixels,map.size,map.size,THREE.RGBAFormat);
+          const texture=new THREE.CompressedTexture([...map.mipmaps],map.size,map.size,THREE.RGBA_BPTC_Format);
           texture.name='cultivation-shared-level-one-'+names[index];
           texture.colorSpace=index%3===0?THREE.SRGBColorSpace:THREE.NoColorSpace;
-          texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.generateMipmaps=true;
+          texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.generateMipmaps=false;
           texture.minFilter=THREE.LinearMipmapLinearFilter;texture.magFilter=THREE.LinearFilter;
           texture.anisotropy=4;texture.needsUpdate=true;return[names[index],texture];
         }));
@@ -133,6 +149,7 @@ export class CultivationAssetGenerator implements CultivationAssetSource {
     }
     if (key.startsWith('weather-') && ['wall', 'floor', 'ceiling', 'metal'].includes(finish)) {
       const base = this.textures(`lab-${finish}`);
+      if (!(base.albedo instanceof THREE.DataTexture)) throw Error('Weather generation needs RGBA inputs.');
       const result = generateWeather(base.albedo, finish as Parameters<typeof generateWeather>[1]);
       Object.values(base).forEach(map => map.dispose());
       return result;
@@ -143,15 +160,34 @@ export class CultivationAssetGenerator implements CultivationAssetSource {
   geometry(key: string, generate: () => THREE.BufferGeometry): THREE.BufferGeometry {
     if (this.geometryData[key]) throw new Error(`Duplicate geometry bake key: ${key}`);
     const geometry = generate();
+    // Presentation normals and linear vertex colours do not need float32.
+    // Positions/UVs, topology, groups and authoritative collision stay exact.
+    if (key.startsWith('cultivation-blender-') || key.startsWith('cultivation-security-drones/')) {
+      for (const [name, Type, scale] of [['normal', Int16Array, 32767], ['color', Uint8Array, 255]] as const) {
+        const source = geometry.getAttribute(name);
+        if (!source) continue;
+        const normalizedColour16 = name==='color' && source.normalized && source.array instanceof Uint16Array;
+        if (!(source.array instanceof Float32Array) && !normalizedColour16) continue;
+        const minimum=name==='normal'?-1:0;
+        // Preserve HDR/other custom ranges instead of silently clamping them.
+        if (!normalizedColour16 && source.array.some(value=>!Number.isFinite(value)||value<minimum||value>1)) continue;
+        const values = new Type(source.array.length);
+        const factor=normalizedColour16?scale/65535:scale;
+        for (let i=0; i<values.length; i++) values[i] = Math.round(source.array[i] * factor);
+        geometry.setAttribute(name, new THREE.BufferAttribute(values, source.itemSize, true));
+      }
+      if (geometry.index?.array instanceof Uint32Array && geometry.getAttribute('position').count < 65536)
+        geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(geometry.index.array), 1));
+    }
     const attributes: Record<string, BakedArray & { itemSize: number; normalized: boolean }> = {};
     for (const [name, attribute] of Object.entries(geometry.attributes)) {
       if (attribute instanceof THREE.InterleavedBufferAttribute) throw new Error('Interleaved bake attributes are unsupported.');
-      attributes[name] = { ...this.array(attribute.array), itemSize: attribute.itemSize, normalized: attribute.normalized };
+      attributes[name] = { ...this.array(attribute.array,attribute.array.BYTES_PER_ELEMENT>1?attribute.itemSize:0), itemSize: attribute.itemSize, normalized: attribute.normalized };
     }
     geometry.computeBoundingBox(); geometry.computeBoundingSphere();
     const box = geometry.boundingBox!, sphere = geometry.boundingSphere!;
     this.geometryData[key] = {
-      attributes, ...(geometry.index ? { index: this.array(geometry.index.array) } : {}),
+      attributes, ...(geometry.index ? { index: this.array(geometry.index.array,geometry.index.array.BYTES_PER_ELEMENT>1?1:0) } : {}),
       groups: geometry.groups.map(group => ({ ...group })),
       ...(!box.isEmpty() ? { box: [...box.min.toArray(), ...box.max.toArray()] } : {}),
       sphere: [...sphere.center.toArray(), sphere.radius],

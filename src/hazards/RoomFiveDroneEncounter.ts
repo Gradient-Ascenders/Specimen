@@ -224,6 +224,12 @@ export class RoomFiveDroneEncounter {
     if (sewerState === 'dormant') this.room.sewer.eye.material.color.setHex(0x080b07);
     this.projectiles.update(dt, this.projectileTargets);
   }
+  /** Skins/effects only: the render scope never hides colliders or light owners. */
+  get chamberPresentationRoots():readonly THREE.Object3D[]{
+    return [...this.drones.map(drone=>drone.presentation.root),...this.flyers.filter(flyer=>!flyer.authored).map(flyer=>flyer.body),
+      ...this.beams,this.platformBoosters.root];
+  }
+
   /** Cosmetic queries run once per presented frame, after room/camera selection. */
   updatePresentation(deltaSeconds: number, camera: THREE.Camera): void {
     if (this.disposed) return;

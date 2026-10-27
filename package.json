@@ -31,7 +31,8 @@
     "validate:production": "node scripts/validate-production-build.mjs",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "benchmark:loading": "node scripts/benchmark-level-one-loading.mjs"
+    "benchmark:loading": "node scripts/benchmark-level-one-loading.mjs",
+    "benchmark:level-two": "node scripts/benchmark-level-two-performance.mjs"
   },
   "dependencies": {
     "@fontsource-variable/space-grotesk": "^5.3.0",

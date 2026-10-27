@@ -175,8 +175,9 @@ test('the actual Blender buffers replace old coverage and share one Level 1 fini
     const originals=scene.collisionMeshes.map(mesh=>({mesh,geometry:mesh.geometry,metadata:structuredClone(mesh.userData),
       position:mesh.position.toArray(),quaternion:mesh.quaternion.toArray(),scale:mesh.scale.toArray()}));
     assert.equal(scene.blenderArt.diagnostics.assets,CULTIVATION_BLENDER_ASSETS.length);
-    assert.equal(scene.blenderArt.diagnostics.newTextures,6);
-    assert.equal(scene.blenderArt.diagnostics.textureBytes,24*1024*1024);
+    assert.equal(scene.blenderArt.diagnostics.newTextures,3);
+    assert.equal(scene.blenderArt.diagnostics.textureBytes,6291536);
+    assert.equal(scene.blenderArt.diagnostics.compressedFinishes,true);
     assert.ok(scene.blenderArt.diagnostics.retiredMeshes>0);
     for(const asset of CULTIVATION_BLENDER_ASSETS){
       const root=(scene as any)[asset.owner].root as THREE.Group;
@@ -196,6 +197,7 @@ test('the actual Blender buffers replace old coverage and share one Level 1 fini
         const mesh=root.getObjectByName(batch.name) as THREE.Mesh;
         assert.ok(mesh?.geometry.getAttribute('uv'),batch.name);
         assert.ok(mesh.geometry.getAttribute('color'),batch.name);
+        assert.ok(mesh.geometry.getAttribute('color').array instanceof Uint8Array,'authored normalized colours use one byte per channel');
         assert.equal(mesh.matrixAutoUpdate,false,'immutable local matrices still inherit their existing moving owner');
         assert.equal(mesh.parent,batch.target?root.getObjectByName(batch.target):asset.owner==='roomFour'?scene.roomFourGeometry:root);
         if(batch.finish.endsWith('Lamp'))assert.equal((mesh.material as THREE.MeshStandardMaterial).emissiveIntensity,

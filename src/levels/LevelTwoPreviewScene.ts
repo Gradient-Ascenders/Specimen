@@ -4,6 +4,7 @@ import { CultivationRoomWorkload, CULTIVATION_ROOM_IDS } from './CultivationRoom
 import { freezeStaticTransforms } from '../render/StaticTransforms.ts';
 import { CultivationSurfaceCleanup } from '../render/environment/cultivation/CultivationSurfaceCleanup.ts';
 import { CultivationBlenderArt } from '../render/environment/cultivation/CultivationBlenderArt.ts';
+import { CultivationRoomFiveCulling } from '../render/environment/cultivation/CultivationRoomFiveCulling.ts';
 import { CultivationSurveillanceArt } from '../render/environment/cultivation/CultivationSurveillanceArt.ts';
 import { CultivationAssetOwner, type CultivationAssetSource } from '../render/environment/cultivation/CultivationBakedAssets.ts';
 import { applyCultivationShadowRoles } from '../render/environment/cultivation/CultivationShadowCoverage.ts';
@@ -143,6 +144,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
   readonly elevatorArt: CultivationElevatorArt;
   readonly surfaceCleanup: CultivationSurfaceCleanup;
   readonly blenderArt: CultivationBlenderArt;
+  readonly roomFiveCulling:CultivationRoomFiveCulling;
   readonly surveillanceArt: CultivationSurveillanceArt;
   readonly roomOneObservation: CultivationRoomOneObservation;
   readonly roomTwoObservation: CultivationRoomTwoObservation;
@@ -290,6 +292,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
     this.surfaceCleanup = new CultivationSurfaceCleanup(this, this.assets);
     this.elevatorArt.installDepthPointer(this.roomFour);
     this.blenderArt = new CultivationBlenderArt(this);
+    this.roomFiveCulling=new CultivationRoomFiveCulling(this.roomFive.root);
     // Apply the offline bank's index paths before splitting render scope.
     // These identity groups retain the existing world transforms and owners.
     for (const node of lightNodes) this.roomFourLighting.add(node);
@@ -584,6 +587,7 @@ export class LevelTwoPreviewScene extends CultivationAssetOwner {
   }
 
   dispose(): void {
+    this.roomFiveCulling.restore();
     this.workload.dispose();
     this.surveillanceArt.dispose();
     this.roomOneObservation.dispose();

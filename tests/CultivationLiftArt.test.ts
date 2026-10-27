@@ -13,8 +13,8 @@ test('the authored lift depth pointer follows the real descent and reset, with r
     assert.ok(pointer.children.some(mesh=>mesh.name.includes('Depth')||mesh.name.includes('depth-pointer')));
     assert.equal(scene.elevatorArt.diagnostics.geometryCount,0,'Superseded procedural dressing is never prepared.');
     assert.equal(room.root.getObjectByName('room-4-art-shaft-0-0'),undefined);
-    assert.equal(scene.blenderArt.diagnostics.newTextures,6);
-    assert.equal(scene.blenderArt.diagnostics.textureBytes,24*1024*1024);
+    assert.equal(scene.blenderArt.diagnostics.newTextures,3);
+    assert.equal(scene.blenderArt.diagnostics.textureBytes,6291536);
     const emitters:THREE.Mesh[]=[];
     room.root.traverse(o=>{if(o instanceof THREE.Mesh&&o.name.endsWith('_LiftLamp'))emitters.push(o);});
     assert.equal(emitters.length,8,'Each original scrolling module retains its six practical strips.');

@@ -3,9 +3,17 @@ import type {LevelTwoPreviewScene} from '../../../levels/LevelTwoPreviewScene.ts
 import {CULTIVATION_BLENDER_ASSETS} from './CultivationBlenderManifest.ts';
 import {optimizeFiniteLightEvaluation} from './FiniteLightEvaluation.ts';
 import type {DissolveTarget} from '../../../abilities/DissolveTarget.ts';
+import {ROOM_ONE_MAPS_URL, readRoomOneMaps, type RoomOneMap} from '../containment/RoomOneShell.ts';
+import {readGzipResponse} from '../ReadGzipResponse.ts';
+
+async function loadFallbackMaps(signal:AbortSignal):Promise<readonly RoomOneMap[]>{
+  const response=await fetch(ROOM_ONE_MAPS_URL,{signal});
+  if(!response.ok)throw Error('Could not load Cultivation fallback finishes.');
+  return readRoomOneMaps(await readGzipResponse(response,signal));
+}
 
 /** Pure presentation adapter. Runtime controller roots still own every pose.
- * The existing asset bank supplies exact GLB buffers before GPU preparation. */
+ * The asset bank supplies exact positions and compact normal/colour buffers. */
 export class CultivationBlenderArt {
   private readonly hidden=new THREE.MeshBasicMaterial({visible:false});
   private readonly hiddenSoluble=new THREE.MeshStandardMaterial({visible:false});
@@ -17,13 +25,17 @@ export class CultivationBlenderArt {
   private readonly geometries=new Set<THREE.BufferGeometry>();
   private readonly materials=new Map<string,THREE.MeshStandardMaterial|THREE.MeshBasicMaterial>();
   private readonly textures:THREE.Texture[]=[];
+  private readonly abort=new AbortController();
+  private preparation:Promise<void>|undefined;
   private disposed=false;
-  readonly diagnostics={assets:0,meshes:0,geometries:0,triangles:0,retiredMeshes:0,newTextures:0,textureBytes:0};
+  readonly diagnostics={assets:0,meshes:0,geometries:0,triangles:0,retiredMeshes:0,newTextures:0,textureBytes:0,compressedFinishes:false};
   constructor(scene:LevelTwoPreviewScene){
     const maps=CULTIVATION_BLENDER_ASSETS.length?scene.assets.textures('blender-finishes'):undefined;
     if(maps){
       this.textures.push(...Object.values(maps));this.diagnostics.newTextures=this.textures.length;
-      this.diagnostics.textureBytes=Object.values(maps).reduce((sum,texture)=>sum+(texture.image.data?.byteLength??0),0);
+      this.diagnostics.textureBytes=Object.values(maps).reduce((sum,texture)=>sum+(texture instanceof THREE.CompressedTexture
+        ? texture.mipmaps.reduce((n,mip)=>n+mip.data.byteLength,0) : texture.image.data?.byteLength??0),0);
+      this.diagnostics.compressedFinishes=Object.values(maps).every(texture=>texture instanceof THREE.CompressedTexture);
     }
     const legacy=new Map<string,THREE.MeshBasicMaterial>();
     scene.voltFinaleSet.annex.traverse(o=>{
@@ -143,6 +155,32 @@ export class CultivationBlenderArt {
       this.diagnostics.geometries=this.geometries.size;
     }catch(error){this.dispose();throw error;}
   }
+  /** Native blocks are already in the level bank. Unsupported devices fetch
+   * the original RGBA maps before shader collection or any GPU upload. */
+  prepare(renderer:Pick<THREE.WebGLRenderer,'extensions'>,loader=loadFallbackMaps):Promise<void>{
+    if(this.disposed||!this.diagnostics.compressedFinishes||renderer.extensions.has('EXT_texture_compression_bptc'))return Promise.resolve();
+    return this.preparation??=loader(this.abort.signal).then(maps=>{
+      if(this.disposed)return;
+      if(maps.length<this.textures.length)throw Error('Incomplete Cultivation fallback finishes.');
+      const replacements=new Map<THREE.Texture,THREE.DataTexture>();
+      for(const [index,old]of this.textures.entries()){
+        const map=maps[index],texture=new THREE.DataTexture(map.pixels,map.size,map.size,THREE.RGBAFormat);
+        texture.name=old.name;texture.colorSpace=old.colorSpace;texture.wrapS=old.wrapS;texture.wrapT=old.wrapT;
+        texture.magFilter=old.magFilter;texture.minFilter=old.minFilter;texture.anisotropy=old.anisotropy;
+        texture.repeat.copy(old.repeat);texture.offset.copy(old.offset);texture.generateMipmaps=true;texture.needsUpdate=true;
+        replacements.set(old,texture);
+      }
+      const materials=new Set<THREE.Material>(this.materials.values());
+      for(const mesh of this.meshes)for(const material of [mesh.material].flat())materials.add(material);
+      for(const material of materials)if(material instanceof THREE.MeshStandardMaterial){
+        for(const key of ['map','normalMap','roughnessMap'] as const){const old=material[key];if(old&&replacements.has(old))material[key]=replacements.get(old)!;}
+        material.needsUpdate=true;
+      }
+      for(let i=0;i<this.textures.length;i++){const old=this.textures[i];this.textures[i]=replacements.get(old)!;old.dispose();}
+      this.diagnostics.compressedFinishes=false;
+      this.diagnostics.textureBytes=maps.slice(0,this.textures.length).reduce((sum,map)=>sum+map.pixels.byteLength,0);
+    }).catch(error=>{this.preparation=undefined;if(!this.disposed)throw error;});
+  }
   /** The existing encounter owns deployment poses and visibility; this layer
    * lends only its prepared authored skin until that encounter unloads. */
   attachRuntimeOwners(root:THREE.Object3D):()=>void{
@@ -177,7 +215,7 @@ export class CultivationBlenderArt {
     }
   }
   dispose():void{
-    if(this.disposed)return;this.disposed=true;
+    if(this.disposed)return;this.disposed=true;this.abort.abort();
     for(const detach of this.runtimeBindings)detach();
     for(const skin of this.solubleSkins){skin.material?.dispose();skin.mesh.customDepthMaterial=undefined;skin.mesh.customDistanceMaterial=undefined;}
     for(const mesh of this.meshes)mesh.removeFromParent();

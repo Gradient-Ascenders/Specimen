@@ -348,7 +348,9 @@ export class CultivationPreparationQueue {
       // the hidden originals only lengthens startup and background slices.
       if (!materials.some(material => material.visible)) continue;
       const geometry = source.geometry;
-      const feature = source.type + ':' + source.receiveShadow + ':' + (source instanceof THREE.InstancedMesh ? 'instanced:' + !!source.instanceColor : 'ordinary') + ':' +
+      // receiveShadow is a uniform in Three r185, not a shader variant. The
+      // same live material/geometry features can share a preparation copy.
+      const feature = source.type + ':' + (source instanceof THREE.InstancedMesh ? 'instanced:' + !!source.instanceColor : 'ordinary') + ':' +
         Object.entries(geometry.attributes).map(([name, a]) => name + a.itemSize + ':' + a.normalized).sort().join(',') + ':' +
         Object.entries(geometry.morphAttributes).map(([name, entries]) => name + ':' + entries.length).sort().join(',');
       const proxy = clonePrewarmDrawable(source, this.instanceDisposers) as Drawable; proxy.visible = true; proxy.frustumCulled = false; proxy.castShadow = false;

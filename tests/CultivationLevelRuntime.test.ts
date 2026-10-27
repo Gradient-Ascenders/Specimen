@@ -19,7 +19,8 @@ test('normal render never overwrites borrowed finale actors with a second world 
   const bob=body(),goop=body(),volt=body();
   const movie={active:true,present(){movieFrames++;}};
   const renderLayer={scene:new THREE.Scene(),cameraRig:{camera:new THREE.PerspectiveCamera(),aimPresentationWeight:0,
-    setThirdPersonOverride(){},isFirstPersonForTarget(){return false;},setContextualCamera(){},update(){},queueLookInput(){}},renderer:{compile(){}},render(){draws++;}};
+    setThirdPersonOverride(){},isFirstPersonForTarget(){return false;},setContextualCamera(){},update(){},queueLookInput(){}},
+    renderer:{compile(){},shadowMap:{type:THREE.PCFShadowMap}},render(){draws++;}};
   const runtime=new CultivationLevelRuntime({authoredAssets:cultivationAssets,host:{dataset:{}} as unknown as HTMLElement,
     input:{enabled:true,endPointerUpdate(){}} as unknown as Input,renderLayer:renderLayer as unknown as RenderLayer,
     progression:{unlockedSlimeIds:['bob','goop'],activeSlimeId:'bob'},window:new EventTarget() as unknown as Window,debugAvailable:false});
@@ -28,7 +29,7 @@ test('normal render never overwrites borrowed finale actors with a second world 
     renderedBobPosition:new THREE.Vector3(),renderedGoopPosition:new THREE.Vector3(),renderedVoltPosition:new THREE.Vector3(),
     bobPresentation:presentation(0),goopPresentation:presentation(1),voltPresentation:presentation(2),
     controller:{readModel:{state:'playing'}},deathSequence:{isPlaying:true},manager:{activeSlimeId:'bob',isAvailable:()=>false},
-    scene:{setDarkRoomLighting(){}},goopAcidPresentation:{update(){}},pairPresentation:{update(){}}};
+    scene:{setDarkRoomLighting(){}},lightingPass:{setQuality(){},update(){}},goopAcidPresentation:{update(){}},pairPresentation:{update(){}}};
   const stats={frameDeltaSeconds:1/60,rawFrameDeltaSeconds:1/60} as LoopStats;
   runtime.render(.5,stats);
   assert.deepEqual(writes,[0,0,0]);assert.deepEqual(presents,[0,0,0]);

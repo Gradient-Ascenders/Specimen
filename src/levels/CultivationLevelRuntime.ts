@@ -224,6 +224,7 @@ export class CultivationLevelRuntime {
   private readonly input: Input;
   private readonly renderLayer: RenderLayer;
   private shadowRequest: RenderShadowRequest | undefined;
+  private releaseReducedTransmissionCap:(()=>void)|undefined;
   private readonly hostWindow: Window;
   private readonly debugAvailable: boolean;
   private readonly sentryPreviewAvailable = import.meta.env?.DEV === true;
@@ -358,10 +359,14 @@ export class CultivationLevelRuntime {
 
   preparePresentation(): Promise<void> {
     const resources = this.requireResources();
+    // Set the capture budget before the queue primes its retained framebuffer;
+    // gameplay must not resize it on the first controllable frame.
+    this.releaseReducedTransmissionCap??=this.renderLayer.gelRendering.requestReducedTransmissionCap(.25);
     return this.presentationPreparation ??= Promise.all([
       resources.bobPresentation.prepare(),
       resources.goopPresentation.prepare(),
       resources.voltPresentation.prepare(),
+      ...(resources.authoredPreview ? [resources.authoredPreview.blenderArt.prepare(this.renderLayer.renderer)] : []),
       ...(resources.authoredPreview ? [resources.authoredPreview.roomFive.captiveVoltPresentation.prepare()] : []),
     ])
       .then(async () => {
@@ -1007,8 +1012,12 @@ export class CultivationLevelRuntime {
       }
       this.cameraShadowCulling?.prepare(this.renderLayer.cameraRig.camera);
       try {
+        // The finale borrows these craft and flies them out of the chamber.
+        resources.authoredPreview?.roomFiveCulling.prepare(this.renderLayer.cameraRig.camera,
+          resources.pair.activeBody.position,!resources.roomFiveFinale?.active);
         this.renderLayer.render();
       } finally {
+        resources.authoredPreview?.roomFiveCulling.restore();
         this.cameraShadowCulling?.restore();
       }
     } finally {
@@ -1449,6 +1458,8 @@ export class CultivationLevelRuntime {
         authoredPreview.labArt.metal, authoredPreview.root, authoredPreview.securityDroneModels) : undefined;
       if (roomFiveEncounter) {
         rollback(() => roomFiveEncounter.dispose());
+        authoredPreview!.roomFiveCulling.registerChamber(...roomFiveEncounter.chamberPresentationRoots,
+          authoredPreview!.roomFive.captiveVoltPresentation.root);
         addCultivationRoomThreeBoosters(roomFiveEncounter.platformBoosters, authoredPreview!.roomThree);
         addCultivationButtonPlatformBooster(roomFiveEncounter.platformBoosters, authoredPreview!.roomTwo);
         roomFiveEncounter.presentation.mesh.name = 'cultivation-room-5-drone-projectiles';
@@ -1778,6 +1789,7 @@ export class CultivationLevelRuntime {
     resources.roomFiveEncounter?.dispose();
     this.shadowRequest?.dispose();
     this.shadowRequest = undefined;
+    this.releaseReducedTransmissionCap?.();this.releaseReducedTransmissionCap=undefined;
     resources.voltPresentation.dispose();
     resources.damageVignette?.dispose();
     resources.droneProjectilePresentation?.dispose();

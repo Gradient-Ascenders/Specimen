@@ -26,7 +26,7 @@ interface LabFixtureOptions {
 
 /** Original, deterministic facility finishes shared by the dressed Cultivation rooms. */
 export class CultivationLabMaterials extends CultivationAssetOwner {
-  readonly textures: THREE.DataTexture[] = [];
+  readonly textures: import('./CultivationBakedAssets.ts').CultivationTexture[] = [];
   private readonly stickyMaps = createCultivationMembraneTextures(this.assets);
   readonly sticky = createCultivationMembraneMaterial(this.stickyMaps);
   private readonly nurseryStickyMaps=createCultivationBiofilmTextures(this.assets);
@@ -38,6 +38,7 @@ export class CultivationLabMaterials extends CultivationAssetOwner {
   readonly duct = this.finish('duct', 0x879391, 0.65, 0.7);
   private readonly platformMaps = (() => {
     const { ceramicNormal, ceramicRoughness } = this.assets.textures('ceramic');
+    if (!(ceramicNormal instanceof THREE.DataTexture) || !(ceramicRoughness instanceof THREE.DataTexture)) throw Error('Invalid ceramic texture family.');
     return { ceramicNormal, ceramicRoughness };
   })();
   readonly platform = createContainmentPlatformMaterial(this.platformMaps);
@@ -269,7 +270,7 @@ export class CultivationLabMaterials extends CultivationAssetOwner {
 
   get diagnostics() {
     return { materialCount: 15, textureCount: this.textures.length,
-      textureBytes: this.textures.reduce((sum, texture) => sum + (texture.image.data?.byteLength ?? 0), 0),
+      textureBytes: this.textures.reduce((sum, texture) => sum + (texture instanceof THREE.DataTexture ? texture.image.data?.byteLength??0 : texture.mipmaps.reduce((n,m)=>n+m.data.byteLength,0)), 0),
       dressedMeshCount: this.bindings.length, addedDrawCalls: this.decorations.length * 2 };
   }
 

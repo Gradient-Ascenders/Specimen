@@ -76,8 +76,14 @@ npm run build
 
 The registration step reads the actual GLBs, rejects non-geometry exports and
 invalid node names, and aliases identical immutable buffers. The offline bank
-generator imports those exact buffers. Runtime loads the established compressed
-asset bank; it does not import Blender, the generator or the GLBs.
+generator preserves their exact positions, UVs, topology and bounds. Presentation
+normals use normalized signed 16-bit values; linear vertex colours use normalized
+8-bit values. Maximum component rounding errors are `0.5/32767` and `0.5/255`.
+Index buffers use 16 bits when they fit without the reserved restart index.
+Identical arrays share immutable bank storage; each runtime geometry still owns
+its editable arrays. Lossless word deltas improve gzip compression and decode
+directly into those owned arrays. Runtime loads the compressed asset bank; it
+does not import Blender, the generator or the GLBs.
 
 ## Ownership, finishes and preparation
 
@@ -88,14 +94,28 @@ materials exclude them from preparation. New local matrices are frozen; world
 matrices inherit their original controllers. Aliased geometries, shared finishes
 and maps each have one disposal owner. Disposal restores original bindings.
 
-The complete level shares one existing Containment Room 1 diffuse/normal/ORM
-bank: six maps, 24 MiB before mipmaps, about 32 MiB with mipmaps. These images are
-unchanged; no lighting or radiance is baked. The escape airway reuses its existing
+The level bank includes only the used Containment ceramic diffuse/normal/ORM
+family, using the accepted Level 1 BC7 blocks and complete mip chains (6 MiB).
+The unused resin family is omitted. Devices without BPTC fetch the original
+RGBA family before GPU preparation (18 MiB before mipmaps, 24 MiB with mipmaps).
+Sampler settings and source bakes remain the same. The escape airway reuses its existing
 unlit finish policy. The later Room 1 art revision explicitly authorizes moving
 its two neutral fills and two existing shadow keys to the modelled practicals.
 Their final room-local positions are `[-9,17.85,15.5]` and `[9,17.85,35]`, with
 one fill/key pair per fixture. All other light placements, light counts,
 activation, colours, intensities, shadow settings and role policy are unchanged.
+
+Room 5 uses a conservative render scope across the opaque chamber/sewer wall.
+It masks static batches and registered chamber skins/effects only when both the
+camera and active player are inside one sector; fork, portal and return-route
+views retain both. Each draw restores original visibility in `finally`. Lights,
+colliders, mechanism state, inactive bodies and mandatory preparation remain
+under their existing owners.
+
+For Level 2, Balanced gel uses a quarter-dimension background-refraction capture
+before mandatory GPU preparation. The full physical gel option retains its
+requested capture quality; unloading releases the level's budget. This affects
+the background seen through gel, independently of scene resolution and shadows.
 
 Room 1 uses dirty white/grey painted panels, vertex-painted wear and the existing
 weather/deck maps. Foliage is modelled with folded, thick leaves and closed stems;

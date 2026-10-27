@@ -10,7 +10,7 @@ type Finish = 'wall' | 'floor' | 'ceiling' | 'metal';
 
 /** Rooms 1–3 only. Borrows the lab's relief maps; owns weather maps and static dressing. */
 export class CultivationContaminationArt {
-  readonly textures: THREE.DataTexture[] = [];
+  readonly textures: THREE.Texture[] = [];
   readonly finishes: Record<Finish, THREE.MeshStandardMaterial>;
   readonly glass: THREE.MeshStandardMaterial;
   readonly roots: THREE.Group[] = [];
@@ -313,7 +313,7 @@ export class CultivationContaminationArt {
   }
 
 
-  private glassAtlas(): THREE.DataTexture {
+  private glassAtlas(): THREE.Texture {
     const map = this.assets.textures('glass').albedo;
     this.textures.push(map);
     return map;
