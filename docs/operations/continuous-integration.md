@@ -19,7 +19,7 @@ Each smoke shard uses one software-rendering worker. The `Production smoke`
 aggregate check passes only when both shards succeed.
 
 The unit suite is capped at **500 expanded test cases**, including cases
-registered by parameter loops. The curated suite contains 480 cases across 56
+registered by parameter loops. The curated suite contains 483 cases across 57
 files, counted from retained source and the last completed CI log without a new
 test run. It prioritises collision and movement, abilities, level progression,
 checkpoints and recovery, boss combat, loading cancellation and shadow preparation.

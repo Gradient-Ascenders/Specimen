@@ -2,6 +2,10 @@ import { expect, test, type Page } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { ENDING_TIMING as T, endingGoopHitTime } from '../../src/cinematics/BossDefeatTimeline.ts';
 
+const endingMusic = (page: Page) => page.evaluate(() => ((window as any).__endingMusicPlayers as HTMLAudioElement[])
+  .filter(p => p.src.includes('10-blackout-first-sunlight-ending.ogg'))
+  .map(p => ({ time: p.currentTime, paused: p.paused, loop: p.loop, rate: p.playbackRate, volume: p.volume, error: p.error?.message })));
+
 async function advance(page: Page, seconds: number) {
   await page.evaluate(t => {
     const r = (window as any).__endingSession.runtime, movie = r.resources.defeatFinale;
@@ -16,6 +20,23 @@ test('boss defeat plays the balanced struggle, unmerge, last stand, daylight and
   page.on('pageerror', e => failures.push(e.message));
   page.on('console', m => { if (m.type() === 'error' || /GL_INVALID_|CONTEXT_LOST_WEBGL/.test(m.text())) failures.push(m.text()); });
   page.on('response', r => { if (r.status() >= 400) failures.push(`${r.status()}: ${r.url()}`); });
+  await page.addInitScript(() => {
+    const Original = window.Audio;
+    (window as any).__endingMusicPlayers = []; (window as any).__endingMusicLoads = []; (window as any).__endingMusicRequests = []; (window as any).__endingNativePlayed = [];
+    window.Audio = new Proxy(Original, { construct(target, args) {
+      const player = Reflect.construct(target, args) as HTMLAudioElement;
+      (window as any).__endingMusicPlayers.push(player);
+      player.addEventListener('loadstart', () => (window as any).__endingMusicLoads.push(player.src));
+      player.addEventListener('playing', () => (window as any).__endingNativePlayed.push(player.src));
+      const play = player.play.bind(player);
+      player.play = () => {
+        (window as any).__endingMusicRequests.push({ src: player.src, time: player.currentTime,
+          overlap: (window as any).__endingMusicPlayers.filter((p: HTMLAudioElement) => p !== player && !p.paused).map((p: HTMLAudioElement) => p.src) });
+        return play();
+      };
+      return player;
+    } });
+  });
   await page.route('**/assets/index-*.js', async route => {
     const response = await route.fetch(), body = await response.text(), pattern = /([A-Za-z_$][\w$]*)=new ([A-Za-z_$][\w$]*)\(\{initialRuntime:/;
     expect(body).toMatch(pattern); await route.fulfill({ response, body: body.replace(pattern, '$1=globalThis.__endingSession=new $2({initialRuntime:') });
@@ -31,6 +52,7 @@ test('boss defeat plays the balanced struggle, unmerge, last stand, daylight and
   await page.getByRole('button', { name: 'Level 3 Blackout', exact: true }).click();
   await page.getByRole('button', { name: 'Enter Level 3', exact: true }).click({ timeout: 240_000 });
   await page.waitForFunction(() => document.querySelector('.game-flow')?.getAttribute('data-state') === 'playing', null, { timeout: 240_000 });
+  expect(await endingMusic(page), 'GPU rehearsal must not acquire the ending recording').toHaveLength(0);
   const trigger = await page.evaluate(() => {
     const r = (window as any).__endingSession.runtime;
     r.renderLayer.setAnimationLoop(null); for (let i = 0; i < 600; i++) r.fixedUpdate(1 / 60);
@@ -47,6 +69,22 @@ test('boss defeat plays the balanced struggle, unmerge, last stand, daylight and
   expect(trigger.before).toBeGreaterThan(0); expect(trigger.after).toBe(0); expect(trigger.active).toBe(true);
   expect(trigger.prepared.complete).toBe(true); expect(trigger.prepared.frames).toBeGreaterThanOrEqual(20);
   await expect(page.locator('#app')).toHaveAttribute('data-cinematic', 'boss-defeat');
+  // Keep the live clock moving while native metadata/decoding settles;
+  // deliberately freezing it would correctly invoke the 250ms stall pause.
+  await expect.poll(async () => {
+    await page.evaluate(() => (window as any).__endingSession.runtime.fixedUpdate(1 / 60));
+    return page.evaluate(() => (window as any).__endingNativePlayed.some((src: string) => src.includes('10-blackout')));
+  }, { intervals: [50], timeout: 20_000 }).toBe(true);
+  const request = await page.evaluate(() => (window as any).__endingMusicRequests.find((p: any) => p.src.includes('10-blackout')));
+  expect(request.time).toBe(0); expect(request.overlap).toEqual([]);
+  expect((await endingMusic(page))[0]).toMatchObject({ loop: false, rate: 1, error: undefined });
+  const unfocused = await page.context().newPage(); await unfocused.goto('about:blank'); await unfocused.bringToFront();
+  await expect.poll(async () => (await endingMusic(page))[0]?.paused).toBe(true);
+  await page.bringToFront(); await unfocused.close();
+  await expect.poll(async () => {
+    await page.evaluate(() => (window as any).__endingSession.runtime.fixedUpdate(1 / 60));
+    return (await endingMusic(page))[0]?.paused;
+  }, { intervals: [50] }).toBe(false);
   const samples = [[2, '01-broken-boss'], [6, '02-specimen-charge'], [10, '03-boss-charge'],
     [12.5, '03b-boss-beam-launch'], [T.specimenFire - .05, '03c-specimen-before-launch'], [T.specimenFire + .08, '03d-specimen-beam-launch'], [16, '04-balanced-beams'],
     [18, '05-specimen-strain'], [20, '06-boss-strain'], [23, '07-wide-deadlock'], [29, '08-collision-orbit'],
@@ -61,6 +99,10 @@ test('boss defeat plays the balanced struggle, unmerge, last stand, daylight and
   const metrics: unknown[] = [];
   for (const [t, name] of samples.filter(([t]) => process.env.SPECIMEN_ENDING_REFRAME !== '1' || t >= T.destruction)) {
     await advance(page, t);
+    if ([2, T.black + 2, T.daylight + 5, T.credits + 5].includes(t)) {
+      await expect.poll(async () => (await endingMusic(page))[0]?.time).toBeGreaterThan(t - .4);
+      expect(await page.evaluate(() => (window as any).__endingMusicLoads.filter((src: string) => src.includes('10-blackout')).length)).toBe(1);
+    }
     const frame = await page.evaluate(() => {
       const r = (window as any).__endingSession.runtime, l = r.renderLayer;
       r.render(1, { frameDeltaSeconds: 1 / 60 });
@@ -85,9 +127,12 @@ test('boss defeat plays the balanced struggle, unmerge, last stand, daylight and
       await expect(page.locator('.ending-credits')).toContainText('Kevin Ebrahim');
       await expect(page.locator('.ending-credits')).toContainText('Uzair Mahomed');
       await expect(page.locator('.ending-credits')).toContainText('Thank you for playing');
+      await expect(page.locator('.ending-credits p').filter({ hasText: /^Claimed by the Void — vitalezzz$/ })).toHaveCount(1);
+      await expect(page.locator('.ending-credits p').filter({ hasText: /^Exploration Theme — Cleyton Kauffman$/ })).toHaveCount(1);
     }
     if (t === T.sacrifice + .8) {
       await page.keyboard.press('p'); await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'paused');
+      await expect.poll(async () => (await endingMusic(page))[0]?.paused).toBe(true);
       const frozen = await page.evaluate(() => (window as any).__endingSession.runtime.resources.defeatFinale.seconds);
       await advance(page, T.sacrifice + 1.8); expect(await page.evaluate(() => (window as any).__endingSession.runtime.resources.defeatFinale.seconds)).toBe(frozen);
       await page.locator('[data-action="resume"]').click();
@@ -117,6 +162,7 @@ test('boss defeat plays the balanced struggle, unmerge, last stand, daylight and
   });
   expect(ending.phase).toBe('complete'); expect(ending.complete).toBe(true); expect(ending.active).toBe(false); expect(ending.inputEnabled).toBe(false);
   expect(ending.cinematic).toBeUndefined();
+  expect((await endingMusic(page)).every(p => p.paused)).toBe(true);
   expect(failures).toEqual([]);
   await writeFile(info.outputPath('ending-evidence.json'), JSON.stringify({ trigger, metrics, ending, failures }, null, 2));
 });

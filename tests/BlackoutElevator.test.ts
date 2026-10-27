@@ -11,6 +11,7 @@ import { BobCharacterPresentation } from '../src/render/bob/BobCharacterPresenta
 import { GoopCharacterPresentation } from '../src/render/goop/GoopCharacterPresentation.ts';
 import { VoltCharacterPresentation } from '../src/render/volt/VoltCharacterPresentation.ts';
 import { gameplayAudioEvents } from '../src/audio/GameplayAudioEvents.ts';
+import { cinematicMusicEvents, type CinematicMusic } from '../src/audio/CinematicMusic.ts';
 
 function setup() {
   const lift = new BlackoutAscentLift(), root = new THREE.Group(), world = new CollisionWorld(), surfaces = new SurfaceRegistry();
@@ -184,6 +185,32 @@ test('skip and reset release movie ownership without waiting for the motor, and 
     assert.equal(s.camera.fov, 48); assert.equal(s.presentations.bob.root.parent, s.root);
     s.movie.dispose(); s.movie.dispose(); assert.equal(s.movie.begin(s.camera), false);
   } finally { s.dispose(); }
+});
+
+test('ascent music follows live boarding and releases once on completion, skip, reset and disposal', () => {
+  const s = setup(), started: CinematicMusic[] = [], stopped: CinematicMusic[] = [];
+  const offStart = cinematicMusicEvents.on('started', cue => started.push(cue));
+  const offStop = cinematicMusicEvents.on('stopped', cue => stopped.push(cue));
+  try {
+    for (const finish of ['complete', 'skip', 'reset', 'dispose'] as const) {
+      s.movie.reset();
+      assert.equal(s.movie.begin(s.camera), true);
+      const cue = started.at(-1)!;
+      assert.equal(cue.track, 'ascent');
+      assert.equal(cue.duration, s.movie.boardingSeconds + T.duration);
+      assert.equal(cue.seconds, 0);
+      s.movie.update(1 / 60);
+      assert.equal(cue.seconds, s.movie.seconds);
+      if (finish === 'complete') while (s.movie.active) s.movie.update(1 / 60);
+      else if (finish === 'skip') s.movie.update(1 / 60, true);
+      else if (finish === 'reset') s.movie.reset();
+      else s.movie.dispose();
+      assert.equal(cue.playing, false);
+      assert.equal(stopped.filter(item => item === cue).length, 1);
+    }
+    assert.equal(started.length, 4);
+    assert.deepEqual(stopped, started);
+  } finally { offStart(); offStop(); s.dispose(); }
 });
 
 test('passing lights fade at the shaft-pool wrap instead of flashing or changing the light layout', () => {
