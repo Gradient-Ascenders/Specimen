@@ -40,6 +40,18 @@ function fixture(random=()=>0,invincible=true,orbitingPlatforms=false) {
   return {arena,world,targets,body,weapon,aimDirection,presentation,boss,dash,get damageReactions(){return damageReactions;},get dodges(){return dodges;},tick,killSquad,dispose:()=>{boss.dispose();weapon.dispose();targets.dispose();arena.dispose();world.clear();surfaces.clear();}};
 }
 
+test('defeating the boss preserves its damaged hull for the finale without a legacy finishing shot or explosion', () => {
+  const f = fixture(); try {
+    const model = f.boss.controller.readModel;
+    for (const progress of [0, .3, .5, .7, .95]) {
+      f.presentation.update({ ...model, state: 'defeated', progress }, progress * 7, f.body);
+      assert.equal(f.presentation.machine.visible, true);
+      assert.ok(f.presentation.machine.position.y > T.hoverY - 2);
+      assert.equal(f.presentation.finalShot.visible, false); assert.equal(f.presentation.explosion.visible, false);
+    }
+  } finally { f.dispose(); }
+});
+
 for(const end of ['elapsed','cancelled','reset'] as const)test(`dash I-frames reject real orb damage and end immediately when ${end}`,()=>{
   const f=fixture(()=>0,false),movement=new THREE.Vector3(1,0,0),up=new THREE.Vector3(0,1,0);
   const input={enabled:true,pressed:true,cancelled:false,movement,forward:movement,up};
