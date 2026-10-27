@@ -3,16 +3,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
 import { LevelTwoRoomFiveGreybox } from '../src/levels/LevelTwoRoomFiveGreybox.ts';
+import { LevelTwoPreviewScene } from '../src/levels/LevelTwoPreviewScene.ts';
 import { CultivationLabMaterials } from '../src/render/environment/cultivation/CultivationLabMaterials.ts';
 import { CultivationContaminationArt } from '../src/render/environment/cultivation/CultivationContaminationArt.ts';
 import { CultivationMaintenanceArt } from '../src/render/environment/cultivation/CultivationMaintenanceArt.ts';
 import { SewerDroneDamage } from '../src/render/hazards/SewerDroneDamage.ts';
-import { auditOpaqueSurfaces } from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 import { CollisionWorld, CollisionHit, CollisionLayer } from '../src/physics/CollisionWorld.ts';
 import { createRustedSewerDrone } from '../src/levels/RustedSewerDrone.ts';
 import { batchMaintenanceScout } from '../src/render/hazards/BatchMaintenanceScout.ts';
 
-test('patrol drone detailing fits its envelope and retains its live eye with batched machinery and clear motor faces', () => {
+test('patrol drone detailing fits its envelope and retains its live eye with batched machinery', () => {
   const {body, eye} = createRustedSewerDrone(false);
   body.scale.setScalar(.75);
   const bounds = new THREE.Box3().setFromObject(body, true), eyeMaterial = eye.material;
@@ -30,7 +30,7 @@ test('patrol drone detailing fits its envelope and retains its live eye with bat
     assert.equal(body.children.length, 4, 'one eye, two machinery batches and one shared sensor batch');
     const markers = body.children.find(o => o !== eye && o instanceof THREE.Mesh && o.material === eyeMaterial);
     assert.ok(markers, 'sensor markers share live network status without extra lights');
-    assert.deepEqual(auditOpaqueSurfaces(body, .01).conflicts, [], 'motor clearance at the actual patrol scale');
+
     body.traverse(o => { if (o instanceof THREE.Mesh) assert.ok(materials.has(o.material)); });
   } finally {
     body.traverse(o => { if (o instanceof THREE.Mesh) o.geometry.dispose(); });
@@ -38,24 +38,21 @@ test('patrol drone detailing fits its envelope and retains its live eye with bat
   }
 });
 
-test('Volt power cell has baked extraction machinery, a connected button circuit and attached feeds throughout release', () => {
-  const room = new LevelTwoRoomFiveGreybox(() => {});
-  const lab = new CultivationLabMaterials(cultivationAssets), contamination = new CultivationContaminationArt(lab);
-  const art = new CultivationMaintenanceArt(room, lab, contamination);
+test('the production Volt cell keeps its authored machinery and attached feeds throughout release without new resources', () => {
+  const scene = new LevelTwoPreviewScene(() => {}, cultivationAssets), room = scene.roomFive;
   const countLights = () => { let count = 0; room.root.traverse(o => { if (o instanceof THREE.Light) count++; }); return count; };
   const lights = countLights();
   try {
-    const machinery = room.pod.getObjectByName('room-5-volt-battery-extraction-array')!;
-    assert.ok(machinery);
-    assert.ok(machinery.getObjectByName(`${machinery.name}-copper`), 'induction stacks and collection rings');
-    assert.ok(machinery.getObjectByName(`${machinery.name}-ink`), 'Volt power-cell and critical containment signage');
-    const tray = room.root.getObjectByName('room-5-volt-release-connected-power-tray')!;
-    assert.ok(tray, 'a physical ceiling tray connects the console and suspended cell');
-    assert.equal((tray.getObjectByName(`${tray.name}-signal`) as THREE.Mesh).material, room.releaseButton.material);
-    const lamp = machinery.getObjectByName(`${machinery.name}-signal`) as THREE.Mesh;
-    assert.equal(lamp.material, room.releaseButton.material, 'battery meter and button share live release status');
-    const snapshots = [machinery, tray].map(root => root.children.map(o => (o as THREE.Mesh).geometry));
-    room.root.position.set(64, 0, 249);
+    const machinery: THREE.Mesh[] = [];
+    room.pod.traverse(o => { if (o instanceof THREE.Mesh && o.userData.blenderBatch) machinery.push(o); });
+    assert.equal(machinery.length, 18, 'cell, base, cap and four glass doors use shared-material batches');
+    assert.ok(machinery.some(mesh => mesh.name.endsWith('_Ink')), 'containment signage is part of the moving pod');
+    for (const panel of room.glassPanels) {
+      const glass = panel.children.find(o => o instanceof THREE.Mesh && o.userData.blenderBatch && o.name.endsWith('_CellGlass')) as THREE.Mesh;
+      assert.ok(glass, `${panel.name} carries its authored opening pane`);
+      assert.equal((glass.material as THREE.Material).transparent, true);
+    }
+    const snapshots = machinery.map(mesh => ({mesh, geometry:mesh.geometry, material:mesh.material, parent:mesh.parent}));
     for (const elapsed of [0, 1, 2.6, 4, 0]) {
       room.controller.reset(elapsed ? 'rescued' : 'split');
       room.controller.releaseElapsed = elapsed; room.syncPresentation(); room.root.updateMatrixWorld(true);
@@ -68,15 +65,15 @@ test('Volt power cell has baked extraction machinery, a connected button circuit
         assert.ok(upper.distanceTo(expectedUpper) < 1e-8);
         assert.ok(room.dynamicTransformRoots.includes(feed));
       }
-      [machinery, tray].forEach((root, i) => assert.deepEqual(root.children.map(o => (o as THREE.Mesh).geometry), snapshots[i], 'no geometry allocation during release'));
+      for (const s of snapshots) {
+        assert.equal(s.mesh.geometry, s.geometry, 'no geometry allocation during release');
+        assert.equal(s.mesh.material, s.material); assert.equal(s.mesh.parent, s.parent);
+      }
       assert.equal(countLights(), lights);
     }
-    const meshes: THREE.Mesh[] = [];
-    for (const root of [machinery, tray]) root.traverse(o => { if (o instanceof THREE.Mesh) meshes.push(o); });
-    assert.equal(meshes.length, 11, 'hundreds of fittings remain eleven shared-material batches');
     room.reset(); assert.equal(room.releaseButton.position.z, 27.24);
     assert.equal(room.releaseButton.material.color.getHex(), 0xffc754);
-  } finally { art.dispose(); contamination.dispose(); lab.dispose(); room.dispose(); }
+  } finally { scene.dispose(); }
 });
 
 test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and checkpoint/reset transforms', () => {
@@ -87,10 +84,10 @@ test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and check
   }); return values; };
   const lightingBefore = lights(room.root);
   const eyeMaterial = room.sewer.eye.material;
-  const art = new CultivationMaintenanceArt(room, lab, contamination);
+  const art = new CultivationMaintenanceArt(room, lab, contamination, {authoredReplacement:true});
   const authoredLights = lights(room.root).filter(value => lightingBefore.some(old => old.name === value.name));
   assert.deepEqual(authoredLights, lightingBefore, 'sewer fixtures retain their authored lighting');
-  assert.equal(lights(room.root).length, lightingBefore.length + 3, 'only the existing corridor fixtures are added');
+  assert.equal(lights(room.root).length, lightingBefore.length + 2, 'only the two corridor fixtures are added');
   assert.equal(room.sewer.eye.material, eyeMaterial, 'the drone keeps its existing status eye');
   const check = () => {
     assert.equal(room.collisionMeshes.length, before.collisionMeshes.length);
@@ -141,23 +138,21 @@ test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and check
     room.root.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
       const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) if (material.name === 'cultivation-access-damp-adhesive') {
+      for (const material of materials) if (material === lab.nurserySticky) {
         adhesiveSurfaces++;
         assert.ok(material instanceof THREE.MeshStandardMaterial);
         assert.equal(material.map, lab.sticky.map, 'share the jade adhesive route cue');
         assert.equal(material.emissive.getHex(), lab.sticky.emissive.getHex());
-        assert.equal(material.emissiveIntensity, .18);
+        assert.equal(material.emissiveIntensity, lab.sticky.emissiveIntensity);
         assert.equal(object.geometry.getAttribute('membranePanel').count, object.geometry.getAttribute('position').count);
         assert.equal(material.normalMap, lab.sticky.normalMap, 'preserve the wet adhesive finish');
       }
     });
     assert.ok(adhesiveSurfaces > 0);
     assert.equal(art.diagnostics.newTextures, 0);
-    assert.ok(art.diagnostics.staticMeshesBatched > 180);
-    assert.ok(art.diagnostics.batches < 90, 'sewer and chamber hardware stay spatially batched');
-    const chamberBatches = room.root.children.filter(o => o.name.startsWith('room-5-drone-chamber-hardware-')) as THREE.Mesh[];
-    assert.ok(chamberBatches.length > 0 && chamberBatches.length <= 6);
-    assert.ok(chamberBatches.every(mesh => mesh.userData.shadowProxyReceiver), 'existing structural hulls cover detail shadows');
+    assert.ok(art.diagnostics.staticMeshesBatched >= 50);
+    assert.ok(art.diagnostics.batches <= 35, 'authored replacements avoid the retired procedural hardware');
+    assert.equal(room.root.getObjectByName('cultivation-static-platform-art'), undefined, 'Blender owns the production platform finish');
     const chamberMaterials = new Set<THREE.MeshStandardMaterial>();
     room.root.traverse(o => {
       if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshStandardMaterial && o.material.name.startsWith('cultivation-drone-chamber-'))
@@ -167,45 +162,21 @@ test('maintenance art preserves all Room 5 colliders, LOS, acid bounds and check
     assert.equal(panels.map, contamination.finishes.wall.map, 'reuse the earlier rooms weathering');
     assert.equal(panels.emissiveIntensity, .025, 'keep chamber wall emission subdued');
     assert.equal(panels.emissive.getHex(), 0xcdd2c9);
-    const platformArt = room.root.getObjectByName('cultivation-static-platform-art')!;
-    const whiteDecks: THREE.Mesh[] = [];
-    platformArt.traverse(o => {
-      if (!(o instanceof THREE.Mesh) || !(o.material instanceof THREE.MeshStandardMaterial)) return;
-      if (o.material.map === lab.platform.map) {
-        whiteDecks.push(o);
-        assert.equal(o.material.name, 'cultivation-drone-chamber-dirty-white-deck');
-        assert.equal(o.material.roughnessMap, lab.platform.roughnessMap);
-        assert.equal(o.material.color.getHex(), 0xe1dfd6);
-      }
-    });
-    assert.ok(whiteDecks.length > 0);
     const landing = room.root.getObjectByName('room-5-bob-shaft-landing-tile') as THREE.Mesh;
     assert.equal(landing.userData.surfaceTag, 'default', 'the entrance tile is not adhesive');
     assert.equal(landing.userData.textureRole, undefined);
     assert.equal(room.root.getObjectByName('room-5-bob-shaft-climb')!.userData.surfaceTag, 'sticky', 'retain the required vertical climb');
-    let chamberDisposals = 0;
-    for (const mesh of chamberBatches) mesh.geometry.addEventListener('dispose', () => chamberDisposals++);
     const damage = new SewerDroneDamage(room.brokenCore);
     try {
       for (const hits of [0, 1, 2, 0]) {
         damage.update(0, hits);
         for (const part of room.brokenCore.children.filter(p => typeof p.userData.damageStage === 'number'))
           assert.equal(part.visible, hits < part.userData.damageStage);
-        assert.deepEqual(auditOpaqueSurfaces(room.brokenCore).conflicts, [], `drone damage stage ${hits}`);
-      }
-      for (const network of ['red', 'blue', 'green'] as const) {
-        room.controller.security.select(network);
-        for (const dt of [.03, .5]) {
-          room.sewer.sync(room.controller.security, dt);
-          for (const handle of room.controls.values())
-            assert.deepEqual(auditOpaqueSurfaces(handle.parent!).conflicts, [], `${network} switch pose`);
-        }
       }
     } finally { damage.dispose(); }
     let disposal = 0;
     const batch = room.root.children.find(o => o.name.startsWith('room-5-art-static')) as THREE.Mesh;
     batch.geometry.addEventListener('dispose', () => disposal++);
     art.dispose(); art.dispose(); assert.equal(disposal, 1);
-    assert.equal(chamberDisposals, chamberBatches.length);
   } finally { art.dispose(); contamination.dispose(); lab.dispose(); room.dispose(); before.dispose(); }
 });

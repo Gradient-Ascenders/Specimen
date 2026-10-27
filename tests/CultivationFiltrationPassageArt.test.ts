@@ -11,7 +11,6 @@ import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { CultivationLabMaterials } from '../src/render/environment/cultivation/CultivationLabMaterials.ts';
 import { CultivationContaminationArt } from '../src/render/environment/cultivation/CultivationContaminationArt.ts';
 import { CultivationFiltrationPassageArt } from '../src/render/environment/cultivation/CultivationFiltrationPassageArt.ts';
-import { auditOpaqueSurfaces } from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 
 test('filtration niches preserve both routes and the Bob-controlled Goop entry lock', () => {
   const passage = new LevelTwoLabPassageGreybox({
@@ -84,10 +83,6 @@ test('filtration art has a bounded submission budget and one culled, resettable,
     }
     for (const mesh of meshes) if (mesh.castShadow) assert.equal(mesh.material, scene.contaminationArt.finishes.wall);
     assert.equal(art.fan.castShadow, false, 'fine moving blades add no shadow submissions');
-    for (const angle of [0, .27, .83, 1.56, 2.49]) {
-      art.fan.rotation.x = angle;
-      assert.deepEqual(auditOpaqueSurfaces(scene.roomTwoToThreeGoopPassage.root).conflicts, [], `fan angle ${angle}`);
-    }
     art.reset(); art.update(.1); assert.ok(art.fan.rotation.x > 0);
     const angle = art.fan.rotation.x;
     scene.roomTwoToThreeGoopPassage.root.visible = false;

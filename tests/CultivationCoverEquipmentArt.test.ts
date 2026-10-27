@@ -36,7 +36,7 @@ test('the production Blender equipment preserves all eight cover colliders, sigh
    }finally{oldWorld.clear();newWorld.clear();}
    assert.equal((after.material as THREE.Material).visible,false);
    const size=art.propBounds.get(item.name)!.getSize(new THREE.Vector3());
-   assert.ok(size.x>=item.size[0]&&size.y>=item.size[1]);
+   assert.ok(size.x>=item.size[0]-1e-6&&size.y>=item.size[1]-1e-6,'metric envelopes tolerate only Float32 rounding');
   }
   const batches=room.root.children.filter((o):o is THREE.Mesh=>o instanceof THREE.Mesh&&o.userData.blenderBatch&&o.name.includes('_cover_'));
   assert.ok(batches.length>6&&batches.length<=24,'cover detail retains room/cell batching');

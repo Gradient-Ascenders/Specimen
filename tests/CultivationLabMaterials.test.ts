@@ -43,7 +43,7 @@ test('Room 1 material pass preserves collider geometry, transforms, metadata and
   room.dispose();
 });
 
-test('cultured adhesive follows the approved routes and leaves later rooms, the duct and hold button alone',()=>{
+test('cultured adhesive follows the approved routes and Room 5 climb, leaving the lift, duct and hold button alone',()=>{
   const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets);
   try{
     const route=scene.roomTwo.root.getObjectByName('cultivation-room-2-continuous-sticky-route') as THREE.Mesh;
@@ -60,10 +60,24 @@ test('cultured adhesive follows the approved routes and leaves later rooms, the 
         'only the horizontal threshold cap loses the biofilm');
     assert.equal(scene.labArt.nurserySticky.emissiveIntensity,scene.labArt.sticky.emissiveIntensity);
     assert.equal(scene.labArt.nurserySticky.emissive.getHex(),scene.labArt.sticky.emissive.getHex());
-    for(const root of [scene.roomFour.root,scene.roomFive.root,scene.roomTwoToThreeBobAirDuct.root])root.traverse(o=>{
+    for(const root of [scene.roomFour.root,scene.roomTwoToThreeBobAirDuct.root])root.traverse(o=>{
       if(o instanceof THREE.Mesh)for(const material of Array.isArray(o.material)?o.material:[o.material])
         assert.notEqual(material.userData.cultivationBiofilm,true,`out-of-scope adhesive replacement: ${o.name}`);
     });
+    const climb = scene.roomFive.root.getObjectByName('room-5-bob-shaft-climb') as THREE.Mesh;
+    assert.equal(climb.userData.surfaceTag, 'sticky');
+    scene.root.updateMatrixWorld(true);
+    const climbBounds = new THREE.Box3().setFromObject(climb).expandByScalar(1e-5);
+    let climbSkins = 0;
+    scene.roomFive.root.traverse(o => {
+      if (!(o instanceof THREE.Mesh)) return;
+      for (const material of [o.material].flat()) if (material.userData.cultivationBiofilm) {
+        assert.equal(material, scene.labArt.nurserySticky);
+        assert.ok(climbBounds.containsBox(new THREE.Box3().setFromObject(o)), `${o.name} stays on the required climb`);
+        climbSkins++;
+      }
+    });
+    assert.ok(climbSkins > 0);
     const button=scene.roomTwo.root.getObjectByName('cultivation-room-2-wall-button-pad') as THREE.Mesh;
     assert.ok(button.material!==scene.labArt.nurserySticky,'hold button keeps its own material');
     assert.equal(scene.labArt.nurserySticky.transparent,false);

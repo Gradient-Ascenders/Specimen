@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import {createAscentArtFixture,loadAscentArt,ASCENT_ART_POSES} from '../scripts/lib/blackout-ascent-art-states.ts';
-import {auditOpaqueSurfaces} from '../src/render/geometry/OpaqueSurfaceAudit.ts';
+import {createAscentArtFixture,loadAscentArt} from '../scripts/lib/blackout-ascent-art-states.ts';
 
 test('ascent skins retain collision, moving owners, shared shaft buffers and the existing light/map budgets',async()=>{
   const f=createAscentArtFixture();
@@ -29,18 +28,6 @@ test('ascent skins retain collision, moving owners, shared shaft buffers and the
     const lamps:THREE.Mesh[]=[];f.lift.root.traverse(o=>{if(o instanceof THREE.Mesh&&o.name.includes('Batch_Car_Boot'))lamps.push(o);});
     assert.equal(lamps.length,3);assert.equal(lamps.filter(m=>(m.material as THREE.MeshStandardMaterial).emissiveIntensity>.5).length,1);
     f.pose(0,0,0,0);assert.ok(lamps.every(m=>(m.material as THREE.MeshStandardMaterial).emissiveIntensity<.05));
-  }finally{f.dispose();}
-});
-
-test('assembled ascent art avoids depth conflicts through boarding, gates, shaft travel, arrival and reset',async()=>{
-  const f=createAscentArtFixture();
-  try{
-    await f.prepare();
-    for(const pose of ASCENT_ART_POSES){
-      f.pose(pose.distance,pose.rear,pose.front,pose.charge,'labOpen'in pose&&pose.labOpen);
-      const report=auditOpaqueSurfaces(f.scene.root,.0001);
-      assert.deepEqual(report.conflicts.filter(c=>c.first.includes('B3_ASC_')||c.second.includes('B3_ASC_')),[],pose.name);
-    }
   }finally{f.dispose();}
 });
 

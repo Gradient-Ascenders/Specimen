@@ -116,7 +116,10 @@ export class ElevatorDroneEncounter {
     for (const s of this.slots) if (s.phase === 'approaching' || s.phase === 'firing') living++;
     for (let i = 0; i < this.slots.length; i++) {
       const slot = this.slots[i];
-      if (!this.ended && slot.phase === 'pending' && ROOM_FOUR_SPAWNS[i].time <= controller.readModel.elapsed + 1e-9 && living < 8) {
+      // Later waves reuse anchors. Wait for the previous hull (including its
+      // falling wreck) to clear before admitting another drone on that path.
+      if (!this.ended && slot.phase === 'pending' && ROOM_FOUR_SPAWNS[i].time <= controller.readModel.elapsed + 1e-9 && living < 8 &&
+          !this.slots.some((other, j) => other !== slot && other.root.visible && ROOM_FOUR_SPAWNS[j].anchor === ROOM_FOUR_SPAWNS[i].anchor)) {
         slot.phase = 'approaching'; slot.root.visible = true; living++;
         slot.target.mesh.visible = true; slot.drone.collider.visible = true;
         this.world.setTransformMode(slot.target.mesh, ColliderTransformMode.Dynamic);

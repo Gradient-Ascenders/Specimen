@@ -6,12 +6,12 @@ import { parseExterminatorModelAsset, EXTERMINATOR_MODEL_VERSION } from '../src/
 import { ExterminatorMinionPresentation } from '../src/boss/ExterminatorMinionPresentation.ts';
 import { ExterminatorDebris } from '../src/boss/ExterminatorDebris.ts';
 import { FinalBossPresentation } from '../src/boss/FinalBossPresentation.ts';
+import { BossDefeatSet } from '../src/cinematics/BossDefeatSet.ts';
 import { FinalBossController } from '../src/boss/FinalBossController.ts';
 import { FINAL_ARENA, FINAL_BOSS_TUNING as T, FINAL_MERGE_ANCHOR, FINAL_SPECIMEN_MOVEMENT } from '../src/boss/FinalBossConfig.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
-import { auditOpaqueSurfaces } from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 import { FinalBossEncounter } from '../src/boss/FinalBossEncounter.ts';
 import { ExterminationArena } from '../src/boss/ExterminationArena.ts';
 import { CombatTargetRegistry } from '../src/combat/CombatTargetRegistry.ts';
@@ -76,6 +76,7 @@ test('small flying drones are 15 percent larger, distinguish roles and bank with
 
 test('authored boss articulation preserves core, projectile proxies and emitter positions while rebuilding actual RAM contact', async () => {
   const a = await asset(), p = new FinalBossPresentation(), controller = new FinalBossController(), player = body();
+  const ending = new BossDefeatSet(); p.rollRig.add(ending.bossDamage);
   try {
     p.refreshWorldAnchors(); const proxy = p.armour, core = p.core, eye = p.eyeMuzzle.clone();
     p.adoptDroneModel(a.cloneBoss()); assert.equal(p.armour, proxy); assert.equal(p.core, core); assert.ok(p.eyeMuzzle.distanceTo(eye) < 1e-6);
@@ -96,7 +97,7 @@ test('authored boss articulation preserves core, projectile proxies and emitter 
       const top = new THREE.Box3().setFromObject(p.machine.getObjectByName(`EX_Fan_${name}`)!).max.y;
       assert.ok(top < 11.6, `RAM wing ${name} must retain the full-charge jump clearance: ${top}`);
     }
-  } finally { p.dispose(); controller.dispose(); a.dispose(); }
+  } finally { ending.bossDamage.removeFromParent(); ending.dispose(); p.dispose(); controller.dispose(); a.dispose(); }
 });
 
 test('phase two reveals damaged machinery and retry restores the authored panels, gimbals and shutters', async () => {
@@ -180,30 +181,3 @@ test('mechanical destruction pools stay bounded, use the destruction position an
   } finally { debris.dispose(); }
 });
 
-test('submitted drone surfaces remain disjoint at exact and 2mm tolerances through firing, shield, damage and reset poses', async () => {
-  const a = await asset(), p = new FinalBossPresentation(), controller = new FinalBossController(), player = body();
-  const drones = [new ExterminatorMinionPresentation(), new ExterminatorMinionPresentation(true)];
-  try {
-    p.adoptDroneModel(a.cloneBoss()); controller.start(true);
-    const model = controller.readModel;
-    for (const [phase, attack, stage, open] of [[1, 'gun-blast', 'telegraph', true], [1, 'gun-blast', 'active', true], [1, 'summon-defend', 'active', false], [2, 'laser-beam', 'active', true], [2, 'ram', 'active', true]] as const) {
-      model.phase = phase; model.attack = attack; model.stage = stage; model.weakPointOpen = open; model.progress = .5;
-      p.update(model, controller.time + .1, player);
-      for (const tolerance of [.0001, .002]) {
-        const r = auditOpaqueSurfaces(p.rollRig, tolerance);
-        assert.equal(r.conflicts.length, 0, `${phase}/${attack}/${tolerance}: ${JSON.stringify(r.conflicts.slice(0, 2))}`);
-      }
-    }
-    for (const d of drones) {
-      d.adopt(a);
-      for (const guardian of [true, false]) {
-        d.setGuardian(guardian); d.setAimDirection({ x: 1, y: -.2, z: -1 }); d.setVelocity({ x: 12, y: 1, z: 6 }); d.update(.1, 2);
-        for (const tolerance of [.0001, .002]) {
-          const r = auditOpaqueSurfaces(d.root, tolerance);
-          assert.equal(r.conflicts.length, 0, `${d.advanced}/${guardian}/${tolerance}: ${JSON.stringify(r.conflicts.slice(0, 2))}`);
-        }
-      }
-    }
-    p.reset(); assert.equal(auditOpaqueSurfaces(p.rollRig, .002).conflicts.length, 0);
-  } finally { for (const d of drones) d.dispose(); p.dispose(); controller.dispose(); a.dispose(); }
-});

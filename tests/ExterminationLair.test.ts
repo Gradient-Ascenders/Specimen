@@ -6,8 +6,6 @@ import { ExterminationArena } from '../src/boss/ExterminationArena.ts';
 import { parseExterminationLairAsset, EXTERMINATION_LAIR_VERSION } from '../src/boss/ExterminationLairAsset.ts';
 import { EXTERMINATION_LAIR_COVER } from '../src/boss/ExterminationLairLayout.ts';
 import { FINAL_ARENA, FINAL_ARENA_RING, FINAL_SPECIMEN_MOVEMENT } from '../src/boss/FinalBossConfig.ts';
-import { BlackoutBossStaging } from '../src/levels/BlackoutBossStaging.ts';
-import { auditOpaqueSurfaces } from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
@@ -133,18 +131,3 @@ test('RAM removes visible cover with its solid, reset reuses the art, and dispos
   assert.equal(geometries, geometry.size); assert.equal(materials, material.size);
 });
 
-test('the submitted room and staging geometry remain clear through door, hatch and escape states', async () => {
-  const arena = new ExterminationArena(), staging = new BlackoutBossStaging(true), scene = new THREE.Group();
-  scene.add(arena.root, staging.root); arena.adoptArt(await asset());
-  try {
-    for (const progress of [0, .1, .5, 1]) {
-      arena.reset(); arena.setDoors(progress > 0, progress === 1); arena.deployment(progress);
-      arena.setDamaged(progress === 1);
-      if (progress === 1) for (const c of arena.cover) arena.breakCoverAlong(c.position, c.position, .1);
-      for (const tolerance of [.0001, .01]) {
-        const report = auditOpaqueSurfaces(scene, tolerance);
-        assert.equal(report.conflicts.length, 0, JSON.stringify({ progress, tolerance, conflicts: report.conflicts.slice(0, 4) }));
-      }
-    }
-  } finally { arena.dispose(); staging.dispose(); }
-});

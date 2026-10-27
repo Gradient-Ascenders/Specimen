@@ -181,7 +181,7 @@ for (const includeDevelopmentHelpers of [false, true]) {
       scene.update(60, far, far); assert.equal(monitor.dialogue.readModel.text, '');
       scene.update(1 / 60, near, near); assert.equal(monitor.dialogue.readModel.text, 'S');
       assert.deepEqual(scene.collisionMeshes.map(mesh => mesh.uuid), colliders);
-      assert.equal(scene.collisionMeshes.some(mesh => /monitor/.test(mesh.name)), false);
+      assert.equal(scene.collisionMeshes.some(mesh => monitor.root.getObjectById(mesh.id) !== undefined), false);
       assert.equal(scene.measuredFirstUseGeometryPrimeDiagnostics.resourceCount, 23);
     } finally { scene.dispose(); }
   });

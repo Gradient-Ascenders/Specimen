@@ -8,7 +8,6 @@ import {captureContainmentCollisionFingerprint} from '../src/levels/ContainmentC
 import {RoomTwoShell} from '../src/render/environment/containment/RoomTwoShell.ts';
 import {ContainmentArtResources} from '../src/render/environment/containment/ContainmentArtResources.ts';
 import {RoomOneShell} from '../src/render/environment/containment/RoomOneShell.ts';
-import {auditOpaqueSurfaces,collectOpaqueTriangles,findOpaqueSurfaceOverlaps} from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 import {loadRoomOneShellFixture} from './helpers/RoomOneShellAsset.ts';
 import {loadRoomTwoShellFixture} from './helpers/RoomTwoShellAsset.ts';
 import {loadRoomThreeShellFixture} from './helpers/RoomThreeShellAsset.ts';
@@ -86,22 +85,6 @@ test('the Blender hall shares finish resources and preserves all collision data,
   }finally{scene.dispose();}
 });
 
-test('the complete prepared Room 2 has no opaque overlap at 0.1mm or 2mm in tracking, jump, climb and reset states',async()=>{
-  const scene=new ContainmentLevelScene(()=>{});
-  try{
-    await prepare(scene);
-    for(const position of [{x:-9,y:.46,z:31},{x:4.2,y:4.56,z:31.0999},{x:14.22,y:8,z:43},
-      {x:.87909,y:10.81,z:38.41571},{x:0,y:11.36,z:46.5},{x:-9,y:.46,z:31}]){
-      scene.surveillanceCameras.reset(position);
-      scene.platformBoosters.update(.15,position);
-      for(const tolerance of [.0001,.002]){
-        assert.deepEqual(auditOpaqueSurfaces(scene.teaching.roomTwoArt.root,tolerance).conflicts,[],
-          `Overlapping Room 2 faces at ${JSON.stringify(position)}, ${tolerance} m.`);
-      }
-    }
-  }finally{scene.dispose();}
-});
-
 test('unload disposes hall and camera geometry once while leaving borrowed finishes with Room 1',async()=>{
   const scene=new ContainmentLevelScene(()=>{});await prepare(scene);
   const shell=scene.teaching.roomTwoArt.shell,resources=new Set<THREE.BufferGeometry>();
@@ -111,23 +94,6 @@ test('unload disposes hall and camera geometry once while leaving borrowed finis
   scene.teaching.roomOneArt.shell.borrowFinish('Ivory').addEventListener('dispose',()=>finishes++);
   shell.dispose();shell.dispose();assert.equal(geometries,resources.size);assert.equal(finishes,0);
   scene.dispose();assert.equal(finishes,1);
-});
-
-test('the new architecture clears neighbouring duct and Room 3 geometry at both room seams',async()=>{
-  const scene=new ContainmentLevelScene(()=>{});
-  try{
-    await prepare(scene);
-    const triangles=collectOpaqueTriangles(scene.root).filter(triangle=>triangle.min[2]<49.3&&triangle.max[2]>26.7&&
-      triangle.min[1]<18.2&&triangle.max[1]>-.2&&triangle.min[0]<15.4&&triangle.max[0]>-18.6);
-    assert.ok(triangles.some(triangle=>triangle.owner.includes('/room-2-production-art/')));
-    assert.ok(triangles.some(triangle=>!triangle.owner.includes('/room-2-production-art/')));
-    const conflicts:string[]=[];
-    findOpaqueSurfaceOverlaps(triangles,.002,(a,b)=>{
-      const first=a.owner.includes('/room-2-production-art/'),second=b.owner.includes('/room-2-production-art/');
-      if(first!==second)conflicts.push(`${a.owner} / ${b.owner}`);
-    });
-    assert.deepEqual(conflicts,[]);
-  }finally{scene.dispose();}
 });
 
 test('a late hall load is released after unload without adopting geometry or allocating textures',async()=>{

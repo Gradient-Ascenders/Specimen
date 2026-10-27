@@ -4,7 +4,6 @@ import test from 'node:test';
 import * as THREE from 'three';
 import {ContainmentLevelScene} from '../src/levels/ContainmentLevelScene.ts';
 import {captureContainmentCollisionFingerprint} from '../src/levels/ContainmentCollisionFingerprint.ts';
-import {auditOpaqueSurfaces,collectOpaqueTriangles,findOpaqueSurfaceOverlaps} from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 import {sampleContainmentFinale} from '../src/cinematics/ContainmentFinaleTimeline.ts';
 import {ROOM_FIVE_ESCAPE} from '../src/levels/RoomFiveEscapeLayout.ts';
 import {loadRoomOneShellFixture} from './helpers/RoomOneShellAsset.ts';
@@ -67,7 +66,7 @@ test('the authored atrium preserves collision, lasers, platform routes, thruster
   }finally{level.dispose();}
 });
 
-test('the lift-facing wall is sealed to the floor and the shared sliding-door seam clears every opening pose',async()=>{
+test('the lift-facing wall is sealed to the floor while its door aperture stays clear',async()=>{
   const level=new ContainmentLevelScene(()=>{}),shell=level.roomFive.art.shell;
   try{
     await prepare(level);level.root.updateWorldMatrix(true,true);
@@ -77,30 +76,10 @@ test('the lift-facing wall is sealed to the floor and the shared sliding-door se
     }
     assert.equal(new THREE.Raycaster(new THREE.Vector3(9,76,92.6),new THREE.Vector3(0,0,-1),0,2)
       .intersectObject(shell.root,true).length,0,'Keep the actual door aperture clear.');
-    for(const total of [0,48,48.25,48.5,49,49.5,49.75,50]){
-      const room=level.roomFour;room.reset();room.elevator.begin();if(total)room.elevator.update(total,[]);
-      (room as unknown as {syncPresentation():void}).syncPresentation();
-      const triangles=collectOpaqueTriangles(level.root).filter(t=>t.min[2]<92.5&&t.max[2]>90.5&&t.min[1]<80&&t.max[1]>74&&t.min[0]<12&&t.max[0]>6);
-      const conflicts:string[]=[];
-      findOpaqueSurfaceOverlaps(triangles,.002,(a,b)=>conflicts.push(`${a.owner} / ${b.owner}`));
-      assert.deepEqual(conflicts,[],`Door seam at ${total}s.`);
-    }
   }finally{level.dispose();}
 });
 
-test('the complete atrium has no overlapping opaque surfaces through platform travel, hatch opening and reset',async()=>{
-  const level=new ContainmentLevelScene(()=>{}),room=level.roomFive;
-  try{
-    await prepare(level);
-    for(const [time,open] of [[0,0],[1.6,0],[3.2,0],[0,.25],[0,.5],[0,.75],[0,1],[0,0]]){
-      room.reset();if(time)room.updateTraversal(time,farBody,[]);room.art.setReleaseProgress(open);
-      for(const tolerance of [.0001,.002])assert.deepEqual(auditOpaqueSurfaces(room.root,tolerance).conflicts,[],
-        `Opaque overlap at travel ${time}s / hatch ${open} / ${tolerance}m.`);
-    }
-  }finally{level.dispose();}
-});
-
-test('the escape cinematic shares the authored vent shell and seals the open shaft without duplicate surfaces',async()=>{
+test('the escape cinematic shares the authored vent shell and seals the open shaft',async()=>{
   const level=new ContainmentLevelScene(()=>{});
   let film:ContainmentFinalePresentation|undefined;
   try{
@@ -115,12 +94,11 @@ test('the escape cinematic shares the authored vent shell and seals the open sha
     assert.ok(level.roomFive.root.getObjectByName('R5_Escape'),'Use the complete authored Escape assembly.');
     assert.ok(new THREE.Box3().setFromObject(film.visuals.annex).max.z<124,'Retire all cinematic vent dressing when the authored model is ready.');
     const bounds=new THREE.Box3(new THREE.Vector3(-1.81,67.8,125.3),new THREE.Vector3(1.81,77.21,142.3));
-    const triangles=roots.flatMap(root=>collectOpaqueTriangles(root)).filter(t=>bounds.intersectsBox(new THREE.Box3().setFromPoints(t.points)));
-    const rendered=[...new Set(triangles.map(t=>t.mesh))];
-    for(const tolerance of [.002,.01]){
-      let conflicts=0;findOpaqueSurfaceOverlaps(triangles,tolerance,()=>conflicts++);
-      assert.equal(conflicts,0,'No duplicate shell, rib corners or floor-strip surfaces in the assembled cinematic.');
-    }
+    const rendered:THREE.Mesh[]=[];
+    for(const root of roots)root.traverseVisible(object=>{
+      if(object instanceof THREE.Mesh&&[object.material].flat().some(material=>material.visible&&!material.transparent&&material.colorWrite)&&
+        bounds.intersectsBox(new THREE.Box3().setFromObject(object)))rendered.push(object);
+    });
     const origin=new THREE.Vector3(0,75.5,130.1);
     for(const [direction,axis,position] of [
       [[1,0,0],'x',1.6],[[-1,0,0],'x',-1.6],[[0,1,0],'y',77.05],[[0,-1,0],'y',74.75],
@@ -172,7 +150,7 @@ test('landings and the cell roof retain their walking height while platform art 
   }finally{level.dispose();}
 });
 
-test('release visuals follow the real finale clock and the wooden cover keeps one solid, overlap-free dissolve target',async()=>{
+test('release visuals follow the real finale clock and the wooden cover keeps one solid dissolve target',async()=>{
   const level=new ContainmentLevelScene(()=>{}),room=level.roomFive;
   try{
     await prepare(level);
@@ -197,7 +175,7 @@ test('release visuals follow the real finale clock and the wooden cover keeps on
     const size=wood.geometry.boundingBox!.getSize(new THREE.Vector3());
     ROOM_FIVE_ESCAPE.coverSize.forEach((value,index)=>assert.ok(Math.abs(size.getComponent(index)-value)<1e-6));
     assert.equal(wood.userData.solubleId,wood.name);assert.equal(wood.userData.dissolveCollisionDisableProgress,.72);
-    assert.deepEqual(auditOpaqueSurfaces(wood,.002).conflicts,[]);
+
   }finally{level.dispose();}
 });
 

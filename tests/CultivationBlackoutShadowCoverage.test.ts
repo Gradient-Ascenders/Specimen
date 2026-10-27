@@ -40,9 +40,12 @@ test('ordinary Cultivation coverage uses seven bounded sources and preserves Roo
     assert.ok(receivers.every(o => !o.castShadow));
     assert.ok(scene.labArt.floor.customProgramCacheKey().includes('finite-light-branch-v3'));
     // Moving decks stay attached to their collider; the normal material receives.
-    let decks = 0;
-    scene.roomOne.root.traverse(o => { if (o instanceof THREE.Mesh && o.material === scene.labArt.platform) { decks++; assert.equal(o.receiveShadow, true); assert.equal(o.castShadow, true); } });
-    assert.ok(decks > 0);
+    for (const drop of scene.roomOne.platformDrops) {
+      const decks:THREE.Mesh[]=[];
+      drop.mesh.traverse(o=>{if(o instanceof THREE.Mesh&&o.userData.blenderBatch)decks.push(o);});
+      assert.ok(decks.length>0,`${drop.mesh.name}: authored finishes stay attached to the moving owner`);
+      for(const deck of decks){assert.equal(deck.receiveShadow,true);assert.equal(deck.castShadow,true);}
+    }
     const keys: THREE.SpotLight[] = [];
     scene.roomThree.root.traverse(o => { if (o instanceof THREE.SpotLight && o.castShadow) keys.push(o); });
     for (const platform of scene.roomThree.collisionMeshes.filter(mesh => mesh.userData.routeOwner === 'bob' && mesh.userData.routeBeat)) {
@@ -74,23 +77,26 @@ test('role assignment leaves dissolve materials and hidden/transparent/effect ex
   geometry.dispose();
 });
 
-test('four Blackout hallway maps cover the retained floor and exclude acid/light emitters', () => {
+test('four bounded Blackout hallway maps cover their aimed floor pools and exclude acid/light emitters', () => {
   const bay = new BlackoutMaintenanceBay(maintenanceMaps);
   try {
     const spots: THREE.SpotLight[] = [];
     bay.root.traverse(o => { if (o instanceof THREE.SpotLight) spots.push(o); });
     assert.equal(spots.length, 4);
-    assert.ok(spots.every(l => l.castShadow && l.shadow.mapSize.x === 256 && l.distance === 10));
+    assert.ok(spots.every(l => l.castShadow && l.shadow.mapSize.x === 256 && l.distance === 8.2));
     const floor = bay.root.getObjectByName('hallway-floor') as THREE.Mesh;
     assert.ok(floor.receiveShadow && floor.castShadow);
     const acid = bay.root.getObjectByName('animated-acid-surface') as THREE.Mesh;
     assert.deepEqual([acid.castShadow, acid.receiveShadow], [false, false]);
-    for (let z = 54; z <= 74; z += .25) for (const x of [3.2, 6, 8.8]) {
-      const position = new THREE.Vector3(x, .5, z);
-      assert.ok(spots.some(l => {
+    // The eerie connector deliberately has dark gaps between tilted fixtures.
+    // Each retained map must cover its own usable floor pool, rather than the
+    // full corridor width required before the darkness redesign.
+    for (const light of spots) for (const dx of [-.5, 0, .5]) for (const dz of [-.5, 0, .5]) {
+      const position = new THREE.Vector3(light.target.position.x + dx, .5, light.target.position.z + dz);
+      assert.ok([light].some(l => {
         const ray = position.clone().sub(l.position), axis = l.target.position.clone().sub(l.position).normalize();
         return ray.length() < l.distance && ray.normalize().dot(axis) > Math.cos(l.angle);
-      }), `hallway coverage at ${x},${z}`);
+      }), `${light.name} floor coverage at ${position.toArray()}`);
     }
     for (let i = 1; i <= 4; i++) assert.equal(bay.root.getObjectByName(`hallway-flicker-bulb-${i}`)!.castShadow, false);
   } finally { bay.dispose(); }

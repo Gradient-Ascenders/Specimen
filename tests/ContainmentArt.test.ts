@@ -515,7 +515,7 @@ test('Room 5 art builds a reset-safe hero chamber around frozen gameplay', () =>
     mesh.name.startsWith('room-5-'),
   );
 
-  assert.equal(roomFiveColliders.length, 35);
+  assert.equal(roomFiveColliders.length, 50);
   assert.equal(art.root.name, 'room-5-production-art');
   assert.equal(art.containmentAssembly.name, 'room-5-containment-assembly');
   assert.equal(

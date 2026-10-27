@@ -134,13 +134,24 @@ test('all 12 scheduled drones spawn once, corrode from one hit, and reset withou
   } finally { f.dispose(); }
 });
 
-test('uncleared drones overlap waves with a bounded cap and arrival removes every threat', () => {
-  const f = fixture();
+test('uncleared waves queue occupied anchors, resume after a wreck clears, and clear every threat on arrival', () => {
+  const models = new CultivationSecurityDroneModels(cultivationAssets);
+  const f = fixture(models);
   try {
-    for (let i = 0; i < 3000; i++) f.step();
-    const active = f.room.droneRoots.filter(root => root.visible);
-    assert.equal(active.length, 8);
+    const checkAnchors = () => {
+      const active = f.room.droneRoots.flatMap((root, i) => root.visible ? [ROOM_FOUR_SPAWNS[i].anchor] : []);
+      assert.ok(active.length <= 8);
+      assert.equal(new Set(active).size, active.length, 'live and falling hulls never share an approach path');
+      return active.length;
+    };
+    for (let i = 0; i < 3000; i++) { f.step(); checkAnchors(); }
+    assert.equal(checkAnchors(), 7);
+    assert.equal(f.room.droneRoots[7].visible, false, 'second occupant of anchor 2 waits');
     assert.ok(f.encounter.diagnostics().includes('pending'));
+    assert.equal(f.dissolve.startBurn(f.targets[3]), 'started');
+    for (let i = 0; i < 180; i++) { f.step(); checkAnchors(); }
+    assert.equal(f.room.droneRoots[3].visible, false, 'the previous wreck has cleared');
+    assert.equal(f.room.droneRoots[7].visible, true, 'the queued wave takes the vacated anchor');
     for (let i = 0; i < 1000; i++) f.step();
     assert.equal(f.room.controller.readModel.state, 'complete');
     assert.equal(f.encounter.projectiles.liveCount, 0);
@@ -148,7 +159,7 @@ test('uncleared drones overlap waves with a bounded cap and arrival removes ever
     f.reset();
     // Hidden, unspawned drones must not intercept a shot through their authored location.
     assert.equal(f.world.sweepSphere(new THREE.Vector3(0, 33, 10), new THREE.Vector3(0, 0, 4), .05, new CollisionHit()), false);
-  } finally { f.dispose(); }
+  } finally { f.dispose(); models.dispose(); }
 });
 
 test('a real upward acid projectile hits the drone body and starts its destruction', () => {

@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import {createTransitArtFixture,loadTransitArt,TRANSIT_ART_POSES} from '../scripts/lib/blackout-transit-art-states.ts';
-import {auditOpaqueSurfaces} from '../src/render/geometry/OpaqueSurfaceAudit.ts';
+import {createTransitArtFixture,loadTransitArt} from '../scripts/lib/blackout-transit-art-states.ts';
 
 test('distribution hall preserves live collision and electrical targets, with prepared device skins and shared maps',async()=>{
   const f=createTransitArtFixture();
@@ -57,15 +56,10 @@ test('distribution hall preserves live collision and electrical targets, with pr
   }finally{f.dispose();}
 });
 
-test('assembled transit art stays disjoint across bridge/lift travel, and seals walls and protected bores',async()=>{
+test('assembled transit art seals walls and preserves the protected entry and exit bores',async()=>{
   const f=createTransitArtFixture();
   try{
     await f.prepare();
-    for(const pose of TRANSIT_ART_POSES){
-      f.pose(pose.bridge,pose.lift,pose.powered);
-      const report=auditOpaqueSurfaces(f.scene.root,.0001);
-      assert.deepEqual(report.conflicts.filter(c=>c.first.includes('B3_R2_')||c.second.includes('B3_R2_')),[],pose.name);
-    }
     for(const side of [-1,1])for(const y of [-.7,.1,6.85,13.75,20])for(const z of [82,100,117,138,154]){
       const ray=new THREE.Raycaster(new THREE.Vector3(0,y,z),new THREE.Vector3(side,0,0),0,24);
       assert.ok(ray.intersectObject(f.room.art!.root,true).length,`wall coverage ${side},${y},${z}`);

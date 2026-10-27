@@ -369,7 +369,7 @@ test('Goop retains real movement intent after drone updates and settles when con
   Object.defineProperty(globalThis, 'document', { configurable: true,
     value: { createElement: () => new RuntimeFakeElement() } });
   const input = new RuntimeFakeInput(), cameraRig = new RuntimeFakeCameraRig();
-  cameraRig.copyGroundMovementDirection = (x, z, target) => target.set(x, 0, z).normalize();
+  cameraRig.copyGroundMovementDirection = (x, z, target) => target.set(-x, 0, -z).normalize();
   const runtime = new BlackoutLevelRuntime({
     host: new RuntimeFakeElement() as unknown as HTMLElement,
     input: input as unknown as Input,
@@ -386,7 +386,7 @@ test('Goop retains real movement intent after drone updates and settles when con
     r.group.goopBody.teleport(new THREE.Vector3(4, 0.46, 6));
     input.press('moveForward');
     for (let step = 0; step < 24; step++) runtime.fixedUpdate(1 / 60);
-    assert.ok(r.group.goopBody.position.z < 5, 'the real body moves through the controller');
+    assert.ok(r.group.goopBody.position.z > 7, 'the real body moves along the forward spawn heading');
     assert.equal(r.movement.lengthSq(), 0, 'drone update has cleared the shared movement vector');
     assert.ok(r.goopPresentation.diagnostics.signedLean > 0.65, 'Goop still receives the actual player intent');
     input.press('switchSlime'); runtime.fixedUpdate(1 / 60);

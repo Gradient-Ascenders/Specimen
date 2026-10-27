@@ -219,7 +219,9 @@ test('Room 3 batches only static visuals while preserving collider identity', ()
   );
   assert.equal(radiation.material.visible, true);
   for (const cable of room.solubleTargetMeshes) {
-    assert.equal(cable.material.visible, true);
+    const skins:THREE.Mesh[]=[];
+    cable.traverse(object=>{if(object instanceof THREE.Mesh&&object.userData.blenderBatch)skins.push(object);});
+    assert.ok(cable.material.visible||skins.some(mesh=>[mesh.material].flat().some(material=>material.visible)),`${cable.name}: soluble owner retains its visible authored skin`);
     assert.equal(batchedNames.has(cable.name), false);
   }
 
@@ -375,7 +377,8 @@ test('bulk-static preview registration promotes every animated collider', () => 
   assert.deepEqual(
     new Set(scene.dynamicCollisionMeshes.map(mesh => mesh.name)),
     new Set([
-      ...drops.map((drop) => drop.mesh),
+      ...scene.roomOne.platformDrops.map(drop=>drop.mesh),
+      ...scene.roomTwo.blockDrops.flatMap(drop=>drop.dynamicTransformRoots).filter((root):root is THREE.Mesh=>root instanceof THREE.Mesh),
       ...wallColliders,
       ...scene.roomFive.dynamicCollisionMeshes,
       ...scene.roomFour.movingEntranceMeshes,
@@ -1136,7 +1139,7 @@ function assertLaserAgainstPanel(laser: LaserHazard, panel: THREE.Mesh): void {
 }
 
 
-test('Rooms 1–3 acid basins sample both slimes in world space without changing hazards or colliders', () => {
+test('Rooms 1â€“3 acid basins sample both slimes in world space without changing hazards or colliders', () => {
   const failures: unknown[] = [];
   const scene = new LevelTwoPreviewScene(failure => failures.push(failure), cultivationAssets);
   const floors = [scene.roomOne, scene.roomTwo, scene.roomThree].flatMap(room =>

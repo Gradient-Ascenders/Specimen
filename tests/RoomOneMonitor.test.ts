@@ -182,7 +182,7 @@ for (const includeDevelopmentHelpers of [false, true]) {
       assert.equal(scene.roomOneMonitor.root.parent, scene.teaching.roomOneArt.root);
       assert.equal(scene.roomOneMonitor.dialogue.readModel.text, '', 'construction/preloading does not start the text');
       const colliderIds = scene.collisionMeshes.map(mesh => mesh.uuid);
-      assert.equal(scene.collisionMeshes.some(mesh => mesh.name.includes('monitor')), false);
+      assert.equal(scene.collisionMeshes.some(mesh => scene.roomOneMonitor.root.getObjectById(mesh.id) !== undefined), false);
       scene.update(5.99); assert.equal(scene.roomOneMonitor.dialogue.readModel.text, '');
       scene.update(.01); assert.equal(scene.roomOneMonitor.dialogue.readModel.text, 'I');
       scene.updateDeath(2); assert.equal(scene.roomOneMonitor.dialogue.readModel.text, 'I', 'death presentation is not gameplay time');

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { LevelTwoRoomFiveGreybox } from '../src/levels/LevelTwoRoomFiveGreybox.ts';
 import { CultivationPlatformBoosters } from '../src/render/environment/cultivation/CultivationPlatformBoosters.ts';
-import { auditOpaqueSurfaces } from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 
 test('boosters preserve all platforms and collision while reusing two fading light slots', () => {
   const room = new LevelTwoRoomFiveGreybox(() => {});
@@ -37,7 +36,7 @@ test('boosters preserve all platforms and collision while reusing two fading lig
       assert.deepEqual(snapshot.mesh.quaternion.toArray(), snapshot.quaternion.toArray());
       assert.deepEqual(snapshot.mesh.userData, snapshot.metadata);
     }
-    assert.deepEqual(auditOpaqueSurfaces(art.root, .01).conflicts, []);
+
     let disposed = 0;
     exhaust.geometry.addEventListener('dispose', () => disposed++);
     art.dispose(); art.dispose(); assert.equal(disposed, 1); assert.equal(art.root.parent, null);

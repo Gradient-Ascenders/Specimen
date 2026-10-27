@@ -138,8 +138,11 @@ test('retired traversal poles leave no collision or render meshes; platform shap
     assert.deepEqual(ledge.quaternion.toArray(), originalLedge.quaternion.toArray());
     assert.deepEqual(ledge.geometry.getAttribute('position').array, originalLedge.geometry.getAttribute('position').array);
     assert.deepEqual(ledge.geometry.index?.array, originalLedge.geometry.index?.array);
-    assert.ok(ledge.getObjectByName(`${ledge.name}-level-one-platform-art`));
-    assert.equal(ledge.material, scene.labArt.platformArt.hidden);
+    const surfaces:THREE.Mesh[]=[];
+    ledge.traverse(object=>{if(object instanceof THREE.Mesh&&object.userData.blenderBatch)surfaces.push(object);});
+    assert.ok(surfaces.length>0,'the unchanged ledge owns the production authored deck');
+    assert.ok(surfaces.some(mesh=>[mesh.material].flat().some(material=>material.visible)));
+    assert.equal(ledge.material.visible,false);
   } finally { raw.dispose(); rawTwo.dispose(); scene.dispose(); }
 });
 

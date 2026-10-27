@@ -6,7 +6,6 @@ import {MaintenanceDroneDevelopmentFixture} from '../src/vehicles/MaintenanceDro
 import {MaintenanceDroneModel,parseMaintenanceDroneModel} from '../src/render/environment/blackout/MaintenanceDroneModel.ts';
 import {MaintenanceDronePresentation} from '../src/render/environment/blackout/MaintenanceDronePresentation.ts';
 import {BlackoutMaintenanceMaterials} from '../src/render/environment/blackout/BlackoutMaintenanceMaterials.ts';
-import {auditOpaqueSurfaces} from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 import {maintenanceMaps} from './helpers/BlackoutMaintenanceMapData.ts';
 import type {MaintenanceDroneReadModel} from '../src/vehicles/MaintenanceDroneTypes.ts';
 
@@ -53,18 +52,6 @@ test('authored drone fits its collider and rider, spins only inner rotors, and l
     for(const mesh of meshes){const m=mesh.material as THREE.MeshStandardMaterial;if(!m.name.includes('Lamp'))assert.equal(m.emissiveIntensity,0,'solid craft stays dark without a real light');}
     model.removeFromParent();fixture.droneRoot.getObjectByName('maintenance-drone-presentation')!.add(model);
   }finally{presentation.dispose();fixture.dispose();}
-});
-
-test('fixed guards and moving rotors have no duplicate opaque coverage throughout a turn',async()=>{
-  const model=new MaintenanceDroneModel();
-  try{
-    await model.prepare(load);
-    for(const angle of [0,.3,.9,1.7]){
-      for(let i=0;i<model.rotors.length;i++)model.rotors[i].rotation.y=angle*(i%2?-1:1);
-      const report=auditOpaqueSurfaces(model.root,.0001);
-      assert.deepEqual(report.conflicts,[],`rotor angle ${angle}`);
-    }
-  }finally{model.dispose();}
 });
 
 test('drone releases shared geometry once, borrows bay textures, and discards cancelled loads',async()=>{

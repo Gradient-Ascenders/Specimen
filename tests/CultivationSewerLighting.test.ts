@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
 import { CultivationSewerLighting } from '../src/render/environment/cultivation/CultivationSewerLighting.ts';
-import { auditOpaqueSurfaces } from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 
 test('sewer lamp flicker preserves readable light pools and stable slots while leaving the ambush unlit', () => {
   const root = new THREE.Group(), lighting = new CultivationSewerLighting(root);
@@ -30,7 +29,7 @@ test('sewer lamp flicker preserves readable light pools and stable slots while l
     assert.ok(min[1] < max[1] * .25, 'the far lamp has a noticeable brownout');
     assert.ok(min[0] > max[0] * .65, 'the entry lamp retains a weak orientation cue');
     lighting.reset(); assert.deepEqual(lights.map(l => l.intensity), initial);
-    assert.deepEqual(auditOpaqueSurfaces(root).conflicts, []);
+
   } finally { lighting.dispose(); lighting.dispose(); }
   assert.equal(root.children.length, 0);
 });

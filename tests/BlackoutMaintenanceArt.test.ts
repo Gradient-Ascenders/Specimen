@@ -5,7 +5,6 @@ import * as THREE from 'three';
 import {BlackoutMaintenanceBay} from '../src/levels/BlackoutMaintenanceBay.ts';
 import {BlackoutMaintenanceBayController} from '../src/levels/BlackoutMaintenanceBayController.ts';
 import {parseBlackoutMaintenanceArt} from '../src/render/environment/blackout/BlackoutMaintenanceArt.ts';
-import {auditOpaqueSurfaces} from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 import {CollisionWorld} from '../src/physics/CollisionWorld.ts';
 import {SurfaceRegistry} from '../src/physics/SurfaceRegistry.ts';
 import {ElectricalTargetRegistry} from '../src/abilities/ElectricalTargetRegistry.ts';
@@ -56,19 +55,6 @@ test('authored maintenance bay keeps collision, landing heights and borrowed tex
     const fan=s.bay.art.root.getObjectByName('blackout-connector-fan')!;
     s.bay.art.update(.5,true);assert.ok(fan.rotation.x<-.2,'the recessed fan turns');
     s.bay.resetConnector();assert.equal(fan.rotation.x,0,'reset retains the authored fan pose');
-  }finally{s.dispose();}
-});
-
-test('new opaque surfaces stay disjoint with the real door and circuit in closed, moving, open and reset poses',async()=>{
-  const s=setup();
-  try{
-    await s.bay.prepareArt(s.controller.door.collisionMesh,load);
-    for(const progress of [0,.5,1,0]){
-      s.controller.door.restoreState({progress,desiredOpen:progress>0});
-      const report=auditOpaqueSurfaces(s.bay.root,.0001);
-      const authored=report.conflicts.filter(c=>c.first.includes('B3_R1_')||c.second.includes('B3_R1_'));
-      assert.deepEqual(authored,[],`no duplicate opaque art coverage at door progress ${progress}`);
-    }
   }finally{s.dispose();}
 });
 

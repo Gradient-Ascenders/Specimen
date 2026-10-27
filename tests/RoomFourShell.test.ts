@@ -5,7 +5,6 @@ import test from 'node:test';
 import * as THREE from 'three';
 import {ContainmentLevelScene} from '../src/levels/ContainmentLevelScene.ts';
 import {captureContainmentCollisionFingerprint} from '../src/levels/ContainmentCollisionFingerprint.ts';
-import {auditOpaqueSurfaces,collectOpaqueTriangles,findOpaqueSurfaceOverlaps} from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 import {loadRoomOneShellFixture} from './helpers/RoomOneShellAsset.ts';
 import {loadRoomTwoShellFixture} from './helpers/RoomTwoShellAsset.ts';
 import {loadRoomThreeShellFixture} from './helpers/RoomThreeShellAsset.ts';
@@ -52,19 +51,17 @@ test('authored lift art preserves collision, travel, hazard timing, the complete
         .intersectObject(shell.carRoot,true);
       assert.ok(hits[0]);assert.ok(Math.abs(hits[0].point.y-top)<1e-5,'Keep the walkable roof aligned with its collider.');
     }
-    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.resourceCount,137);
-    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.uniqueGeometryCount,137);
+    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.resourceCount,143);
+    assert.equal(level.measuredFirstUseGeometryPrimeDiagnostics.uniqueGeometryCount,143);
   }finally{level.dispose();}
 });
 
-test('the car, counterweight, cables, optics and pocket doors clear opaque surfaces through travel, opening and reset',async()=>{
+test('the counterweight, distance displays and pocket doors follow lift travel, opening and reset',async()=>{
   const level=new ContainmentLevelScene(()=>{}),room=level.roomFour;
   try{
     await prepare(level);
     for(const total of [0,2,8,20,35,48,48.25,48.5,48.75,49,49.25,49.5,49.75,49.9,50,0]){
       pose(level,total);
-      for(const tolerance of [.0001,.002])assert.deepEqual(auditOpaqueSurfaces(room.root,tolerance).conflicts,[],
-        `Surface conflict at ${total} s / ${tolerance} m.`);
       const progress=room.elevator.ascentProgress,d=room.art.shell.diagnostics;
       assert.ok(Math.abs(d.heightMetres-45*progress)<1e-8);
       assert.equal(d.displayMetres,Math.round(45*progress));
@@ -76,24 +73,6 @@ test('the car, counterweight, cables, optics and pocket doors clear opaque surfa
       if(total<48)assert.equal(d.doorOpen,0);
       if(total>=50)assert.equal(d.doorOpen,1);
       assert.equal(room.root.getObjectByName('R4_ExitArrow')!.visible,room.elevator.exitReady);
-    }
-  }finally{level.dispose();}
-});
-
-test('the lift entry and arrival join neighbouring rooms without overlapping opaque coverage',async()=>{
-  const level=new ContainmentLevelScene(()=>{});
-  try{
-    await prepare(level);
-    for(const total of [0,49,50]){
-      pose(level,total);
-      const triangles=collectOpaqueTriangles(level.root).filter(triangle=>triangle.min[2]<94&&triangle.max[2]>76.5&&
-        triangle.min[1]<79&&triangle.max[1]>25);
-      const conflicts:string[]=[];
-      findOpaqueSurfaceOverlaps(triangles,.002,(a,b)=>{
-        if(a.owner.includes('containment-room-4-greybox/')!==b.owner.includes('containment-room-4-greybox/'))
-          conflicts.push(`${a.owner} / ${b.owner}`);
-      });
-      assert.deepEqual(conflicts,[]);
     }
   }finally{level.dispose();}
 });

@@ -111,6 +111,7 @@ for (const scale of [.5, 1]) test(`opening primers retain live transmission dime
   // Model/resource loading is tested separately; inspect the real opening's
   // preparation calls without requiring a GPU in the Node test runner.
   opening.bob.prepare = async () => {};
+  opening.laboratory.prepare = async () => {};
   const tinyScales: number[] = [], liveScales: number[] = [];
   renderer.render = (_scene, camera) => {
     const target = renderer.getRenderTarget();
@@ -362,6 +363,7 @@ test('instance primers upload both live buffers sharing a geometry and never dis
   renderer.render = prepared => {
     prepared.traverseVisible(object => {
       if (!(object instanceof THREE.InstancedMesh)) return;
+      if ([object.material].flat().every(material => !material.visible)) return;
       buffers.add(object.instanceMatrix);
       if (object.instanceColor) buffers.add(object.instanceColor);
       // Model Three's disposal listener: releasing a proxy must not release

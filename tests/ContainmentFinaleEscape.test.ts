@@ -45,7 +45,9 @@ for(const includeDevelopmentHelpers of [false,true])test(`the Room 5 wooden vent
     for(let i=0;i<45;i++)body.update(1/60,zero,{pressed:i===0,held:true,released:false});
     body.update(1/60,forward,{pressed:false,held:false,released:true});
     for(let i=0;i<180;i++)body.update(1/60,body.position.z<124.65?forward:zero);
-    assert.equal(body.grounded,true);assert.equal(body.isSupportedBy(box),true,'The charged jump should land on the actual solid cover.');
+    const sleeve=scene.roomFive.collisionMeshes.find(mesh=>mesh.name==='room-5-prop-escape-sleeve-top')!;
+    assert.ok(sleeve,'the solid frame belongs to the visible vent cover assembly');
+    assert.equal(body.grounded,true);assert.ok(body.isSupportedBy(box)||body.isSupportedBy(sleeve),'The charged jump lands on the cover or its flush solid frame.');
     assert.ok(Math.abs(body.position.y-body.radiusMetres-top)<.025);
     const hit=new CollisionHit();assert.equal(world.sweepSphere(new THREE.Vector3(0,75.5,123),new THREE.Vector3(0,0,2),.2,hit),true);
     assert.equal(hit.object,box,'The wooden box must also block the front, not only provide an invisible top.');

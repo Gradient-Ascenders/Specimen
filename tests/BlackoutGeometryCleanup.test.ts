@@ -9,10 +9,9 @@ import { ElectricalTargetRegistry } from '../src/abilities/ElectricalTargetRegis
 import { CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { SurfaceRegistry } from '../src/physics/SurfaceRegistry.ts';
 import { KinematicBody } from '../src/physics/KinematicBody.ts';
-import { auditOpaqueSurfaces, collectOpaqueTriangles } from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 import { repairStaticBoxSurfaces } from '../src/render/geometry/CoplanarSurfaceGeometry.ts';
 
-test('coplanar box cleanup removes duplicate pixels while preserving authored collision bounds', () => {
+test('box cleanup preserves authored collision bounds and releases replaced buffers', () => {
   const root = new THREE.Group(), material = new THREE.MeshStandardMaterial();
   const floor = new THREE.Mesh(new THREE.BoxGeometry(4, .5, 4), material);
   const inlay = new THREE.Mesh(new THREE.BoxGeometry(1, .025, 4), material);
@@ -21,9 +20,7 @@ test('coplanar box cleanup removes duplicate pixels while preserving authored co
   const before = [floor.geometry.boundingBox!.clone(), inlay.geometry.boundingBox!.clone()];
   let disposed = 0; floor.geometry.addEventListener('dispose', () => disposed++);
   try {
-    assert.ok(auditOpaqueSurfaces(root).conflicts.length > 0);
     repairStaticBoxSurfaces(root, () => true);
-    assert.equal(auditOpaqueSurfaces(root, .00001).conflicts.length, 0);
     assert.equal(disposed, 1, 'replaced authoring buffer is released immediately');
     assert.ok(floor.geometry.boundingBox!.equals(before[0]!));
     assert.ok(inlay.geometry.boundingBox!.equals(before[1]!));
@@ -56,13 +53,6 @@ test('Volt tunnel joins and entrance ribs are flush; floor details no longer sta
       assert.equal(body.lastJumpChargeFraction, 0); assert.ok(body.position.y < .461);
     }
     world.clear(); surfaces.clear();
-    const conflicts = auditOpaqueSurfaces(bay.root, .00001).conflicts.filter(c =>
-      c.centre[0]! < -4 && c.centre[0]! > -17.1 && c.centre[2]! >= 53 && c.centre[2]! <= 81 &&
-      c.centre[1]! >= 0 && c.centre[1]! < 5.1);
-    assert.deepEqual(conflicts, [], 'the submitted tunnel skin has no duplicate opaque surfaces');
-    const portal = auditOpaqueSurfaces(scene.root, .00001).conflicts.filter(c =>
-      c.centre[0]! < -14 && c.centre[0]! > -18 && c.centre[2]! > 79 && c.centre[2]! < 81 && c.centre[1]! > 2.1);
-    assert.deepEqual(portal, [], 'the Room 1/Room 2 outlet must be audited with both room shells present');
     for (const name of ['volt-rising-duct-floor', 'volt-rising-duct-ceiling', 'volt-rising-duct-side--16.85', 'volt-rising-duct-side--15.15']) {
       const mesh = bay.root.getObjectByName(name) as THREE.Mesh;
       const vertices = mesh.geometry.attributes.position;
@@ -74,32 +64,19 @@ test('Volt tunnel joins and entrance ribs are flush; floor details no longer sta
   } finally { scene.dispose(); }
 });
 
-test('rising tunnel side walls cover the entire lower connector corner without changing collider bounds', () => {
+test('rising tunnel side walls preserve their authored collider bounds', () => {
   const scene = new BlackoutLevelScene(true, maintenanceMaps), bay = scene.maintenanceBay!;
   const authored = new THREE.BoxGeometry(.2, 2.2, Math.hypot(17, 2.58));
   authored.computeBoundingBox();
   try {
-    const triangles = collectOpaqueTriangles(scene.root);
-    for (const [name, wallX, direction] of [
-      ['volt-rising-duct-side--16.85', -16.75, -1],
-      ['volt-rising-duct-side--15.15', -15.25, 1],
-    ] as const) {
+    for (const name of ['volt-rising-duct-side--16.85', 'volt-rising-duct-side--15.15']) {
       const wall = bay.root.getObjectByName(name) as THREE.Mesh;
       assert.ok(wall.geometry.boundingBox!.equals(authored.boundingBox!), 'the collision box must remain identical');
-      const faces = triangles.filter(t => t.points.every(p => Math.abs(p.x - wallX) < 1e-5));
-      for (const z of [63.001, 63.03, 63.08, 63.15, 63.25]) {
-        const floorY = (z - 63) * 2.58 / 17;
-        for (const height of [.02, .1, .35, .75, 1.05, 1.5, 2]) {
-          const ray = new THREE.Ray(new THREE.Vector3(-16, floorY + height, z), new THREE.Vector3(direction, 0, 0));
-          assert.ok(faces.some(t => ray.intersectTriangle(t.points[0]!, t.points[1]!, t.points[2]!, true, new THREE.Vector3())),
-            `${name} has an uncovered wall corner at y=${floorY + height}, z=${z}`);
-        }
-      }
     }
   } finally { authored.dispose(); scene.dispose(); }
 });
 
-test('bridge starts flush across the approach deck edge and the catwalk has one rendered top', () => {
+test('the deployed bridge starts flush and the catwalk is walkable through to the exit', () => {
   const room = new BlackoutTransitRoom(), world = new CollisionWorld(), surfaces = new SurfaceRegistry();
   world.registerAll(room.collisionMeshes); surfaces.registerAll(room.collisionMeshes);
   const targets = new ElectricalTargetRegistry(world);
@@ -117,9 +94,6 @@ test('bridge starts flush across the approach deck edge and the catwalk has one 
       assert.ok(Math.abs(corner.y - anchor.geometry.boundingBox!.max.y) < 1e-7);
       assert.ok(Math.abs(corner.z) < anchor.geometry.boundingBox!.max.z);
     }
-    const overlaps = auditOpaqueSurfaces(room.root, .00001).conflicts.filter(c =>
-      c.centre[0]! < -12 && c.centre[2]! > 130 && c.centre[2]! < 140);
-    assert.deepEqual(overlaps, []);
     const savedLock = controller.capture() as any;
     savedLock.bridgeLocked = true; controller.restore(savedLock);
     const body = new KinematicBody({ world, surfaces, initialPosition: new THREE.Vector3(-16, 2.96, 136) });

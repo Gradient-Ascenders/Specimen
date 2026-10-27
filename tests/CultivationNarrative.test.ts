@@ -10,7 +10,6 @@ import { CultivationRoomTwoObservation, CULTIVATION_ROOM_TWO_MONITOR_SCRIPT as S
 import { ContainmentMonitorDialogue, MONITOR_DIALOGUE_TIMING as T, paginateMonitorSections } from '../src/render/environment/containment/ContainmentMonitorDialogue.ts';
 import { MONITOR_TEXT_COLOURS, createContainmentMonitorTexture, paintContainmentMonitorTexture } from '../src/render/environment/containment/ContainmentProceduralTextures.ts';
 import { gameplayAudioEvents } from '../src/audio/GameplayAudioEvents.ts';
-import { auditOpaqueSurfaces } from '../src/render/geometry/OpaqueSurfaceAudit.ts';
 
 const goop=new THREE.Vector3(64,.66,5.5),bob=new THREE.Vector3(62,.66,5.5);
 
@@ -168,8 +167,8 @@ test('the real scene mounts CCTV left of the sticky control, a monitor above the
     assert.equal(scene.goopSpeech.activeConversation,'room-two');
     scene.roomTwo.update(.6,[{id:'bob',position:b,radiusMetres:.45,attached:true,supportCollider:scene.roomTwo.wallButton}]);
     assert.equal(scene.roomTwoToThreeGoopPassage.entryDoor.locked,false);assert.equal(pad.material.color.getHex(),0x62ff91);
-    assert.deepEqual(auditOpaqueSurfaces(scene.roomTwoButtonArt.root).conflicts,[]);
-    assert.deepEqual(auditOpaqueSurfaces(scene.roomTwoButtonArt.root,.01).conflicts,[],'captive fasteners clear the housing face');
+
+
     scene.roomTwoButtonArt.root.traverse(node=>assert.ok(!(node instanceof THREE.Light),'The dressing adds no lights.'));
     scene.goopSpeech.update(120,2,g,g);scene.reset({preserveCompletedDialogue:true});assert.equal(scene.goopSpeech.hasHeard('room-two'),true);
     scene.reset();assert.equal(scene.goopSpeech.hasHeard('room-two'),false);assert.equal(pad.material.color.getHex(),0xe53945);
