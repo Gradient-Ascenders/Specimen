@@ -8,6 +8,7 @@ import type { FinalBossPresentation } from '../boss/FinalBossPresentation.ts';
 import type { ExterminationArena } from '../boss/ExterminationArena.ts';
 import { SecurityDronePresentation, SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
 import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
+import { CinematicMusic } from '../audio/CinematicMusic.ts';
 import type { SoundId } from '../audio/SoundCatalog.ts';
 import { TypewriterAudio } from '../audio/TypewriterAudio.ts';
 import { optimizeFiniteLightEvaluation } from '../render/environment/cultivation/FiniteLightEvaluation.ts';
@@ -60,6 +61,7 @@ export class BossDefeatFinale {
   readonly actors: readonly Actor[];
   readonly preparation = { complete: false, frames: 0 };
   private readonly options: Options;
+  private music?: CinematicMusic;
   private readonly cameraTrack = new BossDefeatCamera();
   private readonly droneResources = new SecurityDronePresentationResources(undefined, true);
   private readonly drones: SecurityDronePresentation[] = [];
@@ -162,13 +164,18 @@ export class BossDefeatFinale {
     for (const [mesh, materials] of this.damageMaterials) { originals.push([mesh, mesh.material]); mesh.material = materials; }
     const restore = this.restore; this.restore = () => { for (const [mesh, material] of originals) mesh.material = material; restore?.(); };
     this.options.specimen.reset(); this.options.specimen.setOpacity(1); this.options.specimen.setTrailEnabled(false);
-    if (!rehearsal) this.options.host.dataset.cinematic = 'boss-defeat';
+    if (!rehearsal) {
+      this.music = new CinematicMusic('ending', T.duration);
+      this.music.update(0);
+      this.options.host.dataset.cinematic = 'boss-defeat';
+    }
     this.sample(0, 1 / 60, true); if (!rehearsal) this.overlay.present(0); return true;
   }
   update(dt: number, skip = false): boolean {
     if (!this.playing) return false;
     if (!Number.isFinite(dt) || dt <= 0) throw new RangeError('Invalid boss ending timestep.');
     this.previousElapsed = this.elapsed; this.elapsed = skip || this.skipRequested ? T.duration : Math.min(T.duration, this.elapsed + dt);
+    this.music?.update(this.elapsed);
     this.didSkipCredits = (skip || this.skipRequested) && this.previousElapsed >= T.credits;
     if (!skip && !this.skipRequested) this.soundStep(this.previousElapsed, this.elapsed);
     this.sample(this.elapsed, dt, false); this.overlay.present(this.elapsed);
@@ -282,6 +289,7 @@ export class BossDefeatFinale {
   }
   private stopSound(): void { for (const key of LOOP_KEYS) gameplayAudioEvents.emit('stop', { key }); gameplayAudioEvents.emit('stopSound', { sound: 'escape-drone-strain-loop-01' }); }
   private release(): void {
+    this.music?.stop(); this.music = undefined;
     if (!this.preparing) this.stopSound();
     if (this.playing) {
       for (const actor of this.actors) {

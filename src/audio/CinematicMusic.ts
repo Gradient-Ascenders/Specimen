@@ -1,6 +1,6 @@
 import { EventBus } from '../core/EventBus.ts';
 
-export type CinematicTrack = 'awakening' | 'escape' | 'rescue' | 'ascent' | 'research';
+export type CinematicTrack = 'awakening' | 'escape' | 'rescue' | 'ascent' | 'research' | 'ending';
 
 /** Discrete ownership changes only; the music owner reads the live clock directly. */
 export const cinematicMusicEvents = new EventBus<{

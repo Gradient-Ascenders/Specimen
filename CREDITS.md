@@ -28,6 +28,8 @@ All 3D models were created independently for Specimen.
 | Article 160 Section 2 | [Zander Noriega](https://opengameart.org/users/zander-noriega) | [OpenGameArt](https://opengameart.org/content/article-160-section-2) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | The Specimen, Act II · laboratory containment failure · original opening trimmed to 57.5 seconds · boundary fades · soundtrack stops at blackout. |
 | Inevitable | vitalezzz | [OpenGameArt](https://opengameart.org/content/inevitable) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | The Specimen, Acts III and IV · drone pursuit, crossfire, fusion and awakening · extended/repeated buildup in Act III flows into the synchronized 35-second fusion passage in Act IV · volume adjustment and fades · attribution notice: Vitalezzz - Inevitable. |
 | Derelict Spaceship | vitalezzz | [OpenGameArt](https://opengameart.org/content/derelict-spaceship) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | The Specimen, Act V · arena reveal and Exterminator introduction · selected 47-second passage aligned to the first arena reveal · volume adjustment and fades · attribution notice: Vitalezzz - Derelict Spaceship. |
+| Claimed by the Void | vitalezzz | [OpenGameArt](https://opengameart.org/content/claimed-by-the-void) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | First Sunlight ending cinematic · final showdown, Exterminator destruction, Goop's sacrifice and laboratory collapse · selected 105-second passage with dialogue level shaping and ending fade · attribution notice: Vitalezzz - Claimed by the Void. |
+| Exploration Theme | [Cleyton Kauffman](https://soundcloud.com/cleytonkauffman) | [OpenGameArt](https://opengameart.org/content/exploration-theme) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | First Sunlight ending cinematic · sunlight reveal and rolling credits · original opening trimmed to 68 seconds, adjusted volume and boundary fades · attribution notice: Music by Cleyton Kauffman - https://soundcloud.com/cleytonkauffman. |
 
 The Specimen uses one synchronized 277-second OGG containing the four individually
 credited compositions above. Music is silent from 2:03.5–2:14; existing sound
@@ -130,6 +132,14 @@ existing data maps while retaining private powered-state materials. No new
 texture assets, external code or third-party dependencies were introduced.
 
 ### Audio / music
+
+First Sunlight uses the requester-supplied `first-sunlight-complete-ending.ogg`,
+copied byte for byte to `public/assets/audio/music/10-blackout-first-sunlight-ending.ogg`.
+The 179-second stereo OGG Vorbis combines Claimed by the Void at 0–105s,
+silence at 105–111s and Exploration Theme at 111–179s. The approved edits,
+dialogue level shaping, transitions and fades are already in the file; the
+game does not re-encode or alter them. Both compositions remain individually
+credited above and are included in the main credits and final rolling credits.
 
 The requester-supplied `specimen-cinematic-music-integration.zip` provides the
 two final runtime recordings, copied unchanged into `public/assets/audio/music/`:

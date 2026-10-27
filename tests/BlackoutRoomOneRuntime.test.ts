@@ -31,6 +31,14 @@ import { FINAL_ARENA, FINAL_ARENA_RING, FINAL_ARENA_ORBIT, FINAL_MERGE_ANCHOR, F
 import type { BossDefeatFinale } from '../src/cinematics/BossDefeatFinale.ts';
 import { ENDING_TIMING } from '../src/cinematics/BossDefeatTimeline.ts';
 import { gameplayAudioEvents } from '../src/audio/GameplayAudioEvents.ts';
+import { cinematicMusicEvents, type CinematicMusic } from '../src/audio/CinematicMusic.ts';
+
+function captureEndingMusic() {
+  const started: CinematicMusic[] = [], stopped: CinematicMusic[] = [];
+  const offStart = cinematicMusicEvents.on('started', cue => { if (cue.track === 'ending') started.push(cue); });
+  const offStop = cinematicMusicEvents.on('stopped', cue => { if (cue.track === 'ending') stopped.push(cue); });
+  return { started, stopped, dispose: () => { offStart(); offStop(); } };
+}
 
 class TestButton {
   private listeners = new Set<() => void>();
@@ -498,31 +506,37 @@ test('Room 4 debug shortcut is gated, ending uses the legal macro flow and compl
 
 test('the ending owns all actors, pauses, reaches natural credits once and restores them on recovery', () => {
   for (const recover of [true, false]) {
-    const f = createFixture(); try {
+    const f = createFixture(), music = captureEndingMusic(); try {
       const originalParent = f.scene.getObjectByName('player-slime-volt-placement')!.parent;
       assert.equal(f.runtime.previewBossDefeatForDebug(), true);
       const { defeatFinale: movie, finalBoss: boss } = finalBossInternals(f.runtime);
+      assert.equal(music.started.length, 1); assert.equal(music.started[0]!.seconds, 0);
+      assert.equal(music.started[0]!.duration, ENDING_TIMING.duration);
       let completions = 0; f.runtime.events.on('completed', () => completions++);
       f.tick(180); const seconds = movie.seconds;
+      assert.equal(music.started[0]!.seconds, seconds);
       f.runtime.stop(); f.tick(120); assert.equal(movie.seconds, seconds); f.runtime.start();
       assert.equal(boss.squad.activeCount, 0); f.switchSlime(); assert.equal(f.runtime.phase, 'boss-defeated');
       assert.equal(movie.begin(f.cameraRig.camera), false, 'an active ending cannot acquire the actors twice');
       if (recover) {
         f.runtime.recoverActiveCheckpoint(); assert.equal(movie.active, false); assert.equal(completions, 0);
+        assert.deepEqual(music.stopped, music.started);
         assert.equal(f.host.dataset.cinematic, undefined);
         assert.equal(f.scene.getObjectByName('player-slime-volt-placement')!.parent, originalParent);
         assert.equal(f.runtime.previewBossDefeatForDebug(), true);
+        assert.equal(music.started.length, 2); assert.equal(music.started[1]!.seconds, 0);
       }
       for (let i = 0; i < ENDING_TIMING.duration * 15 + 10; i++) f.runtime.fixedUpdate(1 / 15);
       assert.equal(f.runtime.phase, 'complete'); assert.equal(completions, 1); assert.equal(movie.active, false); assert.equal(movie.complete, true);
       assert.equal(f.host.dataset.cinematic, undefined); assert.equal(movie.begin(f.cameraRig.camera), false);
       f.tick(20); assert.equal(completions, 1);
-    } finally { f.cleanup(); }
+      assert.deepEqual(music.stopped, music.started); assert.ok(music.started.every(cue => !cue.playing));
+    } finally { f.cleanup(); music.dispose(); }
   }
 });
 
 test('ending shader rehearsal is silent, hides its UI and restores state even after a render failure', async () => {
-  const f = createFixture(); const sounds: unknown[] = [], off = gameplayAudioEvents.on('cue', event => sounds.push(event));
+  const f = createFixture(), music = captureEndingMusic(); const sounds: unknown[] = [], off = gameplayAudioEvents.on('cue', event => sounds.push(event));
   try {
     const r = (f.runtime as any).resources, movie: BossDefeatFinale = r.defeatFinale;
     const bodies = [r.group.bobBody, r.group.goopBody, r.group.voltBody, r.specimenBody], positions = bodies.map(b => b.position.toArray());
@@ -533,13 +547,13 @@ test('ending shader rehearsal is silent, hides its UI and restores state even af
       assert.equal(movie.overlay.element!.hidden, true); assert.deepEqual(bodies.map(b => b.position.toArray()), positions);
       assert.ok(camera.position.toArray().every(Number.isFinite));
     }, () => true);
-    assert.ok(frames >= 20); assert.equal(movie.preparation.complete, true); assert.equal(sounds.length, 0);
+    assert.ok(frames >= 20); assert.equal(movie.preparation.complete, true); assert.equal(sounds.length, 0); assert.equal(music.started.length, 0);
     await assert.rejects(movie.primePresentationFrames(async () => { throw new Error('ending render failed'); }, () => true), /ending render failed/);
     assert.equal(movie.preparation.complete, false); assert.equal(movie.active, false); assert.equal(movie.seconds, 0);
     assert.equal(f.scene.background, background); assert.equal(f.host.dataset.cinematic, undefined);
     assert.deepEqual([r.bobPresentation, r.goopPresentation, r.voltPresentation].map(p => p.root.parent), parents);
-    assert.deepEqual(bodies.map(b => b.position.toArray()), positions); assert.equal(sounds.length, 0);
-  } finally { off(); f.cleanup(); }
+    assert.deepEqual(bodies.map(b => b.position.toArray()), positions); assert.equal(sounds.length, 0); assert.equal(music.started.length, 0);
+  } finally { off(); f.cleanup(); music.dispose(); }
 });
 
 test('the ending keeps its combat audio without dissolving sound effects', () => {
@@ -556,14 +570,32 @@ test('the ending keeps its combat audio without dissolving sound effects', () =>
 });
 
 test('skipping the ending credits requests a clean title return after completing progression', () => {
-  const f = createFixture(); try {
+  const f = createFixture(), music = captureEndingMusic(); try {
     f.runtime.previewBossDefeatForDebug();
     const movie = finalBossInternals(f.runtime).defeatFinale;
     while (movie.seconds < ENDING_TIMING.credits + .5) f.runtime.fixedUpdate(.2);
     f.input.press('skipCinematic'); f.tick(); f.input.release('skipCinematic');
     assert.equal(movie.skippedCredits, true); assert.equal(f.runtime.phase, 'complete');
     assert.equal(f.host.dataset.endingCreditsSkipped, 'true');
-  } finally { f.cleanup(); }
+    assert.equal(music.started.length, 1); assert.deepEqual(music.stopped, music.started);
+  } finally { f.cleanup(); music.dispose(); }
+});
+
+test('ending skip, reset and disposal release their music token exactly once', () => {
+  const f = createFixture(), music = captureEndingMusic();
+  try {
+    const movie = finalBossInternals(f.runtime).defeatFinale;
+    for (const finish of ['skip', 'reset', 'dispose'] as const) {
+      movie.reset(); assert.equal(movie.begin(f.cameraRig.camera), true);
+      const cue = music.started.at(-1)!; assert.equal(cue.seconds, 0);
+      movie.update(.1); assert.equal(cue.seconds, .1);
+      if (finish === 'skip') movie.update(.1, true);
+      else if (finish === 'reset') movie.reset();
+      else movie.dispose();
+      assert.equal(cue.playing, false); assert.equal(music.stopped.filter(item => item === cue).length, 1);
+    }
+    assert.equal(music.started.length, 3); assert.deepEqual(music.stopped, music.started);
+  } finally { f.cleanup(); music.dispose(); }
 });
 
 test('looking up close to a boss deck hides only the fused visual, then restores it with camera clearance',()=>{

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { ENDING_TIMING as T, ENDING_ANCHOR, ENDING_DIALOGUE, endingBeamCollision, sampleEndingSlime,
   sampleEndingDrone, endingDroneEntryTime, endingDroneDeathTime, endingShot, sampleEndingBossWreck, sampleEndingIncomingShot,
@@ -9,6 +10,15 @@ import { BossDefeatEffects } from '../src/cinematics/BossDefeatEffects.ts';
 import { BossDefeatSet } from '../src/cinematics/BossDefeatSet.ts';
 import { BossDefeatCamera } from '../src/cinematics/BossDefeatCamera.ts';
 import { FINAL_ARENA, FINAL_ARENA_RING } from '../src/boss/FinalBossConfig.ts';
+
+test('First Sunlight stream and its embedded transitions match the authoritative ending clock', () => {
+  const data = readFileSync(new URL('../public/assets/audio/music/10-blackout-first-sunlight-ending.ogg', import.meta.url));
+  assert.equal(data.toString('ascii', 0, 4), 'OggS'); assert.equal(data.toString('ascii', 29, 35), 'vorbis');
+  const rate = data.readUInt32LE(40), last = data.lastIndexOf('OggS');
+  assert.equal(data[39], 2); assert.equal(Number(data.readBigUInt64LE(last + 6)) / rate, T.duration);
+  assert.deepEqual([T.explosion, T.regroup, T.drones, T.sacrifice, T.leave, T.goodbye, T.destruction,
+    T.black, T.daylight, T.sky, T.credits, T.duration], [31, 39, 52, 60, 71, 80.5, 94, 105, 111, 127, 133, 179]);
+});
 
 test('ending preserves the exact last-stand conversation and gives silence before daylight', () => {
   assert.deepEqual(ENDING_DIALOGUE.map(l => [l.speaker, l.text]), [

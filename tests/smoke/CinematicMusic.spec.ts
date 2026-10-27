@@ -63,7 +63,7 @@ test('cinematic recordings decode at the nested URL and credits use the existing
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('./', { waitUntil: 'domcontentloaded' });
   const files = ['04-opening-tension.ogg', '05-containment-escape-high-tech-lab.ogg', '06-cultivation-volt-rescue-digital-slash.ogg',
-    '08-blackout-elevator-quiet-ascent.ogg', '09-blackout-research-the-specimen.ogg'];
+    '08-blackout-elevator-quiet-ascent.ogg', '09-blackout-research-the-specimen.ogg', '10-blackout-first-sunlight-ending.ogg'];
   const decoded = await page.evaluate(async files => {
     const context = new AudioContext();
     try {
@@ -78,6 +78,12 @@ test('cinematic recordings decode at the nested URL and credits use the existing
           for (let frame = Math.ceil(124 * buffer.sampleRate); frame < 133 * buffer.sampleRate; frame++)
             blackoutPeak = Math.max(blackoutPeak, Math.abs(samples[frame]!));
         }
+        if (file.startsWith('10-')) for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+          const samples = buffer.getChannelData(channel);
+          // Avoid negligible Vorbis ringing at the edit boundaries.
+          for (let frame = Math.ceil(105.1 * buffer.sampleRate); frame < 110.9 * buffer.sampleRate; frame++)
+            blackoutPeak = Math.max(blackoutPeak, Math.abs(samples[frame]!));
+        }
         return { path: url.pathname, duration: buffer.duration, channels: buffer.numberOfChannels, rate: buffer.sampleRate, blackoutPeak };
       }));
     } finally { await context.close(); }
@@ -85,10 +91,11 @@ test('cinematic recordings decode at the nested URL and credits use the existing
   for (let index = 0; index < decoded.length; index++) {
     expect(decoded[index]!.path).toBe('/group-folder/assets/audio/music/' + files[index]);
     expect(decoded[index]!.channels).toBe(2);
-    expect(decoded[index]!.duration).toBeCloseTo([99.1, 152.92, 129.023, 85.068, 277][index]!, 0);
+    expect(decoded[index]!.duration).toBeCloseTo([99.1, 152.92, 129.023, 85.068, 277, 179][index]!, 0);
   }
   expect(decoded[2]!.duration).toBeGreaterThanOrEqual(VOLT_FINALE.duration);
   expect(decoded[4]!.blackoutPeak).toBe(0);
+  expect(decoded[5]!.blackoutPeak).toBeLessThan(1e-4);
   await expect(page.locator('[data-flow-panel="title"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-flow-panel="title"] [data-action="credits"]').click();
   for (const [title, creator] of [['Tension', 'Tsorthan Grove'], ['High Tech Lab', 'remaxim']]) {
@@ -113,6 +120,8 @@ test('cinematic recordings decode at the nested URL and credits use the existing
     ['Article 160 Section 2', 'Zander Noriega', 'article-160-section-2', 'licenses/by/3.0/'],
     ['Inevitable', 'vitalezzz', 'inevitable', 'publicdomain/zero/1.0/'],
     ['Derelict Spaceship', 'vitalezzz', 'derelict-spaceship', 'publicdomain/zero/1.0/'],
+    ['Claimed by the Void', 'vitalezzz', 'claimed-by-the-void', 'publicdomain/zero/1.0/'],
+    ['Exploration Theme', 'Cleyton Kauffman', 'exploration-theme', 'publicdomain/zero/1.0/'],
   ]) {
     const row = page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: new RegExp(`^${title}$`) }) });
     await expect(row).toHaveCount(1);

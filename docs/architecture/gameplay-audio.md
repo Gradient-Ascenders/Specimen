@@ -364,6 +364,12 @@ Cinematic ownership overrides flow routing, including finales while flow is
 non-looping recording. The last second fades according to the cinematic clock;
 Skip/disposal fades for 800 ms before restoring destination flow music. Loading
 stays silent. Title/restart/failed transitions cancel stale cinematic ownership.
+First Sunlight's `ending` cue is the exception: its supplied 179-second stream
+already contains all fades and a 105–111s silent section. It retains unity
+cinematic gain on top of the shared 0.28 music gain, bypasses the extra runtime
+fade/envelope, and stops immediately on completion/skip/reset/disposal. Rolling
+credits at 133s do not change ownership. Rehearsal creates no music token; see
+`docs/boss-defeat-finale.md` for the asset provenance and two composition credits.
 Pause, focus and master/music controls remain shared; SFX gain is independent.
 A stationary live clock pauses playback after 250 ms, including rendering holds
 when background muting is disabled. Media seek drift above 350 ms is corrected;
