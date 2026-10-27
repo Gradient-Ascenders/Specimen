@@ -3,7 +3,7 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { ENDING_TIMING as T, ENDING_ANCHOR, ENDING_DIALOGUE, endingBeamCollision, sampleEndingSlime,
   sampleEndingDrone, endingDroneEntryTime, endingDroneDeathTime, endingShot, sampleEndingBossWreck, sampleEndingIncomingShot,
-  endingGoopHitTime, sampleEndingGoopHit } from '../src/cinematics/BossDefeatTimeline.ts';
+  endingGoopHitTime, sampleEndingGoopHit, ENDING_DRONE_BAYS } from '../src/cinematics/BossDefeatTimeline.ts';
 import { endingTerrainHeight } from '../src/cinematics/BossDefeatTerrain.ts';
 import { BossDefeatEffects } from '../src/cinematics/BossDefeatEffects.ts';
 import { BossDefeatSet } from '../src/cinematics/BossDefeatSet.ts';
@@ -71,7 +71,7 @@ test('reinforcements emerge from six wall bays in distinct lanes and die to Goop
   for (let i = 0; i < 24; i++) {
     assert.equal(sampleEndingDrone(i, endingDroneEntryTime(i) - .001, point), false);
     assert.equal(sampleEndingDrone(i, endingDroneEntryTime(i), point), true);
-    assert.ok(Math.hypot(point.x, point.z - FINAL_ARENA.centreZ) > 100);
+    assert.ok(Math.hypot(point.x, point.z - FINAL_ARENA.centreZ) < 97);
     assert.equal(sampleEndingDrone(i, T.sacrifice, point), true);
     if (i > 0) { sampleEndingDrone(i - 1, T.sacrifice, other); assert.ok(point.distanceTo(other) > 1.2); }
     if (Number.isFinite(endingDroneDeathTime(i))) assert.equal(sampleEndingDrone(i, endingDroneDeathTime(i), point), false);
@@ -80,6 +80,32 @@ test('reinforcements emerge from six wall bays in distinct lanes and die to Goop
   for (let i = 0; i < 24; i++) if (sampleEndingDrone(i, T.destruction - .5, point)) remaining++;
   assert.ok(remaining >= 12, 'a substantial part of the wave must survive the last stand');
   for (let i = 0; i < 24; i++) assert.equal(sampleEndingDrone(i, T.destruction, point), false);
+});
+
+test('every reinforcement exits its open bay straight inward before turning, with clearance from the arena wall', () => {
+  const set = new BossDefeatSet(), point = new THREE.Vector3(), local = new THREE.Vector3();
+  try {
+    set.root.updateMatrixWorld(true);
+    for (let index = 0; index < 24; index++) {
+      const bay = set.root.getObjectByName(`reinforcement-launch-bay-${Math.floor(index / 4)}`)!;
+      const source = ENDING_DRONE_BAYS[Math.floor(index / 4)]!;
+      assert.ok(bay.position.distanceTo(new THREE.Vector3(source.x, source.y, source.z)) < .001);
+      let previousZ = Infinity;
+      for (let age = 0; age <= 1.6; age += .02) {
+        sampleEndingDrone(index, endingDroneEntryTime(index) + age, point); local.copy(point); bay.worldToLocal(local);
+        assert.ok(Math.abs(local.x) + 1.3 < 2.5, 'the entire drone must clear the bay jambs');
+        assert.ok(Math.abs(local.y) + 1.3 < 2, 'the entire drone must clear the roof and sill');
+        assert.ok(local.z <= previousZ + .001, 'launch must move straight out, never sideways through the shell');
+        assert.ok(local.z + 1.3 < 1.575, 'the drone must remain in front of the solid backing');
+        previousZ = local.z;
+      }
+      assert.ok(local.z + 1.3 < -1.45, 'turning begins only after the entire hull clears the shutter');
+      for (let age = 0; age < 17; age += .02) {
+        sampleEndingDrone(index, endingDroneEntryTime(index) + age, point);
+        assert.ok(Math.hypot(point.x, point.z - FINAL_ARENA.centreZ) + 1.3 < 99, 'the full hull must stay inside the arena wall');
+      }
+    }
+  } finally { set.dispose(); }
 });
 
 test('the boss wreck falls progressively into the pit after the explosion', () => {

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { FINAL_ARENA } from '../boss/FinalBossConfig.ts';
-import { ENDING_ANCHOR, ENDING_EXIT_Z, ENDING_TIMING as T, endingProgress, sampleEndingBossWreck, endingCollapseBlastTime, endingCollapseBlastPosition } from './BossDefeatTimeline.ts';
+import { ENDING_ANCHOR, ENDING_EXIT_Z, ENDING_DRONE_BAYS, ENDING_TIMING as T, endingProgress, sampleEndingBossWreck, endingCollapseBlastTime, endingCollapseBlastPosition } from './BossDefeatTimeline.ts';
 import { BossDefeatTerrain } from './BossDefeatTerrain.ts';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -144,10 +144,14 @@ export class BossDefeatSet {
     }
   }
   private buildDeploymentBays(): void {
-    for (let i = 0; i < 6; i++) {
-      const angle = -.65 + i * .07, x = Math.cos(angle) * 100, z = FINAL_ARENA.centreZ + Math.sin(angle) * 100;
-      const bay = new THREE.Group(); bay.position.set(x, 11 + i * 1.2, z); bay.rotation.y = -angle + Math.PI / 2; this.root.add(bay);
-      this.box('reinforcement-bay-dark-interior', [5, 4, 5], [0, 0, 1.7], this.dark, bay);
+    for (const [i, source] of ENDING_DRONE_BAYS.entries()) {
+      const bay = new THREE.Group(); bay.name = `reinforcement-launch-bay-${i}`;
+      bay.position.set(source.x, source.y, source.z); bay.rotation.y = -source.angle + Math.PI / 2; this.root.add(bay);
+      this.box('reinforcement-bay-dark-interior', [5, 4, .25], [0, 0, 1.7], this.dark, bay);
+      for (const side of [-1, 1]) {
+        this.box('reinforcement-bay-side-wall', [.3, 4, 3], [side * 2.65, 0, .2], this.dark, bay);
+        this.box('reinforcement-bay-liner', [5.6, .3, 3], [0, side * 2.15, .2], this.dark, bay);
+      }
       for (const side of [-1, 1]) this.box('reinforcement-bay-jamb', [.3, 4.6, 1], [side * 2.65, 0, -1], this.metal, bay);
       this.box('reinforcement-bay-header', [5.6, .3, 1], [0, 2.15, -1], this.metal, bay);
       this.doors.push(this.box('reinforcement-launch-shutter', [5, 4, .25], [0, 0, -1.3], this.white, bay));

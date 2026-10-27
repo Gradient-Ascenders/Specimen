@@ -115,7 +115,11 @@ export function sampleEndingBossWreck(t: number, out: THREE.Vector3): THREE.Vect
   const age = Math.max(0, t - ENDING_TIMING.explosion);
   return out.set(Math.sin(age * .8) * age * .8, 12 + age * 2 - 3.2 * age * age, FINAL_ARENA.centreZ - 20 + age * 1.4);
 }
-export function endingDroneEntryTime(index: number): number { return ENDING_TIMING.drones + Math.floor(index / 4) * 1.2 + index % 4 * .22; }
+export const ENDING_DRONE_BAYS = Object.freeze(Array.from({ length: 6 }, (_, group) => {
+  const angle = -.65 + group * .07;
+  return Object.freeze({ angle, x: Math.cos(angle) * 96, y: 11 + group * 1.2, z: FINAL_ARENA.centreZ + Math.sin(angle) * 96 });
+}));
+export function endingDroneEntryTime(index: number): number { return ENDING_TIMING.drones + Math.floor(index / 4) * 1.2 + index % 4 * .45; }
 export function endingDroneDeathTime(index: number): number {
   if (index % 4 === 0) return ENDING_TIMING.leave + 2 + Math.floor(index / 4) * 1.5;
   if (index % 4 === 1) return ENDING_TIMING.goodbye + 2 + Math.floor(index / 4) * 1.4;
@@ -124,11 +128,11 @@ export function endingDroneDeathTime(index: number): number {
 export function sampleEndingDrone(index: number, t: number, out: THREE.Vector3): boolean {
   const start = endingDroneEntryTime(index), age = t - start;
   const group = Math.floor(index / 4), lane = index % 4;
-  const p = ease(t, start, start + 17);
-  const angle = -.65 + group * .07;
-  out.set(THREE.MathUtils.lerp(Math.cos(angle) * 102, 17 + group * 3 + lane * 1.2, p),
-    THREE.MathUtils.lerp(11 + group * 1.2 + (lane % 2 ? .85 : -.85), 3.4 + lane * .9, p),
-    THREE.MathUtils.lerp(FINAL_ARENA.centreZ + Math.sin(angle) * 102 + (lane - 1.5) * .7, ENDING_ANCHOR.z + (lane - 1.5) * 3.3 + group * 2, p));
+  const bay = ENDING_DRONE_BAYS[group]!, side = (lane - 1.5) * .45;
+  const exit = THREE.MathUtils.clamp(age / 1.6, 0, 1), p = ease(t, start + 1.6, start + 17);
+  out.set(THREE.MathUtils.lerp(bay.x - Math.cos(bay.angle) * exit * 6 - Math.sin(bay.angle) * side, 17 + group * 3 + lane * 1.2, p),
+    THREE.MathUtils.lerp(bay.y + (lane % 2 ? .5 : -.5), 3.4 + lane * .9, p),
+    THREE.MathUtils.lerp(bay.z - Math.sin(bay.angle) * exit * 6 + Math.cos(bay.angle) * side, ENDING_ANCHOR.z + (lane - 1.5) * 3.3 + group * 2, p));
   out.x += Math.sin(age * 1.1 + index * 2.1) * .35 * p;
   out.y += Math.sin(age * 1.7 + index) * .25 * p;
   return age >= 0 && t < endingDroneDeathTime(index) && t < ENDING_TIMING.destruction;
