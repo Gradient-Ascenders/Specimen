@@ -108,8 +108,10 @@ Ordinary Start uses the same `src/main.ts` flow in development and production:
 `title → opening → playing`. The original standalone `?trailer=opening` capture
 is still independent. The default opening is the live scene in both builds
 (`?opening=live` also explicitly selects it). The committed 1080p/30fps H.264 MP4
-and its native HTML player remain an opt-in `?opening=mp4` backup, not a WebGL
-video texture. Ordinary Start does not download the backup. See
+and its native HTML player remain an opt-in `?opening=mp4` backup in development
+and explicit `opening-backup` builds. Submission builds omit the video and use
+the live opening for that URL. The backup is not a WebGL video texture, and
+ordinary Start does not download it. See
 [opening movie operations](../operations/opening-movie.md) for exporting,
 encoding, playback and loading details. The backup contains its fixed 16:9
 video without cropping on narrower screens. Both paths use the same sequence.

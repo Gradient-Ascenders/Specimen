@@ -65,7 +65,7 @@ const main = async () => {
       listing = windowsZip('list', temporaryArchive);
     } else {
       // Use argv rather than stdin: a missing stdin EOF can stall zip -@.
-      run('zip', ['-X', '-q', '-nw', temporaryArchive, '--', ...buildFiles], {
+      run('zip', ['-9', '-X', '-q', '-nw', temporaryArchive, '--', ...buildFiles], {
         cwd: stagingDirectory,
         env: { ...process.env, TZ: 'UTC' },
       });
