@@ -9,6 +9,7 @@ import type { ContainmentStaticBatchResult } from '../render/environment/contain
 
 import type { BlackoutCheckpointDefinition } from './BlackoutCheckpointManager.ts';
 import { repairStaticBoxSurfaces } from '../render/geometry/CoplanarSurfaceGeometry.ts';
+import { BlackoutTransitArt, type BlackoutTransitArtBindings, type BlackoutTransitArtLoader } from '../render/environment/blackout/BlackoutTransitArt.ts';
 
 const BRIDGE_APPROACH_CENTRE = new THREE.Vector3(-16, 2.5, 136);
 const BRIDGE_APPROACH_LENGTH = 3.5;
@@ -121,11 +122,13 @@ export class BlackoutTransitRoom {
     new THREE.Vector3(14, 8.4, 96),
     new THREE.Vector3(14, 12.1, 120),
     new THREE.Vector3(-4, 8.9, 139),
+    // Clear the switch wall so Volt can aim here from the service gantry.
+    new THREE.Vector3(10, 14.4, 142.5),
   ] as const;
   readonly switchPosition = new THREE.Vector3(7.12, 8.55, 142.5);
   readonly switchBodyPosition = new THREE.Vector3(7.4, 8.06, 142.5);
   readonly bridgeStart = BRIDGE_APPROACH_CENTRE.clone().addScaledVector(BRIDGE_APPROACH_FORWARD, BRIDGE_APPROACH_LENGTH / 2);
-  readonly bridgeEnd = new THREE.Vector3(0, 0.4, 144);
+  readonly bridgeEnd = new THREE.Vector3(-2.6, 0.4, 142.7);
   readonly exitPosition = new THREE.Vector3(0, 0.86, 151);
   readonly switchButton: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>;
   readonly catwalk: THREE.Mesh;
@@ -142,11 +145,13 @@ export class BlackoutTransitRoom {
   });
 
   private readonly materials: THREE.Material[] = [];
-  private readonly acidMaterial = new AcidSurfaceMaterial();
+  private readonly acidMaterial = new AcidSurfaceMaterial({ emissionStrength: 0.12 });
   private readonly hallwayLights: THREE.PointLight[] = [];
   private readonly hallwayBulbs: THREE.MeshStandardMaterial[] = [];
   private hallwayElapsed = 0;
-  private readonly staticVisuals: ContainmentStaticBatchResult;
+  private staticVisuals: ContainmentStaticBatchResult;
+  private readonly staticSources: THREE.Mesh[];
+  readonly art?: BlackoutTransitArt;
 
   private disposed = false;
 
@@ -155,6 +160,7 @@ export class BlackoutTransitRoom {
 
   constructor(surfaceMaterials?: BlackoutMaintenanceMaterials) {
     this.surfaceMaterials = surfaceMaterials;
+    this.art = surfaceMaterials ? new BlackoutTransitArt(surfaceMaterials) : undefined;
     this.root.name = 'level-3-room-2-powered-transit-gauntlet';
     this.root.userData.levelId = 'blackout';
     this.root.userData.roomId = 'room-2';
@@ -167,6 +173,7 @@ export class BlackoutTransitRoom {
     const warning = this.material(0x665020, 0.86, 0.2);
     const sticky = this.material(0x183a35, 0.48, 0.08, 0x061511, 0.16);
     const acid = this.acidMaterial;
+    acid.emissive.setHex(0x12341a);
     this.materials.push(acid);
     const glass = this.material(0x263c3d, 0.52, 0.55, 0x061011, 0.12);
 
@@ -213,7 +220,8 @@ export class BlackoutTransitRoom {
       if (object instanceof THREE.Mesh && object !== this.switchButton && object !== this.bridgeLockContact &&
           object.userData.textureRole !== 'acid-floor' && !object.name.includes('hallway-bulb')) immutable.push(object);
     });
-    this.staticVisuals = consolidateStaticRoomVisuals(this.root, immutable);
+    this.staticSources = immutable;
+    this.staticVisuals = consolidateStaticRoomVisuals(this.root, this.staticSources);
     this.acidInteractions = new AcidLiquidInteractions(this.acidMaterial,
       this.root.getObjectByName('transit-acid-surface') as THREE.Mesh, 3);
   }
@@ -248,11 +256,18 @@ export class BlackoutTransitRoom {
     }
   }
 
+  /** Resolve the room and device skins before shader/resource preparation. */
+  prepareArt(bindings: BlackoutTransitArtBindings, loader?: BlackoutTransitArtLoader): Promise<void> {
+    return this.art?.prepare(this.root, bindings, () => this.staticVisuals.dispose(),
+      () => { this.staticVisuals = consolidateStaticRoomVisuals(this.root, this.staticSources); }, loader) ?? Promise.resolve();
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     this.acidInteractions.reset();
     this.staticVisuals.dispose();
+    this.art?.dispose();
     this.root.removeFromParent();
     const geometries = new Set<THREE.BufferGeometry>();
     this.root.traverse((object) => {
@@ -436,7 +451,12 @@ export class BlackoutTransitRoom {
     // at its front edge. A centre-anchored ramp used to descend under the slab.
     const start = this.box('transit-bridge-start-anchor', [BRIDGE_APPROACH_LENGTH, 0.5, 3.8], [-16, 2.25, 136], steel);
     start.rotation.y = -Math.atan2(BRIDGE_APPROACH_FORWARD.z, BRIDGE_APPROACH_FORWARD.x);
-    this.box('transit-bridge-end-anchor', [7, 0.5, 6], [0, 0.15, 144], steel);
+    // The local box edge matches the bridge's complete width at deck height.
+    // Keep a real oriented box: the movement solver uses local box bounds.
+    const endCentre = this.bridgeEnd.clone().addScaledVector(BRIDGE_APPROACH_FORWARD, 3.5);
+    const end = this.box('transit-bridge-end-anchor', [7, 0.5, 7], [endCentre.x, 0.15, endCentre.z], steel);
+    end.rotation.y = start.rotation.y;
+    end.userData.preciseMovementCorners = true;
     this.visualBox('transit-bridge-start-marking', [3.1, 0.025, 0.13], [-16, 2.512, 136], warning);
     this.visualBox('transit-bridge-end-marking', [3.5, 0.025, 0.13], [0, 0.414, 144], warning);
   }

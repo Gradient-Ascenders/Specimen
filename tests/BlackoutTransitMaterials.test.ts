@@ -47,15 +47,18 @@ test('deployed bridge top corners meet both anchors across its full width', () =
 test('textured static and interactive geometry preserves the reviewed transit baseline', () => {
   const f = fixture();
   const baseline = JSON.parse(readFileSync(new URL('./fixtures/blackout-transit-authored-surfaces.json', import.meta.url), 'utf8'));
-  // Retain the reviewed geometry contract except the replaced drone/cover
-  // family and the explicitly removed light hangers/two observation-panel rods.
+  // Keep the original contract outside the redesigned mechanisms. Docking
+  // geometry and the added fourth bank have dedicated interaction checks.
+  const redesigned = new Set(['transit-bridge-end-anchor', 'transit-deployable-bridge-deck']);
   baseline.surfaces = baseline.surfaces.filter((saved: { name: string }) =>
     !/^transit-(cover|security|bridge-cover|light-bank-hanger-)/.test(saved.name) &&
     !/^transit-laser-[ab]-(presentation-emitter-|emitter-(start|end)-proxy)/.test(saved.name) &&
-    !['transit-east-service-conduit-96', 'transit-east-service-conduit-116'].includes(saved.name));
+    !['transit-east-service-conduit-96', 'transit-east-service-conduit-116'].includes(saved.name) && !redesigned.has(saved.name));
   const meshes: THREE.Mesh[] = [];
   f.room.root.traverse(m => {
     if (!(m instanceof THREE.Mesh) || m.name.includes('batched') || m.userData.visualOnly || m.userData.sharedLaserEmitter) return;
+    if (redesigned.has(m.name) || m.name.startsWith('transit-light-d-')) return;
+    if (m.parent?.name === 'transit-light-d-receiver') return;
     for (let ancestor: THREE.Object3D | null = m; ancestor; ancestor = ancestor.parent) {
       if (ancestor.name.startsWith('transit-sewer-drone-')) return;
     }
@@ -170,7 +173,7 @@ test('Room 2 borrowers survive until the bay owner disposes maps exactly once ac
     const counts = new Map<THREE.Texture, number>();
     for (const t of textures) { counts.set(t, 0); t.addEventListener('dispose', () => counts.set(t, counts.get(t)! + 1)); }
     assert.equal(kit.diagnostics.textureCount, 24);
-    const owned = [controller.lights[0].targetMaterial, controller.lights[1].targetMaterial, controller.lights[2].targetMaterial,
+    const owned = [...controller.lights.map(light => light.targetMaterial),
       material(controller.lifts[0].root.getObjectByName('transit-lift-a-contact-mount') as THREE.Mesh)];
     const materialCounts = new Map(owned.map(m => [m, 0]));
     for (const m of owned) m.addEventListener('dispose', () => materialCounts.set(m, materialCounts.get(m)! + 1));

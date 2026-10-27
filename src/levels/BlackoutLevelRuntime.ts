@@ -13,6 +13,7 @@ import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
 import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from '../render/IsolatedResourcePrewarm.ts';
 import { BlackoutPresentationPreparation } from '../render/BlackoutPresentationPreparation.ts';
 import { BlackoutMaintenanceBayController } from './BlackoutMaintenanceBayController.ts';
+import { BlackoutConnectorCamera } from './BlackoutConnectorCamera.ts';
 import { BlackoutTransitController } from './BlackoutTransitController.ts';
 import { BLACKOUT_TRANSIT_CHECKPOINTS } from './BlackoutTransitRoom.ts';
 import { BLACKOUT_BOSS_STAGING_CHECKPOINT } from './BlackoutBossStaging.ts';
@@ -184,6 +185,7 @@ interface BlackoutRuntimeResources {
   readonly acidProjectileSystem: AcidProjectileSystem<KinematicBody>;
   readonly goopAcidPresentation: GoopAcidPresentation;
   readonly maintenanceBay?: BlackoutMaintenanceBayController;
+  readonly connectorCamera?:BlackoutConnectorCamera;
   readonly transit?: BlackoutTransitController;
   readonly unregisterTransitCheckpointParticipant?: () => void;
   readonly dronePresentation?: MaintenanceDronePresentation;
@@ -449,8 +451,8 @@ export class BlackoutLevelRuntime {
       resources.bobReflectionEnvironment.texture,
     );
     resources.bobPresentation.setReflectionIntensity(
-      BLACKOUT_BOB_REFLECTION.body,
-      BLACKOUT_BOB_REFLECTION.eyes,
+      0,
+      0,
       true,
     );
     resources.goopPresentation.setReflectionEnvironment(resources.bobReflectionEnvironment.texture);
@@ -466,6 +468,9 @@ export class BlackoutLevelRuntime {
       resources.specimenCharacter.prepare(),
       resources.scene.finalArena?.prepare(),
       resources.finalBoss?.prepare(),
+      resources.dronePresentation?.prepare(),
+      resources.transit?.prepareArt(),
+      resources.maintenanceBay && resources.scene.maintenanceBay?.prepareArt(resources.maintenanceBay.door.collisionMesh),
     ]).then(async () => {
       if (this.resources !== resources) return;
       // The retained light layout includes distant and unpowered fixtures.
@@ -1395,7 +1400,7 @@ export class BlackoutLevelRuntime {
       const lostRider = lostDrone && resources.maintenanceDrone.voltMounted;
       if (lostDrone) resources.maintenanceDrone.requestRecovery('acid');
       if (lostRider) bay.bay.acidInteractions.fallPulse(bodies.volt);
-      const failed = lostRider ? 'volt' : bay.update(deltaSeconds, bodies);
+      const failed = lostRider ? 'volt' : bay.update(deltaSeconds, bodies,specimenGameplay?undefined:body.position);
       resources.dronePresentation?.update(
         deltaSeconds,
         resources.maintenanceDrone.readModel,
@@ -1590,6 +1595,9 @@ export class BlackoutLevelRuntime {
       }
     }
     this.input.endPointerUpdate();
+    if(resources?.connectorCamera&&resources.specimenForm.readModel.controlledForm!=='specimen'){
+      this.renderLayer.cameraRig.setContextualCamera?.(resources.connectorCamera.resolve(resources.group.activeSlimeId==='volt'));
+    }
     this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
     resources?.scene.finalArena?.presentPlatforms(interpolationAlpha);
     resources?.finalBoss?.present(interpolationAlpha);
@@ -1607,7 +1615,13 @@ export class BlackoutLevelRuntime {
       resources.goopPresentation.setOpacity(resources.phase.phase!=='merging'&&!resources.ventArrival?.active&&!resources.elevatorAscent?.active&&resources.group.activeSlimeId === 'goop' && !this.renderLayer.cameraRig.isFirstPersonForTarget(resources.group.goopBody)
         ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
           this.renderLayer.cameraRig.currentFollowDistanceMetres, 1.35, 0.55, 0.25)) : 1);
-      // PMREM is shared with Bob. Dark rooms receive no permanent reflection fill.
+      // Every gel samples its own local lighting. A shared PMREM must not
+      // make Bob visible in a dark area while the other characters disappear.
+      const bobReflection = resources.goopReflectionLighting.weightAt(resources.renderedBobPosition);
+      resources.bobPresentation.setReflectionIntensity(
+        BLACKOUT_BOB_REFLECTION.body * bobReflection,
+        BLACKOUT_BOB_REFLECTION.eyes * bobReflection,
+      );
       const reflectionWeight = resources.goopReflectionLighting.weightAt(resources.renderedGoopPosition);
       resources.goopPresentation.setReflectionIntensity(0.12 * reflectionWeight, 0.28 * reflectionWeight);
       resources.voltPresentation.setOpacity(resources.phase.phase!=='merging'&&!resources.ventArrival?.active&&!resources.elevatorAscent?.active&&resources.group.activeSlimeId === 'volt' && !this.renderLayer.cameraRig.isFirstPersonForTarget(resources.group.voltBody)
@@ -2152,6 +2166,7 @@ export class BlackoutLevelRuntime {
         acidProjectileSystem,
         goopAcidPresentation,
         maintenanceBay,
+        connectorCamera:maintenanceBay?new BlackoutConnectorCamera(group.voltBody):undefined,
         dronePresentation,
         hallwayShadows: scene.maintenanceBay && maintenanceBay
           ? new SpatialShadowCache(scene.maintenanceBay.hallwayShadowLights, [

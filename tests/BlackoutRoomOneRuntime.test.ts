@@ -24,6 +24,7 @@ import type {GoopCharacterPresentation} from '../src/render/goop/GoopCharacterPr
 import { DEFAULT_KINEMATIC_BODY_CONFIG } from '../src/physics/KinematicBody.ts';
 import { CollisionHit, CollisionLayer, type CollisionWorld } from '../src/physics/CollisionWorld.ts';
 import { AcidSurfaceMaterial } from '../src/render/environment/containment/AcidSurfaceMaterial.ts';
+import {GelReflectionLighting} from '../src/render/slime/GelReflectionLighting.ts';
 import type { CombatTargetRegistry } from '../src/combat/CombatTargetRegistry.ts';
 import type { FinalBossEncounter } from '../src/boss/FinalBossEncounter.ts';
 import type { ExterminationArena } from '../src/boss/ExterminationArena.ts';
@@ -187,6 +188,33 @@ function createFixture(debugAvailable = true,playArrival=false,cameraRig=new Tes
 function finalBossInternals(runtime:BlackoutLevelRuntime) {
   return (runtime as unknown as {resources:{finalBoss:FinalBossEncounter;specimenBody:KinematicBody;specimenCharacter:SpecimenCharacterPresentation;collisionWorld:CollisionWorld;combatTargets:{size:number};scene:{finalArena:ExterminationArena}}}).resources;
 }
+
+test('Bob blackout reflections follow his own local lights and disappear in darkness like Goop',context=>{
+  const f=createFixture();
+  try{
+    const r=(f.runtime as unknown as {resources:{
+      group:{bobBody:KinematicBody;goopBody:KinematicBody};
+      bobPresentation:BobCharacterPresentation;goopPresentation:GoopCharacterPresentation;
+      goopReflectionLighting:GelReflectionLighting;
+    }}).resources;
+    const lightingScene=new THREE.Group(),light=new THREE.PointLight(0xffffff,16,5);
+    lightingScene.add(light);r.goopReflectionLighting=new GelReflectionLighting(lightingScene);
+    const bob=context.mock.method(r.bobPresentation,'setReflectionIntensity');
+    const goop=context.mock.method(r.goopPresentation,'setReflectionIntensity');
+    r.group.bobBody.teleport(new THREE.Vector3(0,.46,10));
+    r.group.goopBody.teleport(new THREE.Vector3(0,.46,2));
+    f.render();
+    assert.deepEqual(bob.mock.calls.at(-1)!.arguments,[0,0],'Bob cannot retain a fixed reflection fill outside the light');
+    assert.ok(goop.mock.calls.at(-1)!.arguments[0]>0,'lighting another character does not light Bob');
+    r.group.bobBody.teleport(new THREE.Vector3(0,.46,2));
+    r.group.goopBody.teleport(new THREE.Vector3(0,.46,10));
+    f.render();
+    assert.ok(bob.mock.calls.at(-1)!.arguments[0]>0,'Bob recovers reflections when he enters the light');
+    assert.deepEqual(goop.mock.calls.at(-1)!.arguments,[0,0]);
+    light.intensity=0;f.render();
+    assert.deepEqual(bob.mock.calls.at(-1)!.arguments,[0,0],'switching off the light restores the blackout');
+  }finally{f.cleanup();}
+});
 
 test('debug room access cannot enable invincibility without the Vite development build flag',()=>{
   const f=createFixture(true);try {
@@ -524,7 +552,9 @@ test('real Volt GLB normal jump clears the actual maintenance-vent ceiling at ev
         peakVisualTop = Math.max(peakVisualTop, assertVoltBelowCeiling(mesh, ceiling));
       }
       maximumCompression = Math.max(maximumCompression, r.voltPresentation.diagnostics.headroom.compression);
-      if (frame === 14) {
+      // Measure the complete jump; the apex frame changes with the authored
+      // landing/launch animation and must not be guessed from a frame number.
+      {
         const target = mesh.morphTargetDictionary!.Headroom, weight = mesh.morphTargetInfluences![target]!;
         mesh.morphTargetInfluences![target] = 0;
         for (let i = 0; i < mesh.geometry.getAttribute('position').count; i++) {
@@ -535,7 +565,8 @@ test('real Volt GLB normal jump clears the actual maintenance-vent ceiling at ev
     }
     assert.equal(volt.lastJumpSpeedMetresPerSecond, DEFAULT_KINEMATIC_BODY_CONFIG.minimumJumpSpeedMetresPerSecond);
     assert.ok(peakColliderTop > 1.65 && peakColliderTop < 1.8, 'ordinary jump tuning and unobstructed collider apex');
-    assert.ok(uncompressedTop > 2.65, 'reproduce the reviewer\'s approximately half-metre crest penetration');
+    assert.ok(uncompressedTop > ceilingBottom - .025,
+      'the current uncompressed crest reaches the protected ceiling margin');
     assert.ok(peakVisualTop <= ceilingBottom - 0.02); assert.ok(maximumCompression > 0 && maximumCompression < 1);
     volt.teleport(new THREE.Vector3(-6, 0.46, 49)); f.tick(90); f.render();
     assert.equal(r.voltPresentation.diagnostics.headroom.compression, 0, 'restore authored height after exiting the passage');

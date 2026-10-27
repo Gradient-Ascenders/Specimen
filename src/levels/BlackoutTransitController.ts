@@ -24,6 +24,7 @@ import type { DissolveSystem } from '../abilities/DissolveSystem.ts';
 import { LaserHazardPresentation } from '../render/hazards/LaserHazardPresentation.ts';
 import { DroneProjectilePresentation } from '../render/hazards/DroneProjectilePresentation.ts';
 import { SlimeDamageSystem } from '../systems/SlimeDamageSystem.ts';
+import type { BlackoutTransitArtBindings, BlackoutTransitArtDevice, BlackoutTransitArtLoader } from '../render/environment/blackout/BlackoutTransitArt.ts';
 
 export type TransitSlimeId = 'bob' | 'goop' | 'volt';
 export type TransitBodies = Record<TransitSlimeId, KinematicBody>;
@@ -320,6 +321,25 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
 
   get isActive(): boolean { return this.active; }
 
+  prepareArt(loader?: BlackoutTransitArtLoader): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    const owners: BlackoutTransitArtBindings['owners'] = new Map<BlackoutTransitArtDevice, THREE.Object3D>([
+      ['LiftA', this.lifts[0]!.root], ['LiftB', this.lifts[1]!.root], ['Bridge', this.bridge],
+      ['BankA', this.lights[0]!.root], ['BankB', this.lights[1]!.root], ['BankC', this.lights[2]!.root],
+      ['BankD', this.lights[3]!.root],
+    ]);
+    const retiredDevices: THREE.Mesh[] = [this.bridge];
+    for (const lift of this.lifts) {
+      retiredDevices.push(lift.platform.collisionMesh);
+      const stem = lift.root.getObjectByName(lift.id + '-contact-mount');
+      if (stem instanceof THREE.Mesh) retiredDevices.push(stem);
+    }
+    for (const receiver of this.lights) for (const child of receiver.root.children) {
+      if (child instanceof THREE.Mesh && !receiver.target.hitMeshes.includes(child)) retiredDevices.push(child);
+    }
+    return this.room.prepareArt({ owners, retiredDevices }, loader);
+  }
+
   setActive(active: boolean): void {
     if (this.disposed) return;
     this.active = active;
@@ -468,6 +488,7 @@ export class BlackoutTransitController implements BlackoutCheckpointParticipant 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.room.art?.detachDevices();
     this.bridgeAudio.dispose();
     for (const unregister of [...this.targetUnregisters].reverse()) unregister();
     this.targetUnregisters.length = 0;

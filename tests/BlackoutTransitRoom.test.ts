@@ -157,12 +157,12 @@ test('acid area, exit ramp, bridge anchors, and receivers support the shared thr
     assert.equal(room.acidAt({ x: 18, y: 0.1, z: 100 }), false);
     assert.equal(room.exitAt({ x: 0, y: 0.86, z: 151 }), true);
     assert.equal(room.exitAt({ x: 7, y: 0.86, z: 151 }), false);
-    assert.equal(room.receiverPositions.length, 3);
+    assert.equal(room.receiverPositions.length, 4);
     assert.deepEqual(room.receiverPositions.map(({ x, z }) => [x, z]), [
-      [14, 96], [14, 120], [-4, 139],
+      [14, 96], [14, 120], [-4, 139], [10, 142.5],
     ]);
     assert.ok(room.bridgeStart.distanceTo(new THREE.Vector3(-16, 2.5, 136).addScaledVector(new THREE.Vector3(16, 0, 8).normalize(), 1.75)) < 1e-8);
-    assert.deepEqual(room.bridgeEnd.toArray(), [0, 0.4, 144]);
+    assert.deepEqual(room.bridgeEnd.toArray(), [-2.6, 0.4, 142.7]);
     assert.deepEqual(room.exitPosition.toArray(), [0, 0.86, 151]);
     assert.ok(room.collisionMeshes.some((mesh) => mesh.name === 'goop-acid-exit-ramp'));
     assert.equal(room.switchButton.name, 'bob-bridge-pressure-button');

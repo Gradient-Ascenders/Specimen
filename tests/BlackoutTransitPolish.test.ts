@@ -3,7 +3,7 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { BlackoutTransitRoom } from '../src/levels/BlackoutTransitRoom.ts';
 
-test('exit landing surfaces share a 0.4 m top with butt joints instead of overlapping tops', () => {
+test('exit landing surfaces share a 0.4 m top and the rotated dock joins the main deck', () => {
   const room = new BlackoutTransitRoom();
   try {
     const bounds = (name: string) => new THREE.Box3().setFromObject(room.root.getObjectByName(name)!);
@@ -12,7 +12,7 @@ test('exit landing surfaces share a 0.4 m top with butt joints instead of overla
     const apron = bounds('transit-exit-left-apron');
     const hall = bounds('transit-exit-hallway-floor');
     for (const box of [anchor, deck, apron, hall]) assert.ok(Math.abs(box.max.y - .4) < 1e-6);
-    assert.equal(anchor.max.z, deck.min.z);
+    assert.ok(anchor.max.z > deck.min.z, 'the diagonal dock has a continuous supported handoff');
     assert.equal(deck.max.z, hall.min.z);
     assert.equal(deck.max.x, apron.min.x);
     const ramp = room.root.getObjectByName('goop-acid-exit-ramp') as THREE.Mesh;

@@ -93,7 +93,7 @@ export class BlackoutMaintenanceBayController {
     return distance<.001 || !this.world.raycast(this.rayOrigin,this.rayDirection.normalize(),Math.max(.001,distance-.4),this.rayHit,CollisionLayer.LineOfSight,ignored);
   }
 
-  update(dt:number,bodies:Record<SlimeId,KinematicBody>):SlimeId|undefined {
+  update(dt:number,bodies:Record<SlimeId,KinematicBody>,listener?:ReadonlyVector3State):SlimeId|undefined {
     const previousCharge = this.charge;
     this.charge=this.powered?Math.min(1,this.charge+dt*1.5):0;
     if (previousCharge < 1 && this.charge >= 1) {
@@ -102,7 +102,7 @@ export class BlackoutMaintenanceBayController {
     }
     this.door.setOpen(this.charge>=1);
     this.door.update(dt,Object.entries(bodies).map(([id,body])=>({id,position:body.position,radiusMetres:body.radiusMetres})));
-    this.bay.update(dt,this.charge>=1);
+    this.bay.update(dt,this.charge>=1,listener);
     for(const id of ['bob','goop','volt'] as const){
       const p=bodies[id].position;
       if(p.y < -5) return id;
@@ -145,10 +145,11 @@ export class BlackoutMaintenanceBayController {
     const color=this.powered?0x36ff74:0xff2716;
     this.indicatorMaterial.color.setHex(color);this.indicatorMaterial.emissive.setHex(color);this.indicatorLight.color.setHex(color);
   }
-  reset():void {this.complete=false;this.powered=false;this.charge=0;this.voltTraversedVent=false;this.enteredVentFromBay=false;this.hasPreviousVoltPosition=false;this.door.reset();this.updateIndicator();}
+  reset():void {this.complete=false;this.powered=false;this.charge=0;this.voltTraversedVent=false;this.enteredVentFromBay=false;this.hasPreviousVoltPosition=false;this.door.reset();this.bay.resetConnector();this.updateIndicator();}
 
   dispose():void {
     if(this.disposed)return;this.disposed=true;
+    this.bay.art.detachDoor();
     this.unregister();this.door.dispose();this.receiver.removeFromParent();
     const materials=new Set<THREE.Material>();
     this.receiver.traverse(object=>{if(object instanceof THREE.Mesh){object.geometry.dispose();for(const material of Array.isArray(object.material)?object.material:[object.material])materials.add(material);}});
