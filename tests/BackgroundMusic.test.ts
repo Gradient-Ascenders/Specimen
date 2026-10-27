@@ -139,6 +139,7 @@ test('failed playback on a stopped scene never shows the autoplay prompt', async
 
 // Cinematic routing exercises the same two streaming players as normal BGM.
 import { CinematicMusic, cinematicMusicEvents } from '../src/audio/CinematicMusic.ts';
+import { BossMusic } from '../src/audio/BossMusic.ts';
 
 function cinematicFixture(context: TestContext) {
   context.mock.timers.enable({ apis: ['setInterval'] });
@@ -160,6 +161,9 @@ test('all cinematic tracks preempt level music without overlap, loop or duplicat
     ['awakening', '04-opening-tension.ogg', 1],
     ['escape', '05-containment-escape-high-tech-lab.ogg', .60],
     ['rescue', '06-cultivation-volt-rescue-digital-slash.ogg', 1.75],
+    ['ascent', '08-blackout-elevator-quiet-ascent.ogg', 1.1],
+    ['research', '09-blackout-research-the-specimen.ogg', 1.4],
+    ['ending', '10-blackout-first-sunlight-ending.ogg', 1],
   ] as const) {
     const cue = new CinematicMusic(track, 129);
     cue.update(0);
@@ -186,7 +190,7 @@ test('all cinematic tracks preempt level music without overlap, loop or duplicat
   assert.equal(f.players.length, 2);
 });
 
-for (const [track, duration, halfVolume] of [['awakening', 53.2, .14], ['rescue', 129, .245]] as const) {
+for (const [track, duration, halfVolume] of [['awakening', 53.2, .14], ['rescue', 129, .245], ['ascent', 70, .154], ['research', 277, .196], ['ending', 179, .28]] as const) {
 test(`${track} media clock seeks, stalls, pause/focus, settings and resume retain ownership through natural completion`, context => {
   const f = cinematicFixture(context);
   f.music.setScene(null, true);
@@ -205,11 +209,35 @@ test(`${track} media clock seeks, stalls, pause/focus, settings and resume retai
   context.mock.timers.tick(250); assert.equal(player.paused, true, 'a frozen live clock must pause even with background muting disabled');
   cue.update(3.1); context.mock.timers.tick(50); assert.equal(player.paused, false);
   cue.update(duration - .5); context.mock.timers.tick(50);
-  assert.ok(Math.abs(player.volume - halfVolume) < 1e-10, 'last second follows the actual movie clock');
+  assert.ok(Math.abs(player.volume - halfVolume) < 1e-10, 'ending retains its baked fades; other tracks retain their clock envelope');
   cue.update(duration); context.mock.timers.tick(800);
   assert.equal(f.active().length, 0);
 });
 }
+
+test('ending preempts a boss victory fade, keeps one stream through credits and stops immediately', context => {
+  const f = cinematicFixture(context); f.music.setScene('blackout', true);
+  const boss = new BossMusic(); f.music.beginBoss(boss); f.music.defeatBoss(boss);
+  const cue = new CinematicMusic('ending', 179); cue.update(0);
+  assert.equal(f.active().length, 1);
+  const player = f.active()[0]!;
+  assert.match(player.src, /10-blackout-first-sunlight-ending/);
+  assert.equal(player.currentTime, 0); assert.equal(player.loop, false); assert.equal(player.volume, .28);
+  const plays = player.plays;
+  for (const seconds of [105, 111, 133, 178.5]) {
+    cue.update(seconds); context.mock.timers.tick(50); f.music.setScene(null, true);
+    assert.equal(f.active()[0], player); assert.equal(player.currentTime, seconds);
+    assert.equal(player.plays, plays); assert.equal(player.volume, .28);
+  }
+  cue.stop();
+  assert.equal(f.active().length, 0, 'skip must not leave an outgoing fade playing');
+  context.mock.timers.tick(3000); assert.equal(f.active().length, 0, 'the old boss fade cannot resume');
+  const replay = new CinematicMusic('ending', 179); replay.update(0);
+  assert.equal(f.active()[0]!.currentTime, 0);
+  replay.update(179); assert.equal(f.active().length, 0, 'natural completion stops immediately too');
+  f.music.setScene('intro', true); context.mock.timers.tick(400);
+  assert.match(f.active()[0]!.src, /00-intro/); assert.equal(f.players.length, 2);
+});
 
 test('replay resets to the beginning, stale stop cannot cancel replacement, and disposal clears timers', context => {
   const f = cinematicFixture(context); f.music.setScene('containment', true);

@@ -14,12 +14,16 @@ const MUSIC_PATHS: Record<MusicTrack, string> = {
   escape: 'assets/audio/music/05-containment-escape-high-tech-lab.ogg',
   rescue: 'assets/audio/music/06-cultivation-volt-rescue-digital-slash.ogg',
   boss: 'assets/audio/music/07-blackout-boss-a-flawless-getaway.ogg',
+  ascent: 'assets/audio/music/08-blackout-elevator-quiet-ascent.ogg',
+  research: 'assets/audio/music/09-blackout-research-the-specimen.ogg',
+  ending: 'assets/audio/music/10-blackout-first-sunlight-ending.ogg',
 };
 
 // Retain Volt's prominent mix with the supplied, already-trimmed Digital Slash
 // recording (0.28 * 1.75 = 0.49 at full sliders); its decoded peak is -4.02 dBFS.
-const cinematicGain = (track: MusicTrack | null): number => track === 'escape' ? 0.60 : track === 'rescue' ? 1.75 : 1;
-const isCinematic = (track: MusicTrack | null): boolean => track === 'awakening' || track === 'escape' || track === 'rescue';
+const cinematicGain = (track: MusicTrack | null): number => track === 'escape' ? 0.60 : track === 'rescue' ? 1.75 :
+  track === 'ascent' ? 1.1 : track === 'research' ? 1.4 : 1;
+const isCinematic = (track: MusicTrack | null): boolean => track === 'awakening' || track === 'escape' || track === 'rescue' || track === 'ascent' || track === 'research' || track === 'ending';
 
 /** Menu music continues in title submenus; gameplay music pauses with the game. */
 export function musicForFlow(
@@ -134,6 +138,13 @@ export class BackgroundMusic {
 
   endCinematic(cinematic: CinematicMusic): void {
     if (this.cinematic !== cinematic || this.disposed) return;
+    if (cinematic.track === 'ending') {
+      // The complete ending recording owns its fades. Skip/completion must
+      // stop it immediately, without carrying audio into terminal menus.
+      this.cancelCinematic();
+      this.flowTrack = null;
+      return;
+    }
     this.clearCinematic();
     // A finale can finish before flow leaves playing (for example while a
     // graphics preparation settles). Wait for an explicit destination route.
@@ -177,7 +188,7 @@ export class BackgroundMusic {
   private syncCinematic(resume = true): void {
     const cinematic = this.cinematic;
     if (!cinematic) return;
-    this.cinematicEnvelope = Math.max(0, Math.min(1, cinematic.duration - cinematic.seconds));
+    this.cinematicEnvelope = cinematic.track === 'ending' ? 1 : Math.max(0, Math.min(1, cinematic.duration - cinematic.seconds));
     this.stationaryTicks = cinematic.seconds === this.lastCinematicSeconds ? this.stationaryTicks + 1 : 0;
     this.lastCinematicSeconds = cinematic.seconds;
     this.enabled = this.flowPlay && cinematic.playing && this.stationaryTicks < 5;

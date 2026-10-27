@@ -13,8 +13,8 @@ import { BlackoutResearchEffects } from '../src/cinematics/BlackoutResearchEffec
 
 function capture() {
   let time=0;
-  const cues:{time:number;sound:SoundId;position?:AudioPosition}[]=[],stopped:SoundId[]=[],loops=new Map<string,{sound:SoundId;rate:number;volume:number}>();
-  const off=[gameplayAudioEvents.on('cue',c=>cues.push({time,sound:c.sound,position:c.position && {...c.position}})),
+  const cues:{time:number;sound:SoundId;position?:AudioPosition;volume:number}[]=[],stopped:SoundId[]=[],loops=new Map<string,{sound:SoundId;rate:number;volume:number}>();
+  const off=[gameplayAudioEvents.on('cue',c=>cues.push({time,sound:c.sound,position:c.position && {...c.position},volume:c.volumeScale??1})),
     gameplayAudioEvents.on('loop',c=>loops.set(c.key,{sound:c.sound,rate:c.playbackRate??1,volume:c.volumeScale??1})),
     gameplayAudioEvents.on('stop',c=>loops.delete(c.key)),gameplayAudioEvents.on('stopSound',c=>stopped.push(c.sound))];
   return {cues,loops,stopped,set time(t:number){time=t;},count:(sound:SoundId)=>cues.filter(c=>c.sound===sound).length,
@@ -69,6 +69,8 @@ test('research sound follows the authored light, transformation, door impact, fa
     assert.equal(c.count('specimen-heavy-blast-01'),2); assert.equal(c.count('research-drone-destroy-01'),12);
     c.cues.filter(c=>c.sound==='research-drone-destroy-01').forEach((cue,i)=>assert.ok(Math.abs(cue.time-researchDroneDeathTime(i))<.02));
     assert.ok(c.count('boss-drone-shot-01')>20); assert.equal(c.count('boss-emergence-01'),1);
+    assert.ok(c.cues.filter(c=>c.sound==='boss-drone-shot-01').every(c=>c.volume===.15),
+      'only research firing uses the quieter cinematic mix; every authored shot is still emitted');
     assert.ok(!c.cues.some(c=>c.sound==='world-vent-break-01' || c.sound==='world-platform-land-01'));
     assert.deepEqual([...c.loops.keys()],['research-boss-hover']);
     audio.stop();assert.equal(c.loops.size,0);assert.ok(c.stopped.includes('escape-power-down-01'));
