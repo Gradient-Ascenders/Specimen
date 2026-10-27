@@ -11,7 +11,7 @@ import { GoopCharacterPresentation, type GoopCharacterPresentationState } from '
 import { GelReflectionLighting } from '../render/slime/GelReflectionLighting.ts';
 import {BlackoutLightingPass} from '../render/environment/blackout/BlackoutLightingPass.ts';
 import { resolveCameraTargetOpacity } from '../render/CameraMath.ts';
-import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from '../render/IsolatedResourcePrewarm.ts';
+import { prepareShadowSamplerMaps, renderIsolatedPrewarmResources, withIsolatedPrewarmState } from '../render/IsolatedResourcePrewarm.ts';
 import { BlackoutPresentationPreparation } from '../render/BlackoutPresentationPreparation.ts';
 import { waitForGpuPreparation } from '../render/WaitForGpuPreparation.ts';
 import { BlackoutMaintenanceBayController } from './BlackoutMaintenanceBayController.ts';
@@ -507,6 +507,7 @@ export class BlackoutLevelRuntime {
       await preparation.prepare(this.renderLayer, this.preparationCamera.copy(this.renderLayer.cameraRig.camera),resources.lighting?.lightLayout);
       if (this.resources !== resources) return;
       const primeDeaths=()=>{
+      prepareShadowSamplerMaps(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.cameraRig.camera);
       resources.goopPresentation.primeDeathResources(resources.group.goopBody.position, root => {
         withIsolatedPrewarmState(this.renderLayer.renderer, () => this.renderLayer.withShadowPreparation(true, () =>
           renderIsolatedPrewarmResources(this.renderLayer.renderer, this.renderLayer.scene, this.renderLayer.cameraRig.camera, [root])));
@@ -537,6 +538,9 @@ export class BlackoutLevelRuntime {
           if (!current()) return;
           const viewport = renderer.getViewport(new THREE.Vector4()), transmissionScale = renderer.transmissionResolutionScale;
           withLights(() => withIsolatedPrewarmState(renderer, () => {
+            // Each shot can select previously unused lamps. Allocate their
+            // depth samplers before the receiver draw freezes shadow updates.
+            if (shadows) prepareShadowSamplerMaps(renderer, layer.scene, camera);
             renderer.setViewport(viewport); renderer.setScissorTest(false); renderer.transmissionResolutionScale = transmissionScale;
             layer.withShadowPreparation(shadows, () => renderer.render(layer.scene, camera));
           }));

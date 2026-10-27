@@ -2,7 +2,7 @@ import { cultivationAssets } from './helpers/CultivationBakedAssets.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import { renderIsolatedConfiguration, withIsolatedPrewarmState } from '../src/render/IsolatedResourcePrewarm.ts';
+import { prepareShadowSamplerMaps, renderIsolatedConfiguration, withIsolatedPrewarmState } from '../src/render/IsolatedResourcePrewarm.ts';
 import { copyPrewarmMaterial, createShadowPrewarmMaterial, createDepthPrewarmGroup } from '../src/render/ShadowPrewarmMaterial.ts';
 import { ShadowedDroneBeam } from '../src/render/hazards/ShadowedDroneBeam.ts';
 import { BlackoutPresentationPreparation } from '../src/render/BlackoutPresentationPreparation.ts';
@@ -233,6 +233,48 @@ for (const mode of ['complete', 'reject', 'cancel']) test(`Blackout prepares hid
   geometry.dispose(); material.dispose(); mesh.customDepthMaterial.dispose(); borrowedTarget.dispose();
 });
 
+
+for (const type of [THREE.PCFShadowMap, THREE.BasicShadowMap]) test(`cinematic camera changes initialize only missing shadow samplers and retain cached maps (${type})`, () => {
+  const {renderer, snapshot, borrowedTarget} = fixture(); renderer.shadowMap.type = type;
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+  const lights = [new THREE.SpotLight(), new THREE.SpotLight()];
+  for (const light of lights) { light.castShadow = true; light.shadow.autoUpdate = false; light.shadow.needsUpdate = false; }
+  lights[1].layers.mask = 0; scene.add(mesh, ...lights);
+  const comparison = type === THREE.PCFShadowMap ? THREE.LessEqualCompare : null;
+  let draws = 0;
+  renderer.render = (drawScene, view) => {
+    draws++;
+    assert.equal(drawScene, scene);
+    assert.equal(view.layers.test(mesh.layers), false, 'sampler allocation never submits the room geometry');
+    assert.equal(renderer.shadowMap.enabled, true); assert.equal(renderer.shadowMap.needsUpdate, true);
+    for (const light of lights) if (light.layers.test(view.layers) && light.shadow.needsUpdate) {
+      const map = new THREE.WebGLRenderTarget(1, 1);
+      map.depthTexture = new THREE.DepthTexture(1, 1); map.depthTexture.compareFunction = comparison;
+      light.shadow.map = map; light.shadow.needsUpdate = false;
+    }
+  };
+  const before = snapshot();
+  try {
+    prepareShadowSamplerMaps(renderer as unknown as THREE.WebGLRenderer, scene, camera);
+    const first = lights[0].shadow.map;
+    assert.equal(first?.depthTexture?.compareFunction, comparison);
+    assert.equal(lights[1].shadow.map, null, 'an unselected camera layout allocates nothing');
+    assert.equal(lights[0].shadow.needsUpdate, true, 'the first live frame must capture real casters');
+    lights[0].layers.mask = 0; lights[1].layers.mask = 1;
+    prepareShadowSamplerMaps(renderer as unknown as THREE.WebGLRenderer, scene, camera);
+    assert.equal(lights[1].shadow.map?.depthTexture?.compareFunction, comparison);
+    assert.equal(lights[0].shadow.map, first, 'the previous camera keeps its owned map');
+    lights[0].layers.mask = 1;
+    prepareShadowSamplerMaps(renderer as unknown as THREE.WebGLRenderer, scene, camera);
+    assert.equal(draws, 2, 'returning to prepared light layouts performs no extra draw');
+    assert.ok(lights.every(light => !light.shadow.autoUpdate && light.shadow.needsUpdate));
+    assert.deepEqual(snapshot(), before); assert.equal(camera.layers.mask, 1); assert.equal(mesh.layers.mask, 1);
+  } finally {
+    for (const light of lights) { light.shadow.map?.depthTexture?.dispose(); light.shadow.dispose(); }
+    mesh.geometry.dispose(); mesh.material.dispose(); borrowedTarget.dispose();
+  }
+});
 
 test('Blackout allocates PCF maps before isolated receiver draws', async () => {
   const { renderer, borrowedTarget } = fixture();

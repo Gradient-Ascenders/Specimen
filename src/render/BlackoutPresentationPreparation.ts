@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { RenderLayer } from './RenderLayer.ts';
-import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
+import { prepareShadowSamplerMaps, renderIsolatedPrewarmResources, withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
 import { copyPrewarmMaterial, createShadowPrewarmMaterial, clonePrewarmDrawable } from './ShadowPrewarmMaterial.ts';
 import { requiresTransmissionPreparation } from './TransmissionPreparation.ts';
 import type {BlackoutLightLayout} from './environment/blackout/BlackoutLightLayout.ts';
@@ -94,13 +94,9 @@ export class BlackoutPresentationPreparation {
           } finally { opaque.clear(); }
           if (this.disposed) return;
         }
-        if (group === visible) {
-          // PCF receivers use comparison samplers in r185. Preparation suppresses
-          // shadow updates, so allocate the level-owned maps with a live draw
-          // before submitting receiver proxies; null fallback textures cannot
-          // satisfy those samplers on SwiftShader.
-          primeVisible(() => layer.renderer.render(layer.scene, liveCamera));
-        }
+        // Resolve the selected samplers before exposing receiver proxies. This
+        // empty draw also avoids warming the entire room's geometry twice.
+        if (group === visible) withLights(() => prepareShadowSamplerMaps(layer.renderer, layer.scene, liveCamera));
         scene.add(group);
         try {
           if (group === visible) primeVisible(() => layer.withShadowPreparation(true,

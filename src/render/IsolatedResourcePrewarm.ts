@@ -97,6 +97,51 @@ export function withIsolatedPrewarmState<T>(
   }
 }
 
+/** Allocate typed depth samplers before a primer suppresses shadow updates.
+ * A cinematic camera can select lights that earlier loading poses never used.
+ * Initialize only missing/incompatible maps, without submitting room geometry,
+ * and leave those maps dirty so the live draw captures their actual casters. */
+export function prepareShadowSamplerMaps(
+  renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera,
+): void {
+  const comparison = renderer.shadowMap.type === THREE.PCFShadowMap
+    ? renderer.capabilities?.reversedDepthBuffer ? THREE.GreaterEqualCompare : THREE.LessEqualCompare
+    : null;
+  const sources: {
+    light: THREE.SpotLight | THREE.PointLight | THREE.DirectionalLight;
+    autoUpdate: boolean; needsUpdate: boolean; missing: boolean;
+  }[] = [];
+  scene.traverseVisible(object => {
+    if (!(object instanceof THREE.SpotLight || object instanceof THREE.PointLight || object instanceof THREE.DirectionalLight) ||
+      !object.castShadow || !object.layers.test(camera.layers)) return;
+    const depth = object.shadow.map?.depthTexture;
+    sources.push({light: object, autoUpdate: object.shadow.autoUpdate, needsUpdate: object.shadow.needsUpdate,
+      missing: !depth || depth.compareFunction !== comparison});
+  });
+  if (!sources.some(source => source.missing)) return;
+  const {enabled, autoUpdate, needsUpdate} = renderer.shadowMap;
+  try {
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = true;
+    for (const source of sources) {
+      const shadow = source.light.shadow;
+      shadow.autoUpdate = false;
+      shadow.needsUpdate = source.missing;
+      if (source.missing && shadow.map) {
+        shadow.dispose(); shadow.map = null; shadow.mapPass = null;
+      }
+    }
+    withIsolatedPrewarmState(renderer, () => renderIsolatedPrewarmResources(renderer, scene, camera, []));
+  } finally {
+    Object.assign(renderer.shadowMap, {enabled, autoUpdate, needsUpdate});
+    for (const source of sources) {
+      source.light.shadow.autoUpdate = source.autoUpdate;
+      source.light.shadow.needsUpdate = source.needsUpdate || source.missing;
+    }
+  }
+}
+
 /** Render only explicit resources with the camera's current visible lights. */
 export function renderIsolatedPrewarmResources(
   renderer: THREE.WebGLRenderer,
