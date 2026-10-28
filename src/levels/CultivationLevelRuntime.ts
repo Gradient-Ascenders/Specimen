@@ -2060,7 +2060,7 @@ export class CultivationLevelRuntime {
 
   private registerRescuedVolt(resources: CultivationRuntimeResources): void {
     const room = resources.authoredPreview!.roomFive;
-    room.pod.getWorldPosition(this.roomFiveLocal);
+    room.captiveVolt.getWorldPosition(this.roomFiveLocal);
     resources.voltBody.recoverAt(this.roomFiveLocal);
     if (!resources.manager.isRegistered('volt')) resources.manager.registerBody('volt', resources.voltBody);
     resources.manager.unlock('volt'); resources.voltPresentation.reset();

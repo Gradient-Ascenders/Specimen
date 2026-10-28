@@ -6,7 +6,12 @@ export const VOLT_FINALE_VENT = Object.freeze({
 
 // Raise the actual extraction cell to Bob's level. The scanner can now face
 // him almost level, while Volt boards from the neighbouring cell's front lip.
-export const VOLT_FINALE_CELL = Object.freeze({ y: 31, scannerY: 29.9 });
+export const VOLT_FINALE_CELL = Object.freeze({
+  y: 31, scannerY: 29.9,
+  // Pod deck: -2 + 0.4 / 2. Volt's sole is 0.45 m below his origin;
+  // share the same 1 cm clearance before and after the cinematic handoff.
+  voltLocalY: -1.34,
+});
 // Includes the scout's antenna, not just its ceramic deck. The panel's lower
 // face sits just above that silhouette when it finishes tipping over.
 export const VOLT_FINALE_COVER = Object.freeze({ droneY: 27.81, restOffsetY: .72 });

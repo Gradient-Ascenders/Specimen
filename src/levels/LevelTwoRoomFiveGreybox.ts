@@ -36,7 +36,6 @@ export class LevelTwoRoomFiveGreybox {
   readonly controls = new Map<SecurityNetwork, THREE.Mesh>();
   readonly releaseButton: THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial>;
   readonly podFeeds: THREE.Mesh[] = [];
-  private readonly reunionFloors: THREE.Mesh[] = [];
   readonly reunionDoor: THREE.Mesh;
   readonly releaseCover: THREE.Mesh;
   readonly releaseCoverCollider: THREE.Mesh;
@@ -182,6 +181,7 @@ export class LevelTwoRoomFiveGreybox {
       this.podFeeds.push(feed);
     }
     this.captiveVolt.name = 'room-5-captive-volt';
+    this.captiveVolt.position.y = VOLT_FINALE_CELL.voltLocalY;
     this.captiveVolt.add(this.captiveVoltPresentation.root); this.pod.add(this.captiveVolt);
     this.captiveVoltPresentation.setShadowCasting(false);
     const voltGlow = b.addLight('room-5-volt-glow', [0, 0, 0], 0xffdc35, 50, 12);
@@ -190,11 +190,15 @@ export class LevelTwoRoomFiveGreybox {
     voltGlow.shadow.bias = -.0002; voltGlow.shadow.normalBias = .025;
     voltGlow.shadow.camera.near = .2;
     // Volt and the transparent glass must not eclipse the light inside the pod.
-    // Ground-level reunion route, separate from the upper puzzle route.
-    this.reunionFloors.push(box('reunion-floor', [32, .5, 12], [4, -4, 65], m.floor));
-    this.reunionFloors.push(box('reunion-east-landing', [8, .5, 5], [24, -4, 61.5], m.floor));
-    for (const floor of this.reunionFloors) floor.visible = false;
-    this.dynamicCollisionMeshes.push(...this.reunionFloors);
+    // The rescue now leaves through the upper vent. Permanently blank the
+    // former SERVICE RETURN aperture, including its old sign and jambs.
+    // These shallow panels use the chamber finishes and sit in front of the
+    // baked doorway, with no coplanar faces or new light/shader variants.
+    box('sealed-service-return-wall', [.4, 6.6, 6.2], [19.7, 3.25, 61.5], m.wall);
+    for (const z of [58.45, 64.55])
+      box(`sealed-service-return-edge-${z}`, [.08, 6.6, .12], [19.46, 3.25, z], m.support);
+    for (const y of [1.1, 3.3, 5.5])
+      box(`sealed-service-return-seam-${y}`, [.04, .06, 6], [19.48, y, 61.5], m.support);
     // The old ground-level exit bay is obsolete. Keep the acid bed open below
     // the parkour instead of leaving a freestanding wall/door across the room.
     this.shortcut = box('rescue-shortcut-catwalk', [2, .3, 33], [-4.5, 40, 46.5], m.support);
@@ -229,7 +233,7 @@ export class LevelTwoRoomFiveGreybox {
 
   get dynamicTransformRoots(): readonly THREE.Object3D[] {
     return [this.pod, this.captiveVolt, this.captiveVoltPresentation.root, this.brokenCore, this.releaseButton, ...this.podFeeds,
-      this.releaseCover, this.releaseCoverCollider, this.reunionDoor, this.shortcut, this.shortcutEntry, ...this.reunionFloors,
+      this.releaseCover, this.releaseCoverCollider, this.reunionDoor, this.shortcut, this.shortcutEntry,
       ...this.glassPanels, ...this.solubleTargetMeshes,
       ...[...this.controls.values()].map(control => control.parent!)];
   }
@@ -266,20 +270,14 @@ export class LevelTwoRoomFiveGreybox {
     this.local.set(position.x, position.y, position.z); this.root.worldToLocal(this.local);
     const p = this.local;
     const acidDuct = p.x > 37 && p.x < 43 && p.z > 16 && p.z < 140 && p.y < SEWER_FLOOR_Y + .6;
-    const dryReunion = (this.controller.releasing || this.controller.rescued)
-      && p.x > -12 && p.x < 28 && p.y >= 0 && p.y < 3 && p.z >= 59 && p.z <= 71;
     const contaminatedVent = p.y < .7 && p.y > -.5 && this.acidVentPatches.some(patch => patch.contains(p.x, p.z));
-    return contaminatedVent || acidDuct || (Math.abs(p.x) < 20 && p.z > 18 && p.z < 80 && p.y < .6 && !dryReunion);
+    return contaminatedVent || acidDuct || (Math.abs(p.x) < 20 && p.z > 18 && p.z < 80 && p.y < .6);
   }
   syncPresentation(dt = 1): void {
     const c = this.controller;
     this.releaseButton.position.z = 27.24 - c.buttonProgress * .13;
     this.releaseButton.material.color.setHex(c.security.shutdown ? 0x75e5bd : 0xffc754);
     this.releaseButton.material.emissive.setHex(c.security.shutdown ? 0x38bd94 : 0xffb52c);
-    for (const floor of this.reunionFloors) {
-      floor.visible = c.releasing || c.rescued;
-      floor.position.y = floor.visible ? -.25 : -4;
-    }
     this.sewer.sync(c.security, dt);
     const t = Math.min(1, c.releaseElapsed / 4);
     this.pod.position.set(0, VOLT_FINALE_CELL.y - (VOLT_FINALE_CELL.y - 2.65) * t, 49 + 15 * t);
@@ -298,7 +296,7 @@ export class LevelTwoRoomFiveGreybox {
     }
     this.captiveVolt.visible = !c.rescued;
     this.captiveVoltPresentation.setVisible(!c.rescued);
-    this.reunionDoor.position.y = -8.7 + 5.5 * Math.max(0, (t - .75) / .25);
+    this.reunionDoor.position.y = -8.7; // Keep the curved sewer-side closure sealed too.
     this.shortcut.position.y = c.rescued ? 28.75 : 40;
     this.shortcutEntry.position.y = this.shortcut.position.y;
   }

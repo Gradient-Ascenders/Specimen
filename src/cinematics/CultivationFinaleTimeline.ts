@@ -110,6 +110,9 @@ const GOOP=timed([
 export function sampleVoltFinaleDrone(index:number,t:number,out:THREE.Vector3):void{
   if(index===0){
     if(t<T.coverImpact){out.fromArray(STAGING[0]);
+      // See the grounded captive over the pod's lower rim, then descend to
+      // the original cover-strike height while Bob runs to the panel.
+      out.y=THREE.MathUtils.lerp(CELL.y+CELL.voltLocalY+.9,COVER.droneY,finaleSmooth(T.coverRun,T.coverJump,t));
       const hover=1-finaleSmooth(T.coverHit,T.coverImpact,t);
       out.x+=Math.sin(t*.7)*.13*hover;out.y+=Math.sin(t*1.5)*.07*hover;return;}
     if(t<T.acidHit){
@@ -277,11 +280,11 @@ export function sampleVoltFinaleActor(id:VoltFinaleActor,t:number,out:THREE.Vect
   if(id==='volt'){
     if(t<T.voltJump){
       const step=finaleSmooth(at(36.6),at(38.6),t);
-      out.set(0,CELL.y-1.34*step,49-2.65*step);return;
+      out.set(0,CELL.y+CELL.voltLocalY,49-2.65*step);return;
     }
     if(t<T.hijack){
       const u=(t-T.voltJump)/(T.hijack-T.voltJump);
-      ridePoint('volt',T.hijack,out);out.lerpVectors(_v.set(0,CELL.y-1.34,46.35),out,u);
+      ridePoint('volt',T.hijack,out);out.lerpVectors(_v.set(0,CELL.y+CELL.voltLocalY,46.35),out,u);
       out.y+=Math.sin(u*Math.PI)*.85;return;
     }
     ridePoint('volt',t,out);return;
