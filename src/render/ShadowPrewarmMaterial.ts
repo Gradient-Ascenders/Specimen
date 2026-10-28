@@ -1,5 +1,13 @@
 import * as THREE from 'three';
 
+/** Geometry layout, rather than geometry identity, selects shader features. */
+export function prewarmDrawableFeatures(source: THREE.Mesh | THREE.Points | THREE.Line | THREE.Sprite): string {
+  const geometry = source.geometry;
+  return JSON.stringify([source.type, source instanceof THREE.InstancedMesh && [!!source.instanceColor, !!source.morphTexture],
+    Object.entries(geometry.attributes).map(([name, value]) => [name, value.itemSize, value.normalized]).sort(),
+    Object.entries(geometry.morphAttributes).map(([name, values]) => [name, values.length]).sort()]);
+}
+
 /** Copies own programs, but borrow maps and the presentation's shader uniforms. */
 export function copyPrewarmMaterial(material: THREE.Material): THREE.Material {
   const copy = material instanceof THREE.MeshPhysicalMaterial ? new THREE.MeshPhysicalMaterial().copy(material)

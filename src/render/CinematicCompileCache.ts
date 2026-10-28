@@ -32,8 +32,12 @@ export class CinematicCompileCache {
       const key=JSON.stringify([fields,value.customProgramCacheKey(),(value as THREE.ShaderMaterial).defines,value.clippingPlanes?.length]);
       materialKeys.set(value,key);return key;
     };
-    scene.traverse(object=>{
+    // A cinematic primer owns a concrete shot. Hidden rooms/actors are warmed
+    // by their level preparation, and must not be recompiled under this shot's
+    // fog/environment overrides. Later visible shots acquire their own entry.
+    scene.traverseVisible(object=>{
       if(!(object instanceof THREE.Mesh||object instanceof THREE.Line||object instanceof THREE.Points||object instanceof THREE.Sprite))return;
+      if(!object.layers.test(camera.layers)||[object.material].flat().every(material=>!material.visible))return;
       const material=[object.material].flat().map(materialKey);
       const geometry:THREE.BufferGeometry|undefined='geometry'in object?object.geometry:undefined;
       const geometryKey=JSON.stringify([object.type,object.receiveShadow,geometry?.uuid,

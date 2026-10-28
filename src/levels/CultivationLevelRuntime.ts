@@ -83,6 +83,8 @@ import type { DroneProjectilePresentation } from '../render/hazards/DroneProject
 import type { RenderLayer, RenderShadowRequest } from '../render/RenderLayer.ts';
 import { ventEntranceLightingWeight } from '../render/slime/VentEntranceLighting.ts';
 import { CameraShadowCulling } from '../render/CameraShadowCulling.ts';
+import { HiddenMaterialCulling } from '../render/HiddenMaterialCulling.ts';
+import { AuthoredShadowCulling } from '../render/AuthoredShadowCulling.ts';
 import { optimizeFiniteLightEvaluation } from '../render/environment/cultivation/FiniteLightEvaluation.ts';
 import {
   EMPTY_SLIME_HUD_SNAPSHOT,
@@ -317,6 +319,8 @@ export class CultivationLevelRuntime {
   private constructionMs = 0;
   private preparingRenderResources = false;
   private cameraShadowCulling: CameraShadowCulling | undefined;
+  private hiddenMaterialCulling: HiddenMaterialCulling | undefined;
+  private authoredShadowCulling: AuthoredShadowCulling | undefined;
   private isDarkRoom(resources: CultivationRuntimeResources,
     lightingRoom = resources.authoredPreview?.resolveRoomId(resources.pair.activeBody.position)): boolean {
     return lightingRoom === 5 || (lightingRoom === 4
@@ -372,6 +376,9 @@ export class CultivationLevelRuntime {
       .then(async () => {
         if (this.resources !== resources) return;
         if (!resources.authoredPreview) return;
+        this.hiddenMaterialCulling = new HiddenMaterialCulling(this.renderLayer.scene);
+        this.authoredShadowCulling?.dispose();
+        this.authoredShadowCulling = new AuthoredShadowCulling(resources.authoredPreview.root);
         // Keep compact light loops and contribution guards. Early-zero guards
         // regress mandatory compilation on UHD 620.
         this.renderLayer.scene.traverse(object => {
@@ -1012,10 +1019,12 @@ export class CultivationLevelRuntime {
       }
       this.cameraShadowCulling?.prepare(this.renderLayer.cameraRig.camera);
       try {
-        // The finale borrows these craft and flies them out of the chamber.
+        // Cinematic culling excludes static scenery only; borrowed craft remain live.
         resources.authoredPreview?.roomFiveCulling.prepare(this.renderLayer.cameraRig.camera,
-          resources.pair.activeBody.position,!resources.roomFiveFinale?.active);
-        this.renderLayer.render();
+          resources.pair.activeBody.position,resources.roomFiveFinale?.active?'cinematic':true);
+        if (this.hiddenMaterialCulling && this.authoredShadowCulling) this.hiddenMaterialCulling.render(() =>
+          this.authoredShadowCulling!.render(() => this.renderLayer.render()));
+        else this.renderLayer.render();
       } finally {
         resources.authoredPreview?.roomFiveCulling.restore();
         this.cameraShadowCulling?.restore();
@@ -1762,6 +1771,8 @@ export class CultivationLevelRuntime {
     this.gameplayAudio = undefined;
     const resources = this.requireResources();
     this.cameraShadowCulling = undefined;
+    this.hiddenMaterialCulling = undefined;
+    this.authoredShadowCulling?.dispose(); this.authoredShadowCulling = undefined;
     resources.lightingPass.dispose();
     this.preparationQueue?.dispose(); this.preparationQueue = undefined;
     this.lightLayout?.dispose(); this.lightLayout = undefined;

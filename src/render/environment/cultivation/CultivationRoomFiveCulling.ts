@@ -15,6 +15,7 @@ export class CultivationRoomFiveCulling {
   private readonly eye=new THREE.Vector3();
   private readonly focus=new THREE.Vector3();
   private readonly root:THREE.Group;
+  private readonly staticChamberCount:number;
   readonly diagnostics={chamberObjects:0,sewerObjects:0,culled:0,sector:'transition' as 'transition'|'chamber'|'sewer'};
 
   constructor(root:THREE.Group){
@@ -29,6 +30,7 @@ export class CultivationRoomFiveCulling {
       else if(box.min.x>=29&&box.max.y<-.5&&box.min.z>=16)this.sewer.push(child);
     }
     this.diagnostics.chamberObjects=this.chamber.length;this.diagnostics.sewerObjects=this.sewer.length;
+    this.staticChamberCount=this.chamber.length;
   }
   /** Encounter skins/effects stay in the chamber even as they move. Refuse
    * branches containing lights: shader slots and shadow allocation stay live. */
@@ -40,16 +42,21 @@ export class CultivationRoomFiveCulling {
     }
     this.diagnostics.chamberObjects=this.chamber.length;
   }
-  prepare(camera:THREE.Camera,activePosition:Pick<THREE.Vector3,'x'|'y'|'z'>,enabled=true):void{
+  prepare(camera:THREE.Camera,activePosition:Pick<THREE.Vector3,'x'|'y'|'z'>,enabled:boolean|'cinematic'=true):void{
     this.restore();this.diagnostics.sector='transition';this.diagnostics.culled=0;
     if(!enabled||!this.root.visible)return;
     this.root.updateWorldMatrix(true,false);this.inverse.copy(this.root.matrixWorld).invert();
     camera.getWorldPosition(this.eye).applyMatrix4(this.inverse);
     this.focus.copy(activePosition).applyMatrix4(this.inverse);
+    // Scripted cameras borrow actors from their gameplay sector. Only static
+    // scenery can be excluded using the cinematic lens alone; moving craft
+    // and effects remain eligible regardless of their old room registration.
+    const cinematic=enabled==='cinematic';
     let candidates:readonly THREE.Object3D[]|undefined;
-    if(inSewer(this.eye)&&inSewer(this.focus)){this.diagnostics.sector='sewer';candidates=this.chamber;}
-    else if(inChamber(this.eye)&&inChamber(this.focus)){this.diagnostics.sector='chamber';candidates=this.sewer;}
-    if(candidates)for(const mesh of candidates)if(mesh.visible){mesh.visible=false;this.hidden.push(mesh);}
+    if(inSewer(this.eye)&&(cinematic||inSewer(this.focus))){this.diagnostics.sector='sewer';candidates=this.chamber;}
+    else if(inChamber(this.eye)&&(cinematic||inChamber(this.focus))){this.diagnostics.sector='chamber';candidates=this.sewer;}
+    const count=cinematic&&candidates===this.chamber?this.staticChamberCount:candidates?.length??0;
+    if(candidates)for(let i=0;i<count;i++){const mesh=candidates[i];if(mesh.visible){mesh.visible=false;this.hidden.push(mesh);}}
     this.diagnostics.culled=this.hidden.length;
   }
   restore():void{
