@@ -160,3 +160,21 @@ boss phases and the complete ending. Record frame-time p95/p99, long frames,
 GPU timing when available, and memory across repeated level cycles. A stable
 60 FPS (16.7 ms frame budget) is the engineering target, not a result claimed
 by this patch.
+
+## Recorded Level 1 vent follow-up
+
+The temporary camera-culling scope used the same empty cache key as an
+unscoped draw when no spots were culled. Restoring padding on scope exit could
+therefore leave the next room with stale light counts. Scoped keys now always
+start with `camera:`, including an empty culled set. Unit tests exercise the
+actual runtime cache refresh and exception restoration; the browser replay
+crosses the failing camera boundary and looks back from the exit at the
+recording's ultrawide aspect ratio.
+
+The Blender-authored dark vent replaces visible collider boxes with four
+vertex-shaded batches. All four duct spots and their fixtures are removed;
+Room 1 retains the three-spot signature when facing or entering the vent. The
+vent owns visibility independently from the occluded Room 1 art. Its materials
+are included in the lighting preparation subsets for subsequent rooms too.
+The lower seam has a fitted toe; the upper ramp has matching curved visual and
+collision transitions. See the asset README for regeneration and contracts.

@@ -10,6 +10,7 @@ import {
 } from '../render/bob/BobCharacterPresentation.ts';
 import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
 import type { ContainmentArtResources } from '../render/environment/containment/ContainmentArtResources.ts';
+import { ContainmentVentArt } from '../render/environment/containment/ContainmentVentArt.ts';
 import { RoomOneArt } from '../render/environment/containment/RoomOneArt.ts';
 import { RoomTwoArt } from '../render/environment/containment/RoomTwoArt.ts';
 import { SPECIMEN_POD_CROWN_SECTIONS, SPECIMEN_POD_GLASS, SPECIMEN_POD_LID_RAISE_METRES,
@@ -63,6 +64,7 @@ export class ContainmentTeachingScene {
   private readonly ownedMaterials = new Set<THREE.Material>();
   readonly bob: BobCharacterPresentation;
   readonly goop: GoopCharacterPresentation;
+  readonly ventArt = new ContainmentVentArt();
   private disposed = false;
 
   constructor(
@@ -89,11 +91,11 @@ export class ContainmentTeachingScene {
       // This short floor remains sticky only to smooth the wall-to-duct
       // transition. Its appearance stays ordinary service metal so it reads as
       // part of the vent rather than a second biological membrane.
-      stickyVent: artResources.materials.serviceMetal,
+      stickyVent: this.collisionOnlyMaterial('containment-vent-sticky-collision-only'),
       platform: artResources.materials.secondaryCeramic,
       locked: artResources.materials.lockedStatus,
       exit: artResources.materials.staticCyanEmissive,
-      duct: artResources.materials.serviceMetal,
+      duct: this.collisionOnlyMaterial('containment-vent-collision-only'),
       glass: artResources.materials.containmentGlass,
       egg: artResources.materials.specimenShell,
     };
@@ -122,7 +124,9 @@ export class ContainmentTeachingScene {
     }
     this.roomOneArt = new RoomOneArt(artResources);
     this.roomTwoArt = new RoomTwoArt(artResources);
-    this.root.add(this.roomOneArt.root, this.roomTwoArt.root);
+    // The connecting duct must survive Room 1 occlusion when looking back
+    // from its Room 2 end. It owns a separate visibility branch.
+    this.root.add(this.roomOneArt.root, this.roomTwoArt.root, this.ventArt.root);
 
     this.bob = new BobCharacterPresentation(
       DEFAULT_KINEMATIC_BODY_CONFIG.radiusMetres, options.gelRendering,
@@ -179,6 +183,7 @@ export class ContainmentTeachingScene {
     this.bob.dispose();
     this.goop.dispose();
     this.roomOneArt.dispose();
+    this.ventArt.dispose();
     this.roomTwoArt.dispose();
     this.root.removeFromParent();
     for (const geometry of this.ownedGeometries) geometry.dispose();
@@ -286,7 +291,17 @@ export class ContainmentTeachingScene {
     this.addDuctSide('-a-east', [-3.75, 6.2, 9.5], [0.18, 2.2, 7], materials.duct);
 
     const rampAngle = -THREE.MathUtils.degToRad(26);
-    this.addCollider({ name: 'duct-segment-b-ramp', size: [2, 0.25, 11.88], position: [-4.8, 7.85, 18.5], material: materials.duct, rotationX: rampAngle });
+    this.addCollider({ name: 'duct-segment-b-ramp', size: [2, 0.25, 11.007675305709084], position: [-4.8, 7.6587990116956295, 18.107979879165793], material: materials.duct, rotationX: rampAngle, preciseMovementCorners: true });
+    // A tangent crest eases the 26-degree climb into the landing. The
+    // landing notch extends to its end so no flat slab cuts across the curve.
+    this.addCollider({ name: 'duct-crest-0', size: [2, 0.25, 0.17141233711992504], position: [-4.8, 10.105586690680639, 23.12944697198106], material: materials.duct, rotationX: -0.42857573929063497, preciseMovementCorners: true });
+    this.addCollider({ name: 'duct-crest-1', size: [2, 0.25, 0.16767419467584727], position: [-4.8, 10.169086579834351, 23.27845822260632], material: materials.duct, rotationX: -0.3764977449633387, preciseMovementCorners: true });
+    this.addCollider({ name: 'duct-crest-2', size: [2, 0.25, 0.16441744195881117], position: [-4.8, 10.223295747943318, 23.42710044760089], material: materials.duct, rotationX: -0.32235757792940717, preciseMovementCorners: true });
+    this.addCollider({ name: 'duct-crest-3', size: [2, 0.25, 0.16166608566190022], position: [-4.8, 10.268296905513262, 23.57540344192413], material: materials.duct, rotationX: -0.26636620280504997, preciseMovementCorners: true });
+    this.addCollider({ name: 'duct-crest-4', size: [2, 0.25, 0.15944112986698014], position: [-4.8, 10.304170289364524, 23.723410190486952], material: materials.duct, rotationX: -0.2087953090736997, preciseMovementCorners: true });
+    this.addCollider({ name: 'duct-crest-5', size: [2, 0.25, 0.1577596233107115], position: [-4.8, 10.330990424901657, 23.871176504170716], material: materials.duct, rotationX: -0.14997360455175285, preciseMovementCorners: true });
+    this.addCollider({ name: 'duct-crest-6', size: [2, 0.25, 0.15663379284572454], position: [-4.8, 10.34882288320142, 24.01876948649716], material: materials.duct, rotationX: -0.09027847332367255, preciseMovementCorners: true });
+    this.addCollider({ name: 'duct-crest-7', size: [2, 0.25, 0.15607035059803032], position: [-4.8, 10.357721455170378, 24.16626482905219], material: materials.duct, rotationX: -0.03012318787331432, preciseMovementCorners: true });
     this.addCollider({ name: 'duct-segment-b-roof', size: [2, 0.18, 11.88], position: [-4.8, 9.83, 17.54], material: materials.duct, rotationX: rampAngle });
     this.addCollider({ name: 'duct-segment-b-west-wall', size: [0.18, 2.2, 11.88], position: [-5.8, 8.84, 18.02], material: materials.duct, rotationX: rampAngle });
     this.addCollider({ name: 'duct-segment-b-east-wall', size: [0.18, 2.2, 11.88], position: [-3.8, 8.84, 18.02], material: materials.duct, rotationX: rampAngle });
@@ -301,22 +316,22 @@ export class ContainmentTeachingScene {
     // edge sweep for these three slabs; keep the real notch and solid floor.
     this.addCollider({
       name: 'duct-segment-c-floor-main',
-      size: [7.2, 0.25, 1.37071],
-      position: [-5.7, 10.36, 24.32464],
+      size: [7.2, 0.25, 0.7699950000000015],
+      position: [-5.7, 10.36, 24.6249975],
       material: materials.duct,
       preciseMovementCorners: true,
     });
     this.addCollider({
       name: 'duct-segment-c-floor-front-left',
-      size: [3.54316, 0.25, 0.62929],
-      position: [-7.52842, 10.36, 23.32464],
+      size: [3.5, 0.25, 1.240005],
+      position: [-7.55, 10.36, 23.619997499999997],
       material: materials.duct,
       preciseMovementCorners: true,
     });
     this.addCollider({
       name: 'duct-segment-c-floor-front-right',
-      size: [1.65684, 0.25, 0.62929],
-      position: [-2.92842, 10.36, 23.32464],
+      size: [1.7, 0.25, 1.240005],
+      position: [-2.95, 10.36, 23.619997499999997],
       material: materials.duct,
       preciseMovementCorners: true,
     });

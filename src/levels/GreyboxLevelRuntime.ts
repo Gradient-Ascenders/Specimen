@@ -2325,7 +2325,8 @@ export class GreyboxLevelRuntime {
               // That smaller layout can already see the new hall's finishes.
               const saved=prewarmCamera.clone();
               const ductSubset=createCompileSubset('containment-duct-exit-shader-prewarm-subset',
-                [...resources.testScene.teaching.roomTwoArt.shell.renderMeshes,
+                [resources.testScene.teaching.ventArt.root,
+                  ...resources.testScene.teaching.roomTwoArt.shell.renderMeshes,
                   ...(resources.testScene.roomThree.art.shell.ready?resources.testScene.roomThree.renderSources:[])]);
               try{
                 prewarmCamera.position.set(-8.289,11.671,24.008);
@@ -2691,6 +2692,9 @@ function createRoomPrewarmSources(
   );
   const sources: THREE.Object3D[] = [
     lightingRoot,
+    // The connecting duct survives Room 1 occlusion. Prepare its fixed-shading
+    // materials for later room layouts and both output colour spaces as well.
+    resources.testScene.teaching.ventArt.root,
     ...(!chamberScope ? [resources.testScene.roomFive.goopPresentation.root] : []),
     resources.slimePairPresentation.root,
     resources.goopAcidPresentation.root,

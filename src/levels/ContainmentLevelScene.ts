@@ -322,7 +322,7 @@ export class ContainmentLevelScene {
 
   async prepareEnvironmentArt(roomTwoLoader?:RoomTwoShellLoader,roomThreeLoader?:RoomThreeShellLoader,
     cameraLoader?:ContainmentSurveillanceModelLoader,roomFourLoader?:RoomFourShellLoader,roomFiveLoader?:RoomFiveShellLoader):Promise<void>{
-    await this.teaching.roomOneArt.prepare();
+    await prepareTogether([this.teaching.roomOneArt.prepare(), this.teaching.ventArt.prepare()]);
     if(this.disposed)return;
     const finish=(name:string)=>this.teaching.roomOneArt.shell.borrowFinish(name);
     // Three independent borrowers; bound concurrency rather than serializing
