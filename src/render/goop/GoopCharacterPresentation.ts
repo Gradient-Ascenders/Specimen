@@ -323,7 +323,8 @@ export class GoopCharacterPresentation {
   present(alpha = 1): void {
     this.character.position.copy(this.position);
     const blend = THREE.MathUtils.clamp(alpha, 0, 1);
-    this.character.rotation.y = this.previousYaw + shortestAngleDelta(this.previousYaw, this.yaw) * blend;
+    // Clear X/Z half-turns introduced when a cinematic restores a quaternion.
+    this.character.rotation.set(0, this.previousYaw + shortestAngleDelta(this.previousYaw, this.yaw) * blend, 0);
     const squash = THREE.MathUtils.lerp(this.previousSquash, this.squash, blend);
     const lean = THREE.MathUtils.lerp(this.previousLean, this.lean, blend);
     this.presentedBaseOffsetWorld.lerpVectors(this.previousBaseOffsetWorld, this.baseOffsetWorld, blend);

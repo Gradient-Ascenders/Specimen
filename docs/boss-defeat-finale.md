@@ -54,6 +54,38 @@ All five requested dialogue lines are preserved verbatim. Character dialogue
 uses the game’s existing subtitle/typewriter audio convention; there are no new
 recorded voice assets or third-party models or textures.
 
+## Ending sound effects
+
+The 14 requester-selected ElevenLabs WAVs remain unchanged in
+`ending-cutscene.tar`. `scripts/import-ending-audio.py` prepares mono Vorbis
+assets under `public/assets/audio/ending/`; source hashes, onset trims, gain,
+duration fitting and 100 ms circular loop overlaps are recorded in
+`docs/assets/ending-audio-import.json`. The supplied `beam-deadlock.wav` is a
+two-second impact with a decaying tail, so it provides the initial collision.
+There is no separate sustained collision recording: the deeper deadlock layer
+reuses the existing boss beam at 0.72 speed with its own voice budget.
+
+`BossDefeatAudio` follows the movie's fixed clock, including the two separate
+beam launches and their collision after flight, the overload and explosion,
+slime separation, falling wreck, ballistic debris, Goop's actual shots and
+three direct hits, and the twelve staggered collapse blasts. Four selected
+crossfire lanes provide bounded firing/flyby/impact accents. Existing recordings
+provide drone motors/deployment, doors, body contacts, jumps and landings.
+Movement follows visible sampled poses, without sounds from teleports or seeks.
+These cues use a screen-space mix so the fixed gameplay listener cannot mute
+the tunnel escape or outdoor reveal.
+
+Structural rumble carries the collapse; six quiet panel/debris accents and two
+major girder crashes replace the previous repeated metallic hits. The rumble
+fades in with the boss-defeat handoff, rises at the final explosion, and uses
+1.4 catalog gain (about +3 dB) for a more audible aftermath. Floor-shot
+ricochets are sparse as well. Combat and rumble soften during Goop's goodbye. All requested effects, including
+one-shot tails, stop at 105 seconds; the exit door remains silent until the
+111-second daylight reveal. Outdoor ambience fades out before the credits at
+133 seconds. Pause freezes the shared AudioContext; skip, reset, normal completion
+and disposal release the ending's own loops and reused one-shots. Rehearsal
+remains silent. The score, dialogue and 179-second duration are unchanged.
+
 ## First Sunlight soundtrack
 
 `public/assets/audio/music/10-blackout-first-sunlight-ending.ogg` is copied
@@ -78,10 +110,22 @@ Pause, focus and slow-frame synchronization use the existing music owner.
 
 Development build: **Select cutscene → First sunlight**. Natural gameplay:
 deliver the final hit to the Level 3 boss. **P** pauses; **Enter** or the skip
-button completes the ending through the normal split/escape/completion state
-transitions. During the rolling credits the button changes to **Return to
-title**: skipping then performs a clean title restart, rather than opening the
-same credits a second time. Completion is emitted once.
+button jumps to the start of the rolling credits at 133 seconds. This stops
+the movie's effects, seeds the sky/credits view without replaying skipped cues,
+and seeks the existing soundtrack to the same time. The ending retains ownership
+and progression remains uncommitted while the credits roll.
+During the rolling credits the button changes to **Return to
+title**: returning fades to black over 0.4 seconds, restores a fresh title scene
+behind an app-owned cover, then fades into the menu without a page reload. The
+cover survives cinematic cleanup, so restored characters/cameras cannot flash
+through. That return action enters menu preparation directly without activating
+the standalone credits ledger. The regular ledger's return action uses the same handoff.
+Completion is emitted once.
+
+Character yaw rigs rebuild the full rotation after rehearsal restores their
+quaternions, clearing equivalent X/Z half-turns that could reverse the visible
+face. Dialogue participants look toward the speaker; escape and look-back
+headings retain their authored directions.
 
 All borrowed actor parents, transforms, lights, materials, camera settings and
 scene background/fog are restored on recovery, restart and disposal. Fixed-size
@@ -103,4 +147,10 @@ handoff. It is not evidence of a human-input victory or hardware frame-rate
 qualification.
 
 Set `SPECIMEN_ENDING_SKIP_CREDITS=1` for the browser smoke to additionally press
-the real credits-skip button and verify that a fresh title page loads.
+the real credits-skip button and verify the covered transition to a fresh title
+scene on the same page.
+
+Set `SPECIMEN_ENDING_SKIP_TO_CREDITS=1` to click the real skip button during
+the beam struggle and verify the active rolling credits, cleared effects and
+synchronized soundtrack. Combine it with `SPECIMEN_ENDING_SKIP_CREDITS=1` to
+verify both successive actions through to the menu.

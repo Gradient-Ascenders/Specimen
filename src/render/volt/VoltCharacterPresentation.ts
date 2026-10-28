@@ -331,7 +331,8 @@ export class VoltCharacterPresentation {
   }
   present(alpha = 1): void {
     const blend = THREE.MathUtils.clamp(alpha, 0, 1);
-    this.character.rotation.y = this.previousYaw + shortestAngleDelta(this.previousYaw, this.yaw) * blend;
+    // Clear X/Z half-turns introduced when a cinematic restores a quaternion.
+    this.character.rotation.set(0, this.previousYaw + shortestAngleDelta(this.previousYaw, this.yaw) * blend, 0);
     const body = THREE.MathUtils.lerp(this.previousBodyWeight, this.bodyWeight, blend);
     const flex = THREE.MathUtils.lerp(this.previousFlex, this.flex, blend);
     const lean = THREE.MathUtils.lerp(this.previousLean, this.lean, blend);

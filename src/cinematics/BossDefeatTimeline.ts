@@ -108,6 +108,14 @@ export function sampleEndingSlime(id: EndingSlime, t: number, out: THREE.Vector3
     facing = t < T.daylight + 9 ? 0 : (id === 'bob' ? -.2 : .2);
     if (id === 'bob' && t < T.daylight + 7) { const hop = Math.sin((t - T.daylight) * 5); out.y += Math.max(0, hop) * .4; airborne = hop > 0; }
   }
+  // The stationary group shares eye-lines rather than all staring past one
+  // another. The headings use the presentations' authored local -Z forward.
+  if (t >= T.together && t < T.drones || t >= T.sacrifice && t < T.leave) {
+    const target = t < T.drones
+      ? id === 'volt' ? [(MEET.bob[0] + MEET.goop[0]) / 2, (MEET.bob[1] + MEET.goop[1]) / 2] : MEET.volt
+      : id === 'goop' ? [(MEET.bob[0] + MEET.volt[0]) / 2, (MEET.bob[1] + MEET.volt[1]) / 2] : MEET.goop;
+    facing = Math.atan2(out.x - ENDING_ANCHOR.x - target[0]!, out.z - ENDING_ANCHOR.z - target[1]!);
+  }
   return { visible: t >= T.split && (id !== 'goop' || t < T.hideGoop), airborne, facing };
 }
 

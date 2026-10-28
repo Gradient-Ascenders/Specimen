@@ -308,7 +308,8 @@ export class SpecimenCharacterPresentation {
   present(alpha = 1): void {
     alpha = THREE.MathUtils.clamp(alpha, 0, 1);
     this.support.quaternion.slerpQuaternions(this.previousSupportRotation, this.supportRotation, alpha);
-    this.facing.rotation.y = this.previousYaw + shortestAngleDelta(this.previousYaw, this.yaw) * alpha;
+    // Restored quaternions can decompose a half-turn onto X/Z. This rig is yaw-only.
+    this.facing.rotation.set(0, this.previousYaw + shortestAngleDelta(this.previousYaw, this.yaw) * alpha, 0);
     const squash = THREE.MathUtils.lerp(this.previousWeights.Squash, this.weights.Squash, alpha);
     const stretch = THREE.MathUtils.lerp(this.previousWeights.Stretch, this.weights.Stretch, alpha);
     const shotCharge = THREE.MathUtils.lerp(this.previousShotCharge, this.shotCharge, alpha);

@@ -6,6 +6,12 @@ const endingMusic = (page: Page) => page.evaluate(() => ((window as any).__endin
   .filter(p => p.src.includes('10-blackout-first-sunlight-ending.ogg'))
   .map(p => ({ time: p.currentTime, paused: p.paused, loop: p.loop, rate: p.playbackRate, volume: p.volume, error: p.error?.message })));
 
+const endingEffects = (page: Page) => page.evaluate(() => {
+  const audio = (window as any).__endingSession.runtime.audio;
+  return { ...audio.diagnostics, keys: [...audio.loops.keys()] as string[],
+    sounds: [...audio.voices].map((voice: any) => voice.sound) as string[] };
+});
+
 async function advance(page: Page, seconds: number) {
   await page.evaluate(t => {
     const r = (window as any).__endingSession.runtime, movie = r.resources.defeatFinale;
@@ -85,6 +91,25 @@ test('boss defeat plays the balanced struggle, unmerge, last stand, daylight and
     await page.evaluate(() => (window as any).__endingSession.runtime.fixedUpdate(1 / 60));
     return (await endingMusic(page))[0]?.paused;
   }, { intervals: [50] }).toBe(false);
+  const skipToCredits = process.env.SPECIMEN_ENDING_SKIP_TO_CREDITS === '1';
+  if (skipToCredits) {
+    await advance(page, 16);
+    expect((await endingEffects(page)).keys).toContain('ending:specimen-beam');
+    await page.getByRole('button', { name: 'Skip cutscene · Enter', exact: true }).click();
+    const skipped = await page.evaluate(() => {
+      const r = (window as any).__endingSession.runtime;
+      r.fixedUpdate(1 / 60); r.render(1, { frameDeltaSeconds: 1 / 60 });
+      const movie = r.resources.defeatFinale;
+      return { seconds: movie.seconds, active: movie.active, complete: movie.complete,
+        skippedCredits: movie.skippedCredits, phase: r.phase };
+    });
+    expect(skipped).toEqual({ seconds: T.credits, active: true, complete: false, skippedCredits: false, phase: 'boss-defeated' });
+    await expect(page.locator('.ending-credits')).toBeVisible();
+    await expect(page.locator('[data-flow-panel="credits"]')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Return to title · Enter', exact: true })).toBeVisible();
+    expect((await endingEffects(page)).keys).toEqual([]);
+    expect((await endingEffects(page)).sounds).toEqual([]);
+  }
   const samples = [[2, '01-broken-boss'], [6, '02-specimen-charge'], [10, '03-boss-charge'],
     [12.5, '03b-boss-beam-launch'], [T.specimenFire - .05, '03c-specimen-before-launch'], [T.specimenFire + .08, '03d-specimen-beam-launch'], [16, '04-balanced-beams'],
     [18, '05-specimen-strain'], [20, '06-boss-strain'], [23, '07-wide-deadlock'], [29, '08-collision-orbit'],
@@ -97,8 +122,26 @@ test('boss defeat plays the balanced struggle, unmerge, last stand, daylight and
     [T.destruction + .65, '21a-collapse-explosions'], [T.destruction + 3, '21b-heavy-collapse'], [T.destruction + 7, '21c-smoke-and-girders'], [T.black + 2, '22-silence'],
     [T.daylight + 5, '23-first-sunlight'], [T.sky - 3, '24-the-outside-world'], [T.sky + 5, '25-open-sky'], [T.credits + 5, '26-credits']] as const;
   const metrics: unknown[] = [];
-  for (const [t, name] of samples.filter(([t]) => process.env.SPECIMEN_ENDING_REFRAME !== '1' || t >= T.destruction)) {
+  for (const [t, name] of samples.filter(([t]) => (!skipToCredits || t >= T.credits + 5)
+    && (process.env.SPECIMEN_ENDING_REFRAME !== '1' || t >= T.destruction))) {
     await advance(page, t);
+    if (t === 16) {
+      const effects = await endingEffects(page);
+      expect(effects.failed).toEqual([]);
+      expect(effects.keys).toEqual(expect.arrayContaining(['ending:boss-beam', 'ending:specimen-beam', 'ending:collision']));
+      expect(effects.sounds).toContain('ending-specimen-beam-loop-01');
+    }
+    if (t === 31.15) {
+      const effects = await endingEffects(page);
+      expect(effects.keys).toContain('ending:collapse');
+      expect(effects.keys).not.toContain('ending:boss-beam'); expect(effects.keys).not.toContain('ending:specimen-beam');
+    }
+    if (t === T.black + 2) {
+      const effects = await endingEffects(page);
+      expect(effects.keys).toEqual([]); expect(effects.sounds).toEqual([]);
+    }
+    if (t === T.daylight + 5) expect((await endingEffects(page)).keys).toEqual(['ending:outside']);
+    if (t === T.credits + 5) expect((await endingEffects(page)).keys).toEqual([]);
     if ([2, T.black + 2, T.daylight + 5, T.credits + 5].includes(t)) {
       await expect.poll(async () => (await endingMusic(page))[0]?.time).toBeGreaterThan(t - .4);
       expect(await page.evaluate(() => (window as any).__endingMusicLoads.filter((src: string) => src.includes('10-blackout')).length)).toBe(1);
@@ -133,6 +176,7 @@ test('boss defeat plays the balanced struggle, unmerge, last stand, daylight and
     if (t === T.sacrifice + .8) {
       await page.keyboard.press('p'); await expect(page.locator('.game-flow')).toHaveAttribute('data-state', 'paused');
       await expect.poll(async () => (await endingMusic(page))[0]?.paused).toBe(true);
+      await expect.poll(async () => (await endingEffects(page)).contextState).toBe('suspended');
       const frozen = await page.evaluate(() => (window as any).__endingSession.runtime.resources.defeatFinale.seconds);
       await advance(page, T.sacrifice + 1.8); expect(await page.evaluate(() => (window as any).__endingSession.runtime.resources.defeatFinale.seconds)).toBe(frozen);
       await page.locator('[data-action="resume"]').click();
@@ -141,14 +185,45 @@ test('boss defeat plays the balanced struggle, unmerge, last stand, daylight and
   }
   if (process.env.SPECIMEN_ENDING_SKIP_CREDITS === '1') {
     const origin = await page.evaluate(() => performance.timeOrigin);
+    await page.evaluate(() => {
+      const flow = document.querySelector('.game-flow')!, credits = document.querySelector<HTMLElement>('[data-flow-panel="credits"]')!;
+      (window as any).__endingReturnStates = [];
+      (window as any).__endingReturnCreditsShown = false;
+      new MutationObserver(records => {
+        for (const record of records) {
+          if (record.target === flow && record.attributeName === 'data-state')
+            (window as any).__endingReturnStates.push(record.oldValue, flow.getAttribute('data-state'));
+          if (record.target === credits && record.attributeName === 'hidden' && (record.oldValue === null || !credits.hidden))
+            (window as any).__endingReturnCreditsShown = true;
+        }
+      }).observe(flow, { attributes: true, attributeOldValue: true, subtree: true, attributeFilter: ['data-state', 'hidden'] });
+    });
     expect(await page.evaluate(() => document.pointerLockElement === null)).toBe(true);
     const button = page.getByRole('button', { name: 'Return to title · Enter', exact: true }); await expect(button).toBeVisible();
     const bounds = await button.boundingBox(); expect(bounds).not.toBeNull();
     await page.mouse.click(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
-    await page.evaluate(() => (window as any).__endingSession.runtime.fixedUpdate(1 / 60));
-    await page.waitForFunction(previous => performance.timeOrigin > previous, origin, { timeout: 180_000 });
+    const fading = await page.evaluate(() => {
+      const r = (window as any).__endingSession.runtime;
+      r.fixedUpdate(1 / 60);
+      return { active: r.resources.defeatFinale.active,
+        opacity: Number(document.querySelector<HTMLElement>('#app')!.style.getPropertyValue('--ending-menu-opacity')) };
+    });
+    expect(fading.active).toBe(true); expect(fading.opacity).toBeGreaterThan(0); expect(fading.opacity).toBeLessThan(1);
+    const covered = await page.evaluate(() => {
+      const r = (window as any).__endingSession.runtime;
+      for (let i = 0; i < 30 && r.resources.defeatFinale.active; i++) r.fixedUpdate(1 / 60);
+      return getComputedStyle(document.querySelector('#app')!, '::after').opacity;
+    });
+    expect(covered).toBe('1');
     await expect(page.locator('[data-flow-panel="title"]')).toBeVisible({ timeout: 180_000 });
+    await expect(page.locator('#app')).not.toHaveAttribute('data-ending-menu-fade', 'true');
+    expect(await page.evaluate(() => performance.timeOrigin)).toBe(origin);
     await expect(page.locator('#app')).not.toHaveAttribute('data-cinematic', 'boss-defeat');
+    const returnFlow = await page.evaluate(() => ({ states: (window as any).__endingReturnStates as string[],
+      creditsShown: (window as any).__endingReturnCreditsShown as boolean }));
+    expect(returnFlow.states).not.toContain('credits');
+    expect(returnFlow.creditsShown).toBe(false);
+    await page.screenshot({ path: info.outputPath('return-to-menu.png') });
     expect(failures).toEqual([]);
     await writeFile(info.outputPath('ending-evidence.json'), JSON.stringify({ trigger, metrics, ending: { destination: 'title' }, failures }, null, 2));
     return;

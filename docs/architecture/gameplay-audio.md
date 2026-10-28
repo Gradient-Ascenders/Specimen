@@ -1,6 +1,6 @@
 # Gameplay sound effects
 
-Specimen ships 116 OGG effects: Bob 7, Goop 5, Volt 5, world interactions 6, environment 6, turrets 1, interaction polish 10, intro 14, Containment escape 9, Cultivation sentries 3, Volt rescue 5, Blackout arrival 1, boss fight 27, Blackout elevator/research 17. All have current gameplay mappings. All three former procedural character packs have been replaced with requester-selected ElevenLabs recordings and shared body cues. No new gameplay mechanics, fire rates, damage rules or puzzle timings are introduced.
+Specimen ships 130 OGG effects: Bob 7, Goop 5, Volt 5, world interactions 6, environment 6, turrets 1, interaction polish 10, intro 14, Containment escape 9, Cultivation sentries 3, Volt rescue 5, Blackout arrival 1, boss fight 27, Blackout elevator/research 17, First sunlight ending 14. All have current gameplay mappings. All three former procedural character packs have been replaced with requester-selected ElevenLabs recordings and shared body cues. No new gameplay mechanics, fire rates, damage rules or puzzle timings are introduced.
 
 ## Architecture
 
@@ -10,7 +10,7 @@ Movement uses authoritative KinematicBody events and resolved grounded velocity,
 
 ## Assets and provenance
 
-`public/assets/audio/{bob,goop,volt,world,environment,turrets,polish,intro,escape,cultivation,blackout,boss}/` contains only runtime OGG files. Source archives and original WAVs are not shipped in production. The separately supplied turret WAV was transcoded once to OGG Vorbis.
+`public/assets/audio/{bob,goop,volt,world,environment,turrets,polish,intro,escape,cultivation,blackout,boss,ending}/` contains only runtime OGG files. Source archives and original WAVs are not shipped in production. The separately supplied turret WAV was transcoded once to OGG Vorbis.
 
 The requester generated Bob's replacement recordings in ElevenLabs and selected them through listening review. The seven originals (six stereo PCM16 WAVs and one stereo Vorbis file, all 48 kHz) are preserved byte-for-byte in `assets/audio/bob/bob-sounds.tar`. `scripts/import-bob-audio.py` prepares the runtime files using NumPy and SoundFile/libsndfile: average stereo to mono, remove DC offset, balance levels without compression, cap peaks with headroom, apply 2 ms edge fades, and encode Vorbis. The powerful jump starts at source 0.58 s and hard landing at 0.30 s to remove separate preparation sounds before their main hit; soft landing starts at 0.065 s to remove its leading delay. Other clips retain their full timeline. `docs/assets/bob-audio-import.json` records source/archive hashes, trims, gains and resulting RMS. Reimport with `python3 scripts/import-bob-audio.py` after installing NumPy and SoundFile; Python is not a game dependency.
 
@@ -548,3 +548,43 @@ requested loops and one-shots, including reused recordings, without calling
 Loop pitch/volume changes flow through `GameplayAudio` to the existing mixer;
 there are no browser timers or changes to gameplay, dialogue or cinematic
 lengths. The 17 new recordings and destruction alias load only for Blackout.
+
+## First sunlight ending effects
+
+`ending-cutscene.tar` contains 14 selected ElevenLabs WAVs. Reimport with
+`python3 scripts/import-ending-audio.py` after installing NumPy and SoundFile.
+The shared pipeline produces mono OGG files with peak headroom, 2 ms one-shot
+edge fades and 100 ms circular overlaps on the four new loops. The 9.48-second
+Specimen charge is fitted to its 9.45-second window; the overload retains its
+five-second buildup. Source/archive hashes and all edits are recorded in
+`docs/assets/ending-audio-import.json`. No original audio is overwritten.
+
+The two-second `beam-deadlock.wav` supplies the initial collision impact. The
+missing sustained deadlock recording is covered by `ending-beam-collision-loop-01`,
+which aliases the existing boss beam at 0.72 speed with an independent voice
+budget and gain. The fifteen ending IDs, including this reuse, load only in
+Blackout. The earlier levels' banks exclude them.
+
+`BossDefeatAudio` synchronizes the charge, staggered beam launches, travelling
+beam collision, overload, main blast, slime separation, falling boss wreck,
+ballistic debris, Goop's last stand and final structural destruction. Goop uses
+his own acid shot; three direct hits use the new gel impact. Four sampled drone
+lanes keep incoming shots and flybys within the existing global 24-voice budget;
+only occasional shots receive a quiet floor-impact accent. Twelve separate blasts
+follow the visible final explosions. Structural rumble carries the collapse,
+with six quiet debris accents and two major girder crashes. Shared movement audio
+tracks visible actor poses, and existing motor/stop cues follow all three door
+sequences. Drone dissolves remain silent as authored.
+
+Structural rumble fades in over the first 1.5 seconds of the boss-defeat handoff,
+stays low during the beam struggle, and rises at the boss's final explosion.
+Its catalog gain is 1.4 (about +3 dB), making the continuing aftermath more audible.
+
+The mix is nonpositional because the cinematic camera leaves the fixed gameplay
+listener behind. Combat and rumble duck during the farewell. At 105 seconds,
+all owned loops and one-shot tails stop for six seconds of silence. The exit
+door becomes audible only at daylight, 111 seconds; outdoor ambience fades
+out over the final four seconds before the 133-second credits. Pause uses the
+existing AudioContext suspension. Rehearsal emits no effects, and skip/reset/
+completion/disposal stop the owner's requested voices, including reused clips.
+No soundtrack, story, simulation or camera timings change.

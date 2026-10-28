@@ -405,6 +405,132 @@
     "loop": false
   },
   {
+    "id": "ending-beam-collision-impact-01",
+    "path": "assets/audio/ending/ending-beam-collision-impact-01.ogg",
+    "durationSeconds": 1.932958,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.68298,
+    "loop": false
+  },
+  {
+    "id": "ending-boss-strain-loop-01",
+    "path": "assets/audio/ending/ending-boss-strain-loop-01.ogg",
+    "durationSeconds": 7.9,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.19185,
+    "loop": true
+  },
+  {
+    "id": "ending-boss-wreck-fall-01",
+    "path": "assets/audio/ending/ending-boss-wreck-fall-01.ogg",
+    "durationSeconds": 8.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.51559,
+    "loop": false
+  },
+  {
+    "id": "ending-collapse-blast-01",
+    "path": "assets/audio/ending/ending-collapse-blast-01.ogg",
+    "durationSeconds": 3.072771,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.63336,
+    "loop": false
+  },
+  {
+    "id": "ending-debris-impact-01",
+    "path": "assets/audio/ending/ending-debris-impact-01.ogg",
+    "durationSeconds": 1.757812,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.45938,
+    "loop": false
+  },
+  {
+    "id": "ending-energy-overload-rise-01",
+    "path": "assets/audio/ending/ending-energy-overload-rise-01.ogg",
+    "durationSeconds": 5.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.40817,
+    "loop": false
+  },
+  {
+    "id": "ending-girder-crash-01",
+    "path": "assets/audio/ending/ending-girder-crash-01.ogg",
+    "durationSeconds": 3.889604,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.65086,
+    "loop": false
+  },
+  {
+    "id": "ending-goop-hit-01",
+    "path": "assets/audio/ending/ending-goop-hit-01.ogg",
+    "durationSeconds": 1.0,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.7414,
+    "loop": false
+  },
+  {
+    "id": "ending-outdoor-ambience-loop-01",
+    "path": "assets/audio/ending/ending-outdoor-ambience-loop-01.ogg",
+    "durationSeconds": 19.98,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.09456,
+    "loop": true
+  },
+  {
+    "id": "ending-projectile-flyby-01",
+    "path": "assets/audio/ending/ending-projectile-flyby-01.ogg",
+    "durationSeconds": 0.795188,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.62798,
+    "loop": false
+  },
+  {
+    "id": "ending-slime-separate-01",
+    "path": "assets/audio/ending/ending-slime-separate-01.ogg",
+    "durationSeconds": 1.434937,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.64346,
+    "loop": false
+  },
+  {
+    "id": "ending-specimen-beam-loop-01",
+    "path": "assets/audio/ending/ending-specimen-beam-loop-01.ogg",
+    "durationSeconds": 7.9,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.337,
+    "loop": true
+  },
+  {
+    "id": "ending-specimen-charge-01",
+    "path": "assets/audio/ending/ending-specimen-charge-01.ogg",
+    "durationSeconds": 9.45,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.51743,
+    "loop": false
+  },
+  {
+    "id": "ending-structural-rumble-loop-01",
+    "path": "assets/audio/ending/ending-structural-rumble-loop-01.ogg",
+    "durationSeconds": 11.98,
+    "sampleRate": 48000,
+    "channels": 1,
+    "peak": 0.25507,
+    "loop": true
+  },
+  {
     "id": "escape-cell-hatch-open-01",
     "path": "assets/audio/escape/escape-cell-hatch-open-01.ogg",
     "durationSeconds": 2.56,
