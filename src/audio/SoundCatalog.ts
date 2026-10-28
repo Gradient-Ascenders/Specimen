@@ -19,6 +19,23 @@ const CINEMATIC: SoundSpatialProfile = { refDistance: 18, rolloffFactor: .6, max
 
 /** Mono OGG assets; requester-selected ElevenLabs character effects and shared turret audio. */
 export const SOUND_DEFINITIONS = {
+  'ending-boss-strain-loop-01': { path: 'assets/audio/ending/ending-boss-strain-loop-01.ogg', loop: true, volume: 1, maxVoices: 1 },
+  'ending-specimen-charge-01': { path: 'assets/audio/ending/ending-specimen-charge-01.ogg', loop: false, volume: 1, maxVoices: 1 },
+  'ending-specimen-beam-loop-01': { path: 'assets/audio/ending/ending-specimen-beam-loop-01.ogg', loop: true, volume: 1.2, maxVoices: 1 },
+  'ending-beam-collision-impact-01': { path: 'assets/audio/ending/ending-beam-collision-impact-01.ogg', loop: false, volume: 1.1, maxVoices: 1 },
+  // The supplied pack has the collision impact but no sustained deadlock clip.
+  // A separate ID gives this deeper layer its own voice budget and mix.
+  'ending-beam-collision-loop-01': { path: 'assets/audio/boss/boss-beam-sustain-loop-01.ogg', loop: true, volume: 1, maxVoices: 1 },
+  'ending-energy-overload-rise-01': { path: 'assets/audio/ending/ending-energy-overload-rise-01.ogg', loop: false, volume: 1, maxVoices: 1 },
+  'ending-slime-separate-01': { path: 'assets/audio/ending/ending-slime-separate-01.ogg', loop: false, volume: 1, maxVoices: 1 },
+  'ending-boss-wreck-fall-01': { path: 'assets/audio/ending/ending-boss-wreck-fall-01.ogg', loop: false, volume: 1, maxVoices: 1 },
+  'ending-structural-rumble-loop-01': { path: 'assets/audio/ending/ending-structural-rumble-loop-01.ogg', loop: true, volume: 1.4, maxVoices: 1 },
+  'ending-debris-impact-01': { path: 'assets/audio/ending/ending-debris-impact-01.ogg', loop: false, volume: 1, maxVoices: 3 },
+  'ending-girder-crash-01': { path: 'assets/audio/ending/ending-girder-crash-01.ogg', loop: false, volume: 1, maxVoices: 4 },
+  'ending-projectile-flyby-01': { path: 'assets/audio/ending/ending-projectile-flyby-01.ogg', loop: false, volume: 1, maxVoices: 3 },
+  'ending-goop-hit-01': { path: 'assets/audio/ending/ending-goop-hit-01.ogg', loop: false, volume: 1.1, maxVoices: 2 },
+  'ending-collapse-blast-01': { path: 'assets/audio/ending/ending-collapse-blast-01.ogg', loop: false, volume: 1, maxVoices: 5 },
+  'ending-outdoor-ambience-loop-01': { path: 'assets/audio/ending/ending-outdoor-ambience-loop-01.ogg', loop: true, volume: 1, maxVoices: 1 },
   'blackout-lift-power-restore-01': { path: 'assets/audio/blackout/blackout-lift-power-restore-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: CINEMATIC },
   'blackout-lift-start-01': { path: 'assets/audio/blackout/blackout-lift-start-01.ogg', loop: false, volume: 1, maxVoices: 1, spatial: CINEMATIC },
   'blackout-lift-travel-loop-01': { path: 'assets/audio/blackout/blackout-lift-travel-loop-01.ogg', loop: true, volume: .8, maxVoices: 1, spatial: CINEMATIC },
@@ -143,9 +160,10 @@ export const SOUND_DEFINITIONS = {
 } as const;
 export type SoundId = keyof typeof SOUND_DEFINITIONS;
 const ALL_SOUND_IDS = Object.keys(SOUND_DEFINITIONS) as SoundId[];
-export const BOSS_SOUND_IDS = ALL_SOUND_IDS.filter(id => id.startsWith('boss-') || SOUND_DEFINITIONS[id].path.startsWith('assets/audio/boss/'));
+export const BOSS_SOUND_IDS = ALL_SOUND_IDS.filter(id => !id.startsWith('ending-') && (id.startsWith('boss-') || SOUND_DEFINITIONS[id].path.startsWith('assets/audio/boss/')));
 export const BLACKOUT_CUTSCENE_SOUND_IDS = ALL_SOUND_IDS.filter(id => id.startsWith('research-') || SOUND_DEFINITIONS[id].path.startsWith('assets/audio/blackout/') && id !== 'blackout-vent-slime-slide-01');
-const EARLIER_SOUND_IDS = ALL_SOUND_IDS.filter(id => !BOSS_SOUND_IDS.includes(id) && !BLACKOUT_CUTSCENE_SOUND_IDS.includes(id));
+export const ENDING_SOUND_IDS = ALL_SOUND_IDS.filter(id => id.startsWith('ending-'));
+const EARLIER_SOUND_IDS = ALL_SOUND_IDS.filter(id => !BOSS_SOUND_IDS.includes(id) && !BLACKOUT_CUTSCENE_SOUND_IDS.includes(id) && !ENDING_SOUND_IDS.includes(id));
 // The live Cultivation escape includes Volt taking over a security drone.
 /** Cumulative banks start warming ahead of each level's visual preparation. */
 export const SOUND_BANKS = {

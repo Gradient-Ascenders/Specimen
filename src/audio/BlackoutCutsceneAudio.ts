@@ -10,7 +10,7 @@ import { RESEARCH_WING_ORIGIN as ORIGIN, researchWorldPoint } from '../cinematic
 import { FINAL_ARENA } from '../boss/FinalBossConfig.ts';
 
 /** A cinematic owns only its requested voices, not the application's mixer. */
-class CutsceneSoundTrack {
+export class CutsceneSoundTrack {
   private readonly sounds = new Set<SoundId>();
   private readonly loops = new Set<string>();
   private lastTime = -Infinity;
@@ -33,10 +33,13 @@ class CutsceneSoundTrack {
       gameplayAudioEvents.emit('loop', {key, sound, position, volumeScale, playbackRate});
     } else if (this.loops.delete(key)) gameplayAudioEvents.emit('stop', {key});
   }
-  stop(): void {
+  protected releaseSounds(): void {
     for (const key of this.loops) gameplayAudioEvents.emit('stop', {key});
     for (const sound of this.sounds) gameplayAudioEvents.emit('stopSound', {sound});
-    this.loops.clear(); this.sounds.clear(); this.lastTime = this.frameBefore = -Infinity;
+    this.loops.clear(); this.sounds.clear();
+  }
+  stop(): void {
+    this.releaseSounds(); this.lastTime = this.frameBefore = -Infinity;
   }
 }
 

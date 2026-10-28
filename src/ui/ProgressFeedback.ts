@@ -37,7 +37,11 @@ export class ProgressFeedback {
 
   setObjective(text: string, animateChange: boolean): void {
     if (this.objective.textContent === text) return;
-    this.objectiveAnimation?.stop();
+    // The ending may hide the HUD before publishing its final objective.
+    // We replace the styles below, so discard the old animation without
+    // committing its current frame to a non-rendered element.
+    this.objectiveAnimation?.cancel();
+    this.objectiveAnimation = undefined;
     this.objective.textContent = text;
     this.objective.style.opacity = '1';
     this.objective.style.transform = 'none';
@@ -85,7 +89,7 @@ export class ProgressFeedback {
 
   reset(): void {
     ++this.version;
-    this.noticeAnimation?.stop(); this.objectiveAnimation?.stop();
+    this.noticeAnimation?.cancel(); this.objectiveAnimation?.cancel();
     this.noticeAnimation = this.objectiveAnimation = undefined;
     this.element.hidden = true; this.remaining = 0; this.leaving = false;
     this.objective.style.opacity = '1'; this.objective.style.transform = 'none';

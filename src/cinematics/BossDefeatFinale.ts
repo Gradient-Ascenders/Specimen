@@ -7,10 +7,10 @@ import type { SpecimenCharacterPresentation, SpecimenCharacterState } from '../r
 import type { FinalBossPresentation } from '../boss/FinalBossPresentation.ts';
 import type { ExterminationArena } from '../boss/ExterminationArena.ts';
 import { SecurityDronePresentation, SecurityDronePresentationResources } from '../render/hazards/SecurityDronePresentation.ts';
-import { gameplayAudioEvents } from '../audio/GameplayAudioEvents.ts';
 import { CinematicMusic } from '../audio/CinematicMusic.ts';
-import type { SoundId } from '../audio/SoundCatalog.ts';
+import { BossDefeatAudio } from '../audio/BossDefeatAudio.ts';
 import { TypewriterAudio } from '../audio/TypewriterAudio.ts';
+import { ENDING_MENU_FADE_SECONDS, setEndingMenuFade, clearEndingMenuFade } from '../ui/EndingMenuFade.ts';
 import { optimizeFiniteLightEvaluation } from '../render/environment/cultivation/FiniteLightEvaluation.ts';
 import { FINAL_ARENA } from '../boss/FinalBossConfig.ts';
 import { preserveResearchPresentation } from './BlackoutResearchPreparation.ts';
@@ -19,7 +19,7 @@ import { BossDefeatEffects } from './BossDefeatEffects.ts';
 import { BossDefeatCamera } from './BossDefeatCamera.ts';
 import { BossDefeatOverlay } from './BossDefeatOverlay.ts';
 import { ENDING_TIMING as T, ENDING_ANCHOR as A, ENDING_DIALOGUE, endingProgress, endingShot,
-  sampleEndingSlime, sampleEndingDrone, sampleEndingBossWreck, endingDroneDeathTime, endingGoopHitTime, endingCollapseBlastTime, type EndingSlime } from './BossDefeatTimeline.ts';
+  sampleEndingSlime, sampleEndingDrone, sampleEndingBossWreck, endingGoopHitTime, type EndingSlime } from './BossDefeatTimeline.ts';
 
 type Presentation = BobCharacterPresentation | GoopCharacterPresentation | VoltCharacterPresentation;
 interface Options {
@@ -38,21 +38,6 @@ const UP = new THREE.Vector3(0, 1, 0), ZERO = new THREE.Vector3();
 const PREPARATION = [1, 6, 10, 12.5, T.specimenFire - .05, T.specimenFire + .08, 16, 18, 23, 28, 31.2, 32, 34.5, 37, 41, 48,
   T.drones + 4, T.sacrifice + 1, T.insist + 1, T.leave + 2, T.lookBack + 1, endingGoopHitTime(2) + .08,
   T.goodbye + 1, T.runAgain + 4, T.destruction + .5, T.destruction + 3, T.destruction + 7, T.daylight + 3, T.sky + 1, T.credits + 5];
-const CUES: readonly { at: number; sound: SoundId; gain: number }[] = [
-  { at: 1, sound: 'escape-drone-strain-loop-01', gain: .4 },
-  { at: T.charge, sound: 'volt-charge-ready-01', gain: .8 },
-  { at: T.fire, sound: 'volt-shoot-01', gain: 1 },
-  { at: T.specimenFire, sound: 'volt-shoot-01', gain: 1 },
-  { at: T.impact, sound: 'cultivation-cover-drone-impact-01', gain: .55 },
-  { at: T.strain, sound: 'cultivation-duct-floor-strain-01', gain: .7 },
-  { at: T.escalation, sound: 'cultivation-cover-break-free-01', gain: .7 },
-  { at: T.explosion, sound: 'escape-drone-destruction-01', gain: 1 },
-  { at: T.explosion + .12, sound: 'world-platform-land-01', gain: .65 },
-  { at: T.landing, sound: 'bob-land-hard-01', gain: .5 },
-  { at: T.drones - .8, sound: 'world-activation-01', gain: .65 },
-  { at: T.destruction, sound: 'cultivation-cover-drone-impact-01', gain: .8 },
-];
-const LOOP_KEYS = ['ending-energy-roar', 'ending-electrical-strain', 'ending-collapse'];
 
 export class BossDefeatFinale {
   readonly set = new BossDefeatSet();
@@ -62,6 +47,7 @@ export class BossDefeatFinale {
   readonly preparation = { complete: false, frames: 0 };
   private readonly options: Options;
   private music?: CinematicMusic;
+  private readonly audio = new BossDefeatAudio();
   private readonly cameraTrack = new BossDefeatCamera();
   private readonly droneResources = new SecurityDronePresentationResources(undefined, true);
   private readonly drones: SecurityDronePresentation[] = [];
@@ -88,6 +74,7 @@ export class BossDefeatFinale {
   private playing = false; private played = false; private disposed = false; private skipRequested = false;
   private preparing = false;
   private didSkipCredits = false;
+  private menuFadeElapsed = 0;
   private readonly specimenState: SpecimenCharacterState;
 
   constructor(options: Options) {
@@ -144,7 +131,7 @@ export class BossDefeatFinale {
     if (this.disposed || this.playing || this.played && !rehearsal) return false;
     this.restore = preserveResearchPresentation(this.scene); this.playing = true; this.played = !rehearsal;
     this.preparing = rehearsal;
-    this.elapsed = this.previousElapsed = 0; this.skipRequested = this.didSkipCredits = false; this.camera = camera;
+    this.elapsed = this.previousElapsed = this.menuFadeElapsed = 0; this.skipRequested = this.didSkipCredits = false; this.camera = camera;
     this.savedCamera = { fov: camera.fov, far: camera.far, position: camera.position.clone(), quaternion: camera.quaternion.clone() };
     if (this.scene instanceof THREE.Scene) { this.oldBackground = this.scene.background; this.oldFog = this.scene.fog; }
     const allowed = new Set<THREE.Object3D>();
@@ -169,15 +156,35 @@ export class BossDefeatFinale {
       this.music.update(0);
       this.options.host.dataset.cinematic = 'boss-defeat';
     }
-    this.sample(0, 1 / 60, true); if (!rehearsal) this.overlay.present(0); return true;
+    this.sample(0, 1 / 60, true);
+    if (!rehearsal) { this.audio.update(-1 / 60, 0); this.overlay.present(0); }
+    return true;
   }
   update(dt: number, skip = false): boolean {
     if (!this.playing) return false;
     if (!Number.isFinite(dt) || dt <= 0) throw new RangeError('Invalid boss ending timestep.');
-    this.previousElapsed = this.elapsed; this.elapsed = skip || this.skipRequested ? T.duration : Math.min(T.duration, this.elapsed + dt);
+    if (this.elapsed < T.credits && (skip || this.skipRequested)) {
+      this.skipRequested = false;
+      this.audio.stop();
+      this.elapsed = this.previousElapsed = T.credits;
+      this.sample(T.credits, dt, true);
+      this.music?.update(T.credits);
+      this.overlay.present(T.credits);
+      return false;
+    }
+    if (this.elapsed >= T.credits && (skip || this.skipRequested || this.menuFadeElapsed > 0)) {
+      this.previousElapsed = this.elapsed; this.elapsed = Math.min(T.duration, this.elapsed + dt);
+      this.menuFadeElapsed = Math.min(ENDING_MENU_FADE_SECONDS, this.menuFadeElapsed + dt);
+      const p = this.menuFadeElapsed / ENDING_MENU_FADE_SECONDS;
+      setEndingMenuFade(this.options.host, p * p * (3 - 2 * p));
+      this.music?.update(this.elapsed); this.overlay.present(this.elapsed);
+      if (this.menuFadeElapsed < ENDING_MENU_FADE_SECONDS) return false;
+      this.didSkipCredits = true;
+      this.release(); return true;
+    }
+    this.previousElapsed = this.elapsed; this.elapsed = Math.min(T.duration, this.elapsed + dt);
     this.music?.update(this.elapsed);
-    this.didSkipCredits = (skip || this.skipRequested) && this.previousElapsed >= T.credits;
-    if (!skip && !this.skipRequested) this.soundStep(this.previousElapsed, this.elapsed);
+    this.audio.update(this.previousElapsed, this.elapsed);
     this.sample(this.elapsed, dt, false); this.overlay.present(this.elapsed);
     if (this.elapsed >= T.duration) { this.release(); return true; } return false;
   }
@@ -252,27 +259,6 @@ export class BossDefeatFinale {
     this.cameraTrack.present(camera, t, this.specimenSource, this.bossSource, this.effects.collision, this.actors[0]!.position, this.actors[1]!.position, this.actors[2]!.position);
     if (!this.preparing) this.overlay.present(t);
   }
-  private soundStep(before: number, t: number): void {
-    for (const cue of CUES) if (before < cue.at && t >= cue.at) gameplayAudioEvents.emit('cue', { sound: cue.sound, volumeScale: cue.gain });
-    if (before < T.charge && t >= T.charge) gameplayAudioEvents.emit('loop', { key: LOOP_KEYS[0]!, sound: 'world-machinery-loop-01', volumeScale: .2 });
-    if (before < T.fire && t >= T.fire) gameplayAudioEvents.emit('loop', { key: LOOP_KEYS[1]!, sound: 'escape-drone-strain-loop-01', volumeScale: .65 });
-    if (before < T.explosion && t >= T.explosion) { for (const key of LOOP_KEYS.slice(0, 2)) gameplayAudioEvents.emit('stop', { key });
-      gameplayAudioEvents.emit('loop', { key: LOOP_KEYS[2]!, sound: 'world-machinery-loop-01', volumeScale: .18 }); }
-    if (before < T.black && t >= T.black) this.stopSound();
-    if (t > T.explosion && t < T.black && Math.floor((t - T.explosion) / 3) !== Math.floor((before - T.explosion) / 3))
-      gameplayAudioEvents.emit('cue', { sound: 'cultivation-duct-floor-strain-01', volumeScale: .25 });
-    for (let i = 0; i < 24; i++) { const death = endingDroneDeathTime(i);
-      if (before < death - 1 && t >= death - 1) gameplayAudioEvents.emit('cue', { sound: 'volt-shoot-01', position: this.actors[1]!.position, volumeScale: .35, maxDistance: 120 });
-    }
-    if (t >= T.leave && t < T.hideGoop && Math.floor((t - T.leave) / .7) !== Math.floor((before - T.leave) / .7))
-      gameplayAudioEvents.emit('cue', { sound: 'volt-shoot-01', position: this.actors[1]!.position, volumeScale: .25, maxDistance: 100 });
-    if (t >= T.returnFire && t < T.hideGoop && Math.floor((t - T.returnFire) / .32) !== Math.floor((before - T.returnFire) / .32))
-      gameplayAudioEvents.emit('cue', { sound: 'specimen-turret-shot', volumeScale: .16 });
-    for (let i = 0; i < 3; i++) if (before < endingGoopHitTime(i) && t >= endingGoopHitTime(i))
-      gameplayAudioEvents.emit('cue', { sound: 'world-door-stop-01', volumeScale: .17 });
-    for (let i = 0; i < 12; i++) if (before < endingCollapseBlastTime(i) && t >= endingCollapseBlastTime(i))
-      gameplayAudioEvents.emit('cue', { sound: 'cultivation-cover-drone-impact-01', volumeScale: .55 });
-  }
   async primePresentationFrames(render: (camera: THREE.PerspectiveCamera) => Promise<void>, current: () => boolean): Promise<void> {
     if (this.disposed || this.playing || !current()) return;
     const camera = new THREE.PerspectiveCamera(52, 16 / 9, .1, 1800), wasPlayed = this.played;
@@ -287,10 +273,9 @@ export class BossDefeatFinale {
       this.preparation.complete = current();
     } finally { this.release(); this.played = wasPlayed; this.elapsed = this.previousElapsed = 0; }
   }
-  private stopSound(): void { for (const key of LOOP_KEYS) gameplayAudioEvents.emit('stop', { key }); gameplayAudioEvents.emit('stopSound', { sound: 'escape-drone-strain-loop-01' }); }
   private release(): void {
     this.music?.stop(); this.music = undefined;
-    if (!this.preparing) this.stopSound();
+    if (!this.preparing) this.audio.stop();
     if (this.playing) {
       for (const actor of this.actors) {
         if (actor.parent) actor.parent.add(actor.presentation.root); else actor.presentation.root.removeFromParent();
@@ -304,7 +289,11 @@ export class BossDefeatFinale {
     this.playing = this.preparing = false; this.owned.visible = false; this.set.reset(); this.overlay.hide();
     if (this.options.host.dataset.cinematic === 'boss-defeat') delete this.options.host.dataset.cinematic;
   }
-  reset(): void { this.release(); this.played = false; this.didSkipCredits = false; this.elapsed = this.previousElapsed = 0; }
+  reset(): void {
+    this.release();
+    if (this.menuFadeElapsed > 0 && !this.didSkipCredits) clearEndingMenuFade(this.options.host);
+    this.played = false; this.didSkipCredits = false; this.elapsed = this.previousElapsed = this.menuFadeElapsed = 0;
+  }
   dispose(): void { if (this.disposed) return; this.reset(); this.disposed = true; this.overlay.dispose(); this.effects.dispose(); this.set.dispose();
     this.drones.forEach(d => d.dispose()); this.droneResources.dispose(); this.damagedClones.forEach(m => m.dispose()); this.owned.removeFromParent(); }
 }

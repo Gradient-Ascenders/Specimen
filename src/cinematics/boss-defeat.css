@@ -1,4 +1,5 @@
 .boss-defeat-finale .ending-flash { position:absolute; inset:0; z-index:3; pointer-events:none; opacity:0; }
+#app[data-ending-menu-fade]::after { content:''; position:fixed; inset:0; z-index:10000; background:#000; opacity:var(--ending-menu-opacity,0); pointer-events:auto; }
 .boss-defeat-finale .finale-subtitle { z-index:4; }
 .boss-defeat-finale .finale-skip { z-index:6; }
 .boss-defeat-finale .finale-subtitle { left:7%; right:7%; width:auto; bottom:max(14%,64px); font:500 clamp(14px,1.35vw,23px)/1.5 var(--ui-font-body); }

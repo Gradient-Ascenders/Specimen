@@ -15,6 +15,7 @@ import { SLIME_PORTRAITS } from './SlimePortraits.ts';
 import { SlimeRosterPresentation } from './SlimeRosterPresentation.ts';
 import { HudPanelPresentation } from './HudPanelPresentation.ts';
 import { ProgressFeedback } from './ProgressFeedback.ts';
+import { fadeEndingMenu } from './EndingMenuFade.ts';
 import { createLevelSelectCards, loadLevelPreviews } from './LevelSelectCards.ts';
 import type { CheckpointReachedEvent } from '../levels/GameLevelRuntime.ts';
 import { HudFooterLayout } from './HudFooterLayout.ts';
@@ -340,7 +341,7 @@ export class GameFlowStateModel {
   }
 
   beginReturnToMenu(): boolean {
-    if (this.currentState !== 'paused') return false;
+    if (this.currentState !== 'paused' && this.currentState !== 'credits') return false;
     this.menuReturnState = 'title';
     this.setState('loading');
     return true;
@@ -356,7 +357,7 @@ export class GameFlowStateModel {
 
   completeGame(returnToTitle = false):boolean {
     if(this.currentState!=='playing')return false;
-    this.menuReturnState='title';this.setState(returnToTitle ? 'title' : 'credits');return true;
+    this.menuReturnState='title';this.setState(returnToTitle ? 'loading' : 'credits');return true;
   }
 
   back(): boolean {
@@ -647,11 +648,12 @@ export class GameFlowUI {
   /** Existing Level 3 completion is the sole authority for the final credits. */
   completeGame(returnToTitle = false):void {
     if(this.disposed||!this.model.completeGame(returnToTitle))return;
-    this.gameFinished=true;this.actions.stopGameplay();this.syncState();
-    if(returnToTitle)this.actions.restartGame?.();
+    this.gameFinished=true;this.actions.stopGameplay();
+    if(returnToTitle)void this.returnToMenu(true);
+    else this.syncState();
   }
   private backToMenu():void {
-    if(this.gameFinished&&this.model.state==='credits'&&this.actions.restartGame) {this.actions.restartGame();return;}
+    if(this.gameFinished&&this.model.state==='credits'&&this.actions.returnToMenu) {void this.returnToMenu();return;}
     if(this.model.back())this.syncState();
   }
 
@@ -1209,8 +1211,12 @@ export class GameFlowUI {
     }
   }
 
-  private async returnToMenu(): Promise<void> {
-    if (!this.actions.returnToMenu || !this.model.beginReturnToMenu()) return;
+  private async returnToMenu(fromCompletion = false): Promise<void> {
+    if (!this.actions.returnToMenu || (fromCompletion ? this.model.state !== 'loading' : !this.model.beginReturnToMenu())) return;
+    const fromEnding = this.gameFinished, host = this.element.parentElement;
+    const reducedMotion = this.settings.value.reduceMenuMotion || this.motionPreference.matches;
+    if (fromEnding && host) await fadeEndingMenu(host, 1, reducedMotion);
+    if (this.disposed) return;
     const status = this.requireElement('#loading-title');
     status.textContent = 'Returning to menu…';
     this.panels.get('loading')!.dataset.loadingState = 'loading';
@@ -1221,11 +1227,16 @@ export class GameFlowUI {
     this.syncState();
     try {
       await this.actions.returnToMenu();
-      if (!this.disposed) this.completeBoot();
+      if (!this.disposed) {
+        this.gameFinished = false;
+        this.completeBoot();
+        if (fromEnding && host) await fadeEndingMenu(host, 0, reducedMotion);
+      }
     } catch {
       if (!this.disposed) {
         status.textContent = 'Could not open the main menu. Reload to try again.';
         this.panels.get('loading')!.dataset.loadingState = 'failed';
+        if (fromEnding && host) await fadeEndingMenu(host, 0, reducedMotion);
       }
     }
   }

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { BOSS_SOUND_IDS, BLACKOUT_CUTSCENE_SOUND_IDS, SOUND_DEFINITIONS } from '../../src/audio/SoundCatalog.ts';
+import { BOSS_SOUND_IDS, BLACKOUT_CUTSCENE_SOUND_IDS, ENDING_SOUND_IDS, SOUND_DEFINITIONS } from '../../src/audio/SoundCatalog.ts';
 
-test('all boss and Blackout cutscene effects decode as mono audio from the production nested base', async ({page}) => {
+test('all boss, Blackout and ending effects decode as mono audio from the production nested base', async ({page}) => {
   // This checks shipped assets and the browser decoder, independently of game
   // rendering. Combat event routing is exercised by FinalBossAudio.test.ts.
   await page.route('**/group-folder/', route => route.fulfill({contentType:'text/html', body:'<!doctype html><title>Boss audio decoder</title>'}));
@@ -16,8 +16,8 @@ test('all boss and Blackout cutscene effects decode as mono audio from the produ
         return {id, channels:buffer.numberOfChannels, duration:buffer.duration, sampleRate:buffer.sampleRate};
       }));
     } finally {await context.close();}
-  }, [...BOSS_SOUND_IDS,...BLACKOUT_CUTSCENE_SOUND_IDS].map(id => ({id,path:SOUND_DEFINITIONS[id].path})));
-  expect(decoded).toHaveLength(46);
+  }, [...BOSS_SOUND_IDS,...BLACKOUT_CUTSCENE_SOUND_IDS,...ENDING_SOUND_IDS].map(id => ({id,path:SOUND_DEFINITIONS[id].path})));
+  expect(decoded).toHaveLength(61);
   for (const clip of decoded) {
     expect(clip.channels, clip.id).toBe(1);
     expect(clip.duration, clip.id).toBeGreaterThan(.1);

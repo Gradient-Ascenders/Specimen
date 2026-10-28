@@ -348,6 +348,7 @@ function startGame(): void {
         openingPresentation?.dispose();
         openingPresentation = undefined;
         levelTwoRuntime = undefined;
+        levelThreeRuntime = undefined;
         levelPreviewRequested = undefined;
         titlePresentation?.dispose();
         titlePresentation = undefined;
@@ -371,6 +372,7 @@ function startGame(): void {
           reduceMotion: settings.value.reduceMenuMotion,
         });
         await titlePresentation.prepare();
+        titlePresentation.render(0);
       },
       startSelectedLevel,
       playOpening: () => playOpening(),
