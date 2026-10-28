@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { readGzipResponse } from '../ReadGzipResponse.ts';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import type {ElevatorSequence} from '../../../puzzle/ElevatorSequence.ts';
 import type {LaserHazard} from '../../../hazards/LaserHazard.ts';
@@ -6,7 +7,7 @@ import type {ElevatorPresentation} from '../../elevator/ElevatorPresentation.ts'
 import type {AuthoredLaserEmitter,LaserHazardPresentation} from '../../hazards/LaserHazardPresentation.ts';
 
 const PARTS=['Architecture','Car','Counterweight','Wheel','Motor','DoorLeft','DoorRight','ExitArrow','Segment','Cable'] as const;
-export const ROOM_FOUR_SHELL_URL=new URL('../../../../assets/environments/containment-room-four/room-four-lift.glb',import.meta.url).href;
+export const ROOM_FOUR_SHELL_URL=new URL('../../../assets/delivery/room-four.bin',import.meta.url).href;
 export type RoomFourShellLoader=(signal:AbortSignal)=>Promise<THREE.Group>;
 
 export async function parseRoomFourShell(bytes:ArrayBuffer):Promise<THREE.Group>{
@@ -19,7 +20,7 @@ export async function parseRoomFourShell(bytes:ArrayBuffer):Promise<THREE.Group>
 async function loadShell(signal:AbortSignal):Promise<THREE.Group>{
   const response=await fetch(ROOM_FOUR_SHELL_URL,{signal});
   if(!response.ok)throw new Error('Could not load Room 4 lift art.');
-  return parseRoomFourShell(await response.arrayBuffer());
+  return parseRoomFourShell(await readGzipResponse(response,signal));
 }
 
 /** Presentation consumes the real lift and laser state. No new colliders,

@@ -7,6 +7,7 @@ import { SpecimenDash } from '../combat/SpecimenDash.ts';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
 import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import * as THREE from 'three';
+import { CinematicCompileCache } from '../render/CinematicCompileCache.ts';
 import { GoopCharacterPresentation, type GoopCharacterPresentationState } from '../render/goop/GoopCharacterPresentation.ts';
 import { GelReflectionLighting } from '../render/slime/GelReflectionLighting.ts';
 import {BlackoutLightingPass} from '../render/environment/blackout/BlackoutLightingPass.ts';
@@ -527,6 +528,7 @@ export class BlackoutLevelRuntime {
         const layer = this.renderLayer, renderer = layer.renderer;
         const yieldFrame = () => new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
         const current = () => this.resources === resources;
+        const cinematicPrograms = new CinematicCompileCache();
         const visibility = layer.canvas.style.visibility;
         layer.canvas.style.visibility = 'hidden';
         try { const warmFrame = async (camera: THREE.PerspectiveCamera) => {
@@ -534,7 +536,7 @@ export class BlackoutLevelRuntime {
           const shadows = renderer.shadowMap.enabled;
           const withLights = <T>(action: () => T): T => resources.lighting?.lightLayout
             ? resources.lighting.lightLayout.withLayout(camera, camera.position, action) : action();
-          await withLights(() => layer.withShadowPreparation(shadows, () => renderer.compileAsync(layer.scene, camera)));
+          await withLights(() => layer.withShadowPreparation(shadows, () => cinematicPrograms.compile(renderer, layer.scene, camera)));
           if (!current()) return;
           const viewport = renderer.getViewport(new THREE.Vector4()), transmissionScale = renderer.transmissionResolutionScale;
           withLights(() => withIsolatedPrewarmState(renderer, () => {
@@ -1587,6 +1589,7 @@ export class BlackoutLevelRuntime {
 
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void {
     const resources = this.resources;
+    resources?.defeatFinale?.effects.setDensity(this.renderLayer.graphicsConfiguration.effectsDensity);
     if (resources) {
       this.renderLayer.cameraRig.setThirdPersonOverride(!resources.deathSequence.isPlaying || !!resources.ventArrival?.active || !!resources.elevatorAscent?.active || !!resources.researchFinale?.active || !!resources.finalBoss?.cinematic ||
         resources.phase.phase === 'merging' || resources.phase.phase === 'splitting' ||
@@ -1695,6 +1698,8 @@ export class BlackoutLevelRuntime {
       camera.position.set(-7,4.5,191);camera.lookAt(FINAL_MERGE_ANCHOR);camera.updateMatrixWorld(true);
     }
     this.gameplayAudio?.updateListener();
+    // Select after all cinematic cameras/actor poses have been presented.
+    resources?.specimenCharacter.updateDetail(this.renderLayer.cameraRig.camera);
     if (resources && !resources.researchFinale?.active && !resources.defeatFinale?.active) {
       resources.goopPresentation.updateDetail(this.renderLayer.cameraRig.camera);
       resources.voltPresentation.updateDetail(this.renderLayer.cameraRig.camera);

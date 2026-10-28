@@ -95,6 +95,9 @@ export class AudioManager implements AudioPlayback {
   private gameplayGain: GainNode | undefined;
   private compressor: DynamicsCompressorNode | undefined;
   private readonly buffers = new Map<SoundId, AudioBuffer>();
+  // Several cinematic IDs intentionally reuse a recording with different
+  // gains/voice limits. Share immutable decoded data, not playback voices.
+  private readonly recordings = new Map<string, Promise<AudioBuffer>>();
   private readonly voices = new Set<Voice>();
   private readonly loops = new Map<string, LoopRequest>();
   private contextAttempted = false;
@@ -185,16 +188,25 @@ export class AudioManager implements AudioPlayback {
 
   private async loadSound(sound: SoundId): Promise<void> {
     try {
-      const response = await fetch(soundUrl(sound, this.base), this.loadingAbort
-        ? { signal: this.loadingAbort.signal }
-        : undefined);
-      if (!response.ok) throw new Error('Audio request failed');
-      const bytes = await response.arrayBuffer();
-      if (this.disposed) return;
-      const buffer = await this.decodeAudioData(bytes);
-      if (!(buffer.duration > 0)) throw new Error('Empty audio');
+      const url = soundUrl(sound, this.base);
+      let recording = this.recordings.get(url);
+      if (!recording) {
+        recording = this.loadRecording(url);
+        this.recordings.set(url, recording);
+      }
+      const buffer = await recording;
       if (!this.disposed) { this.buffers.set(sound, buffer); this.reconcileLoops(); }
     } catch { if (!this.disposed) this.failed.add(sound); }
+  }
+
+  private async loadRecording(url: string): Promise<AudioBuffer> {
+    const response = await fetch(url, this.loadingAbort ? { signal: this.loadingAbort.signal } : undefined);
+    if (!response.ok) throw new Error('Audio request failed');
+    const bytes = await response.arrayBuffer();
+    if (this.disposed) throw new Error('Audio disposed');
+    const buffer = await this.decodeAudioData(bytes);
+    if (!(buffer.duration > 0)) throw new Error('Empty audio');
+    return buffer;
   }
 
   /** Call synchronously in a trusted pointer/key event; never replay old shots. */
@@ -394,7 +406,7 @@ export class AudioManager implements AudioPlayback {
     for (const { sound, resolve } of this.loadQueue.splice(0)) {
       this.pending.delete(sound); resolve();
     }
-    this.stopAll(); this.buffers.clear();
+    this.stopAll(); this.buffers.clear(); this.recordings.clear();
     this.gameplayGain?.disconnect(); this.effects?.disconnect(); this.compressor?.disconnect(); this.master?.disconnect();
     void this.context?.close().catch(() => {});
   }

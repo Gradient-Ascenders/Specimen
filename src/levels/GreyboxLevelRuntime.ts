@@ -2222,6 +2222,7 @@ export class GreyboxLevelRuntime {
       programsBefore: number; programsAfterCompile: number;
     }>();
     const programBindings = new ProgramBindingPrewarm();
+    const preparedDepthVariants = new Set<string>();
     const isCurrent = (): boolean =>
       this.resources === resources &&
       this.lightingPrewarmGeneration === generation;
@@ -2280,7 +2281,7 @@ export class GreyboxLevelRuntime {
             // caster. Compile their actual depth materials independently.
             // Depth programs are independent of the visible light layout.
             if (!chamberScope) {
-              const depthBatch = createDepthPrewarmGroup(compileSubset);
+              const depthBatch = createDepthPrewarmGroup(compileSubset, preparedDepthVariants);
               this.depthPrewarmGroups.push(depthBatch);
               this.compilingDepthGroups.add(depthBatch);
               const shadowScene = new THREE.Scene();
