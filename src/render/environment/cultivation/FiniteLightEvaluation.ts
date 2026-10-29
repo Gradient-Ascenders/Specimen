@@ -46,7 +46,7 @@ const compactSpots = spotStart >= 0 && spotEndMarker > spotStart && spotLoop.inc
 // or cone evaluation. Keep IncidentLight fully initialized for the shadow
 // and shared BRDF loops that follow, retaining all nonzero light math.
 function skipZeroRadiance(chunk: string): string {
-  if (chunk.includes('// specimen-zero-radiance-v1')) return chunk;
+  if (chunk.includes('// specimen-zero-radiance-v2')) return chunk;
   for (const [kind, variable] of [['Point', 'pointLight'], ['Spot', 'spotLight']]) {
     const call = `get${kind}LightInfo( ${variable}, geometryPosition, directLight );`;
     chunk = chunk.replaceAll(call, `if ( any( notEqual( ${variable}.color, vec3( 0.0 ) ) ) ) {
@@ -57,7 +57,13 @@ function skipZeroRadiance(chunk: string): string {
       directLight.visible = false;
     }`);
   }
-  return '// specimen-zero-radiance-v1\n' + chunk;
+  // Three marks directional lights visible even when their radiance is zero.
+  // The existing visibility guards then skip both shadow sampling and BRDF
+  // work for dark cinematic lights, retaining the original nonzero math.
+  const directional = 'getDirectionalLightInfo( directionalLight, directLight );';
+  chunk = chunk.replaceAll(directional, `${directional}
+    directLight.visible = any( notEqual( directionalLight.color, vec3( 0.0 ) ) );`);
+  return '// specimen-zero-radiance-v2\n' + chunk;
 }
 const finiteLightingChunk = compactSpots.replaceAll(
   DIRECT_LIGHT_CALL, `if ( directLight.visible ) { ${DIRECT_LIGHT_CALL} }`,
@@ -77,8 +83,8 @@ export function optimizeFiniteLightEvaluation(material: THREE.Material, skipPadd
   const priorCompile = material.onBeforeCompile;
   const priorKey = material.customProgramCacheKey();
   // Preserve an inherited padding hook when preparing a material clone.
-  const earlyZero = skipPaddingMath || priorKey.includes(':finite-light-branch-v4');
-  const suffix = earlyZero ? ':finite-light-branch-v4' : ':finite-light-branch-v3';
+  const earlyZero = skipPaddingMath || priorKey.includes(':finite-light-branch-v5');
+  const suffix = earlyZero ? ':finite-light-branch-v5' : ':finite-light-branch-v3';
   const first = priorKey.indexOf(suffix);
   // Clones may borrow an already composed hook. Keep its original key order
   // and remove only redundant markers, including around later custom hooks.

@@ -172,6 +172,40 @@ Raw evidence: `inactive-sun-rooms-built/` against `directional-shader-before/`,
 runtime control's two entries labelled Room 4 reused the Room 3 shortcut and
 are excluded; built comparisons use `teleportToFinalBoss()` and actual combat.
 
+## Retained zero-radiance directional shader guard
+
+Dark directional lights now skip shadow sampling and physical lighting math
+through the existing visibility guards. Nonzero lighting math and accumulation
+order remain unchanged. The existing opt-in applies to Containment and Blackout;
+Cultivation retains its previous shader path. The opt-in cache version advances
+from v4 to v5, including inherited preparation hooks.
+
+The first controlled pair improves software completion medians by 5.2–8.2%
+in six ordinary Blackout views and 2.2–2.6% in two combat views. A reverse-order
+repeat, with the retained sun policy on both sides, improves ordinary views by
+5.7–7.8% and combat by 1.5–3.3%. The actual build reproduces approximately
+5–8% and 2–4%, respectively. Draw counts and triangles are unchanged. These
+are completed software-renderer draws, not evaluation-machine frame rates.
+
+- All 103 built comparisons are pixel-identical: eight Blackout room/combat
+  views, 74 cinematic checkpoints and 21 Containment room/doorway views.
+- Program-key sets match after normalizing the intentional cache suffix:
+  204 in Blackout, 301 in Containment. Graphics, resource counts and first-use
+  events match. The first positive daylight frame uses the retained 1024-square
+  sun map without new programs, storage or inspections.
+- Build/layout and 28 focused units pass. Research escape, ending playback and
+  Medium/1080p preparation pass (6.3 minutes). Cultivation's Bob/Goop pixel
+  control passes with zero difference and no GL errors (4.3 minutes).
+- No additional loading-time claim: the new Containment capture is 148.920 s,
+  consistent with the retained reflection improvement, and Blackout loading
+  differences are smaller than the original rehearsal saving.
+
+Raw evidence: `directional-summary.json`, `directional-{control,guard}-repeat/`,
+`directional-rooms-built/`, `directional-cinematics-built/`,
+`directional-containment-built/` and `directional-{functional,cultivation}.log`.
+The initial pair (`directional-shader-{before,guard}/`) predates the sun policy;
+only compare timings within each matched pair.
+
 ## Test and instrumentation corrections
 
 - `a3e3b03`: the baseline unit suite had 511 passes / one failure. The failing
@@ -224,15 +258,17 @@ gain; no production change is retained. Raw data: `containment-probe-{before,loo
 
 ## Current investigation and validation
 
-The generated-asset milestone stops at stale Containment radiance inputs.
-Untouched `08d9a5e`, using the same pinned dependencies, reproduces the failure:
-the checker omits four duct lights present in the committed bake input; all
-other input fields and remaining lights match. The standalone 512-unit suite
-passes. Cultivation's radiance check also reports stale inputs; an audit of
-every generated check on both revisions is queued. No lighting bake is changed.
+All 14 generated-asset checks have identical outcomes on untouched `08d9a5e`
+and the candidate, using the same pinned dependencies: 12 pass; Containment
+and Cultivation radiance inputs are stale. Containment's checker omits four duct
+lights present in the committed input; other fields and remaining lights match.
+Cultivation's source/geometry hashes differ, with 333 rather than 331 static
+meshes and 787,349 rather than 787,245 triangles; its lights match. The standalone
+512-unit suite passes. No lighting bake is changed.
 Raw evidence: `baseline-containment-provenance.log`,
 `containment-bake-input-{expected,actual,delta}.json` and
-`sun-milestone-generated*.log`.
+`cultivation-bake-input-{expected,actual,delta}.json`,
+`generated-provenance-audit.json` and `sun-milestone-generated*.log`.
 
 The same-shader shadow-profile test reproduces a pre-existing Cultivation
 failure on the untouched `08d9a5e` build. After the preparation gate, it allocates
@@ -257,6 +293,23 @@ Text-typing work after staged room placement is expected and is not a steady
 playback baseline. Raw data: `runtime-cpu-baseline/` (13 valid views; see its
 recorded final error), `runtime-cpu-boss-baseline/` and `runtime-cpu-summary.json`.
 
+Static lighting-array packing remains experimental. The profiled Cultivation
+control reduces sampled flattening work, but aggregate allocation estimates
+vary. An unprofiled frozen A/B/A run preserves every image and resource count,
+with submission medians as follows:
+
+| View | Original arrays | Packed arrays | Restored arrays |
+| --- | ---: | ---: | ---: |
+| Containment Room 1 | 17.65 ms | 17.90 ms | 18.35 ms |
+| Cultivation Room 3 | 19.85 ms | 25.75 ms | 26.95 ms |
+| Blackout Room 1 | 26.10 ms | 35.50 ms | 26.10 ms |
+
+These mixed results do not support adoption. A fresh-browser control supplies
+each array format before module initialization to separate steady behavior
+from possible effects of switching hot JavaScript value types. No packing
+change is in production. Raw data: `static-uniform-control/` and
+`static-uniform-repeat/`. Submission wall time includes native blocking calls.
+
 Manual capture review confirms the intended Containment doorway view, controlled
 research-to-combat camera and ending daylight view are present in the retained
 exact-image comparisons, including the separate ending-sun comparisons above.
@@ -273,13 +326,13 @@ identical pixels but no useful timing gain. No camera-culling change is retained
 Raw controls: `zero-directional-shadows/`, `authored-box-control/` and
 `blackout-box-control/` beneath the artifact root.
 
-A separate zero-radiance directional shader control matches all eight room
-images exactly, with unchanged draws/programs and no first-use changes.
-Software completion medians improve 5.2–8.2% in regular rooms and 2.2–2.6% in
-combat. A reverse-order repeat is queued; no production shader change yet.
-Raw evidence: `directional-shader-{before,guard}/`.
+Cultivation's original load attributes 47.05 s to program-log queries and
+15.47 s to shader-log queries. That time may be compiler waiting, rather than
+avoidable diagnostic overhead. A matched control suppresses the log queries,
+independently checks every program's link status before audited readiness, and
+records six completed live draws. No renderer error-policy change is retained.
 
-Next: assess static uniform packing and repeated directional controls, and
-finish the generated-asset provenance audit. Preserve independently positioned companions and authoritative
+Next: assess the shader-query control, draw attribution and fresh-start uniform
+control, then run the broader integration/graphics milestone. Preserve independently positioned companions and authoritative
 simulation. Real Alder Lake GPU loading, frame pacing, first-use behavior and
 visual checks remain outstanding.

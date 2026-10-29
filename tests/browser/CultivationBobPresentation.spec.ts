@@ -767,7 +767,7 @@ test('Cultivation retained shaders match early-zero controls for Bob and Goop ro
         layer.scene.traverseVisible((o: any) => {
           if (!o.isMesh) return; group.add(o.clone(false));
           for (const m of Array.isArray(o.material)?o.material:[o.material])
-            if (m.customProgramCacheKey().includes(':finite-light-branch-v4')) throw new Error('Level 2 unexpectedly enabled early-zero guards');
+            if (m.customProgramCacheKey().includes(':finite-light-branch-v5')) throw new Error('Level 2 unexpectedly enabled early-zero guards');
             else if (m.customProgramCacheKey().includes(':finite-light-branch-v3')) materials.add(m);
         });
         let guarded = 0;
