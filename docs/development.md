@@ -79,6 +79,13 @@ Upload those contents to the host's group directory, retaining `assets/`,
 A ZIP upload publishes the game only if the host extracts it. Relative paths
 support hosting under a subdirectory; verify the confirmed public URL.
 
+Archives preserve build modification times for static-host cache invalidation.
+A fixed timestamp can cause a same-sized replacement `index.html` to receive an
+incorrect `304 Not Modified`, leaving references to removed bundles. After an
+update, hard-refresh or open `index.html?build=<revision>` once. For a model 404,
+compare its exact filename with `build-manifest.json`; a retired name points to
+a cached launch page or an existing tab running the old build.
+
 To serve an extracted archive locally, use
 `scripts/build/start-production-server.sh` or the matching PowerShell script.
 They extract to a temporary directory and serve `/group-folder/`.
