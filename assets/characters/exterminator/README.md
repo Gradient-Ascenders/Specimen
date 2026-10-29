@@ -58,7 +58,7 @@ remains available for synchronous headless encounter fixtures.
 
 ```sh
 npm run build
-npx playwright test tests/browser/ExterminatorModels.spec.ts
+npx playwright test tests/browser/rendering/ExterminatorModels.spec.ts
 ```
 
 The model checks exercise actual exported geometry and pivots, real RAM contacts

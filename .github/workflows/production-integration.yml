@@ -51,7 +51,7 @@ jobs:
 
       - name: Run production integration journeys
         timeout-minutes: 25
-        run: npm run test:integration
+        run: npm run test:integration -- --grep @nightly
 
       - name: Upload browser diagnostics on failure
         if: failure()
@@ -107,9 +107,9 @@ jobs:
           SPECIMEN_FIREFOX_SOFTWARE_WEBGL: '1'
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: >-
-          xvfb-run --auto-servernum npx playwright test tests/smoke/ProductionSmoke.spec.ts
+          xvfb-run --auto-servernum npx playwright test --project=smoke
           --grep "plain production boots"
-          --config playwright.smoke.config.ts --headed
+          --headed
 
       - name: Upload Firefox diagnostics on failure
         if: failure()

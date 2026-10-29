@@ -1,0 +1,215 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { Input, type InputAction } from '../../../src/core/Input.ts';
+
+function createInput(): {
+  input: Input;
+  hostWindow: EventTarget;
+  hostDocument: EventTarget & { pointerLockElement: EventTarget | null };
+  pointerLockElement: EventTarget;
+} {
+  const hostWindow = new EventTarget();
+  const hostDocument = Object.assign(new EventTarget(), {
+    hidden: false,
+    pointerLockElement: null as EventTarget | null,
+    exitPointerLock: () => undefined,
+  });
+  const pointerLockElement = Object.assign(new EventTarget(), {
+    requestPointerLock: () => undefined,
+  });
+
+  const input = new Input({
+    pointerLockElement: pointerLockElement as unknown as HTMLElement,
+    document: hostDocument as unknown as Document,
+    window: hostWindow as unknown as Window,
+  });
+
+  return { input, hostWindow, hostDocument, pointerLockElement };
+}
+
+function dispatchKey(
+  target: EventTarget,
+  type: 'keydown' | 'keyup',
+  code: string,
+  repeat = false,
+): void {
+  const event = new Event(type, { cancelable: true });
+  Object.defineProperties(event, {
+    code: { value: code },
+    repeat: { value: repeat },
+  });
+  target.dispatchEvent(event);
+}
+
+function assertOrphanRepeatIsIgnored(
+  code: string,
+  action: InputAction,
+): void {
+  const { input, hostWindow } = createInput();
+
+  dispatchKey(hostWindow, 'keydown', code);
+  assert.equal(input.isDown(action), true);
+  assert.equal(input.wasPressed(action), true);
+
+  input.resetState();
+  dispatchKey(hostWindow, 'keydown', code, true);
+  assert.equal(input.isDown(action), false);
+  assert.equal(input.wasPressed(action), false);
+
+  dispatchKey(hostWindow, 'keyup', code);
+  dispatchKey(hostWindow, 'keydown', code);
+  assert.equal(input.isDown(action), true);
+  assert.equal(input.wasPressed(action), true);
+
+  input.dispose();
+}
+
+test('restart-key orphan repeat cannot retrigger after input reset', () => {
+  assertOrphanRepeatIsIgnored('KeyR', 'debugReset');
+});
+
+test('movement-key orphan repeat cannot reactivate after input reset', () => {
+  assertOrphanRepeatIsIgnored('KeyW', 'moveForward');
+});
+
+test('pointer cleanup does not masquerade as an input-state cancellation', () => {
+  const { input } = createInput();
+
+  input.endPointerUpdate();
+  assert.equal(input.wasClearedSinceFixedUpdate, false);
+
+  input.dispose();
+});
+
+test('focus clearing remains visible until the next fixed update', () => {
+  const { input, hostWindow } = createInput();
+
+  hostWindow.dispatchEvent(new Event('blur'));
+  assert.equal(input.wasClearedSinceFixedUpdate, true);
+
+  input.endFixedUpdate();
+  assert.equal(input.wasClearedSinceFixedUpdate, false);
+
+  input.dispose();
+});
+
+test('pointer-lock loss clears held input and camera motion without a window blur', () => {
+  const { input, hostWindow, hostDocument, pointerLockElement } = createInput();
+  hostDocument.pointerLockElement = pointerLockElement;
+  dispatchKey(hostWindow, 'keydown', 'KeyW');
+  const down = Object.assign(new Event('mousedown'), { button: 2 });
+  hostWindow.dispatchEvent(down);
+  hostWindow.dispatchEvent(Object.assign(new Event('mousemove'), { movementX: 12, movementY: 8 }));
+  assert.equal(input.isDown('aimAbility'), true);
+  assert.equal(input.pointerDeltaX, 12);
+
+  hostDocument.pointerLockElement = null;
+  hostDocument.dispatchEvent(new Event('pointerlockchange'));
+  assert.equal(input.held.size, 0);
+  assert.equal(input.pointerDeltaX, 0);
+  assert.equal(input.pointerDeltaY, 0);
+  assert.equal(input.wasClearedSinceFixedUpdate, true);
+  hostDocument.pointerLockElement = pointerLockElement;
+  hostDocument.dispatchEvent(new Event('pointerlockchange'));
+  dispatchKey(hostWindow, 'keydown', 'KeyW', true);
+  assert.equal(input.isDown('moveForward'), false);
+  dispatchKey(hostWindow, 'keyup', 'KeyW');
+  dispatchKey(hostWindow, 'keydown', 'KeyW');
+  assert.equal(input.isDown('moveForward'), true);
+  input.dispose();
+});
+
+test('a late pointer-lock grant is released while gameplay input is disabled', () => {
+  const { input, hostDocument, pointerLockElement } = createInput();
+  let exits = 0;
+  Object.assign(hostDocument, { exitPointerLock: () => { exits++; } });
+  input.setEnabled(false);
+  hostDocument.pointerLockElement = pointerLockElement;
+  hostDocument.dispatchEvent(new Event('pointerlockchange'));
+  assert.equal(exits, 1);
+  input.dispose();
+  hostDocument.dispatchEvent(new Event('pointerlockchange'));
+  assert.equal(exits, 1, 'Disposal removes the pointer-lock listener.');
+});
+
+test('mouse ability actions require pointer lock and preserve press/hold state', () => {
+  const { input, hostWindow, hostDocument, pointerLockElement } = createInput();
+
+  const unlockedAim = new Event('mousedown');
+  Object.defineProperty(unlockedAim, 'button', { value: 2 });
+  hostWindow.dispatchEvent(unlockedAim);
+  assert.equal(input.isDown('aimAbility'), false);
+
+  hostDocument.pointerLockElement = pointerLockElement;
+  const aimDown = new Event('mousedown');
+  Object.defineProperty(aimDown, 'button', { value: 2 });
+  hostWindow.dispatchEvent(aimDown);
+  assert.equal(input.isDown('aimAbility'), true);
+  assert.equal(input.wasPressed('aimAbility'), true);
+
+  const fireDown = new Event('mousedown');
+  Object.defineProperty(fireDown, 'button', { value: 0 });
+  hostWindow.dispatchEvent(fireDown);
+  assert.equal(input.wasPressed('fireAbility'), true);
+
+  input.endFixedUpdate();
+  assert.equal(input.isDown('aimAbility'), true);
+  assert.equal(input.wasPressed('aimAbility'), false);
+  assert.equal(input.wasPressed('fireAbility'), false);
+
+  const aimUp = new Event('mouseup');
+  Object.defineProperty(aimUp, 'button', { value: 2 });
+  hostWindow.dispatchEvent(aimUp);
+  assert.equal(input.isDown('aimAbility'), false);
+  assert.equal(input.wasReleased('aimAbility'), true);
+
+  input.dispose();
+});
+
+test('context menu prevention is scoped to the game canvas boundary', () => {
+  const { input, hostWindow, pointerLockElement } = createInput();
+  const canvasContextMenu = new Event('contextmenu', { cancelable: true });
+  const windowContextMenu = new Event('contextmenu', { cancelable: true });
+
+  pointerLockElement.dispatchEvent(canvasContextMenu);
+  hostWindow.dispatchEvent(windowContextMenu);
+
+  assert.equal(canvasContextMenu.defaultPrevented, true);
+  assert.equal(windowContextMenu.defaultPrevented, false);
+
+  input.dispose();
+  const afterDispose = new Event('contextmenu', { cancelable: true });
+  pointerLockElement.dispatchEvent(afterDispose);
+  assert.equal(afterDispose.defaultPrevented, false);
+});
+
+
+test('maintenance drone mount uses M and descend supports either Shift key without stale hold state', () => {
+  const { input, hostWindow } = createInput();
+
+  dispatchKey(hostWindow, 'keydown', 'KeyM');
+  assert.equal(input.isDown('mountDrone'), true);
+  assert.equal(input.wasPressed('mountDrone'), true);
+  input.endFixedUpdate();
+  dispatchKey(hostWindow, 'keyup', 'KeyM');
+  assert.equal(input.wasReleased('mountDrone'), true);
+
+  dispatchKey(hostWindow, 'keydown', 'ShiftLeft');
+  assert.equal(input.isDown('droneDescend'), true);
+  input.endFixedUpdate();
+
+  dispatchKey(hostWindow, 'keydown', 'ShiftRight');
+  assert.equal(input.isDown('droneDescend'), true);
+  dispatchKey(hostWindow, 'keyup', 'ShiftLeft');
+  assert.equal(
+    input.isDown('droneDescend'),
+    true,
+    'releasing one Shift must preserve the other held binding',
+  );
+  dispatchKey(hostWindow, 'keyup', 'ShiftRight');
+  assert.equal(input.isDown('droneDescend'), false);
+  assert.equal(input.wasReleased('droneDescend'), true);
+
+  input.dispose();
+});

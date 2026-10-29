@@ -1,10 +1,10 @@
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 
 import { ContainmentLevelScene } from '../../src/levels/ContainmentLevelScene.ts';
 import { captureContainmentCollisionFingerprint } from '../../src/levels/ContainmentCollisionFingerprint.ts';
 
 const fixtureUrl = new URL(
-  '../../tests/fixtures/containment-colliders.json',
+  '../../artifacts/collision/containment-colliders.json',
   import.meta.url,
 );
 const scene = new ContainmentLevelScene(() => {}, {
@@ -12,6 +12,7 @@ const scene = new ContainmentLevelScene(() => {}, {
 });
 
 try {
+  await mkdir(new URL('.', fixtureUrl), { recursive: true });
   const fingerprint = captureContainmentCollisionFingerprint(
     scene.collisionMeshes,
   );

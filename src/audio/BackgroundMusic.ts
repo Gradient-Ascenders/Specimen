@@ -5,7 +5,7 @@ import type { BossMusic } from './BossMusic.ts';
 export type MusicLevel = 'containment' | 'cultivation' | 'blackout';
 export type MusicTrack = 'intro' | MusicLevel | CinematicTrack | 'boss';
 
-const MUSIC_PATHS: Record<MusicTrack, string> = {
+export const MUSIC_PATHS: Readonly<Record<MusicTrack, string>> = {
   intro: 'assets/audio/music/intro-osmotic-memory.ogg',
   containment: 'assets/audio/music/containment-thought-loop.ogg',
   cultivation: 'assets/audio/music/cultivation-unsolved-investigation.ogg',

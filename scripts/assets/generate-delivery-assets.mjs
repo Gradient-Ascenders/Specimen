@@ -21,7 +21,9 @@ for (const [source, name] of assets) {
   if (check) {
     // Validate source equivalence across zlib versions, rather than relying
     // on one machine's choice of equivalent compressed blocks.
-    if (!gunzipSync(await readFile(destination)).equals(bytes)) throw Error('Stale delivery asset: ' + name);
+    const delivered = await readFile(destination);
+    if (delivered.length >= bytes.length) throw Error('Delivery asset does not reduce transport size: ' + name);
+    if (!gunzipSync(delivered).equals(bytes)) throw Error('Stale delivery asset: ' + name);
   } else await writeFile(destination, packed);
   manifest.push({ source, output: name, sourceBytes: bytes.length,
     sourceSHA256: createHash('sha256').update(bytes).digest('hex') });

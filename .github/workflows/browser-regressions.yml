@@ -1,0 +1,68 @@
+name: Browser regressions
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Browser suite (opening-backup uses a separate MP4 build)
+        type: choice
+        default: all
+        options: [all, integration, rendering, cinematics, media, opening-backup]
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    name: ${{ inputs.suite }} (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm install --global npm@11.18.0
+      - run: npm ci
+      - name: Build the selected artifact
+        env:
+          SUITE: ${{ inputs.suite }}
+        run: |
+          if [ "$SUITE" = opening-backup ]; then
+            npm run build -- --mode opening-backup
+          else
+            npm run build
+          fi
+      - run: npm run validate:production
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+      - name: Run the selected suite
+        env:
+          SUITE: ${{ inputs.suite }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          case "$SUITE" in
+            all) npx playwright test --fully-parallel --shard="$SHARD/4" ;;
+            opening-backup) npx playwright test --config playwright.backup.config.ts --fully-parallel --shard="$SHARD/4" ;;
+            integration|rendering|cinematics|media) npx playwright test --project="$SUITE" --fully-parallel --shard="$SHARD/4" ;;
+            *) exit 1 ;;
+          esac
+      - name: Retain browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-${{ inputs.suite }}-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
+            artifacts/
+          if-no-files-found: ignore
+          retention-days: 7

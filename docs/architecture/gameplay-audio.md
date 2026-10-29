@@ -49,7 +49,7 @@ disposal according to their lifecycle owner. Pending loads must not restart a
 cancelled scene. Ending audio follows `BossDefeatTimeline`; its collapse silence
 and daylight handoff must stay aligned with the supplied score.
 
-Use the audio unit tests and `tests/smoke/GameplayAudio.spec.ts` when changing
+Use the audio unit tests and `tests/browser/integration/GameplayAudio.spec.ts` when changing
 routing. Check decoded playback, transitions, muted starts, pause/resume,
 retry/skip and teardown in a real browser. Source hashes and automated checks
 do not replace a listening review.

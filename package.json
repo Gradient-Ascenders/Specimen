@@ -13,10 +13,10 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "test": "node --test --test-concurrency=2 tests/*.test.ts",
+    "test": "node --test --test-concurrency=2 \"tests/unit/**/*.test.ts\"",
     "test:browser": "npm run build && playwright test",
-    "test:smoke": "playwright test tests/smoke/ProductionSmoke.spec.ts tests/smoke/OpeningGraphics.spec.ts tests/smoke/LevelSelector.spec.ts --config playwright.smoke.config.ts",
-    "test:integration": "playwright test tests/smoke/CharacterDetailFallback.spec.ts tests/smoke/CleanGameplayMode.spec.ts tests/smoke/GameplayAudio.spec.ts tests/smoke/ProductionParity.spec.ts --config playwright.smoke.config.ts",
+    "test:smoke": "playwright test --project=smoke --project=ui",
+    "test:integration": "playwright test --project=integration",
     "check:generated-assets": "node scripts/assets/check-generated-assets.mjs",
     "validate:production": "node scripts/build/validate-production-build.mjs",
     "archive": "npm run build && node scripts/build/create-production-archive.mjs"
