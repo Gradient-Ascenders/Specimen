@@ -133,8 +133,9 @@ visual qualification. The repeated routed pair and both baselines match exactly.
 Pooled steady-view medians differ by about 1%; no frame-rate gain is claimed.
 
 Build, production layout and 28 focused units pass. The Medium/1080p five-room
-travel/restart browser check passes in 4.4 minutes. Graphics cycles and High
-coverage remain queued. No production room visibility or simulation changes.
+travel/restart browser check passes in 4.4 minutes. High coverage remains queued. The corrected all-level graphics cycle passes
+in 12.1 minutes: 12 mode changes, switching/fades and nine restarts, with no
+new live programs, inspections or GL errors. No production room visibility or simulation changes.
 
 Raw evidence: `containment-reflection-{before,loop}[-repeat]/`,
 `containment-aligned-{before,built}/` and `containment-loop-*.log`.
@@ -160,6 +161,15 @@ outside the earlier entry-view coverage and is a lower-priority first-use item.
   assertion now scales with the selected effects density; the full ending retry
   passes. Production effects remain unchanged.
 
+- Graphics preparation fixtures now expect the existing Medium transmission
+  scale of 0.75, finish the real arrivals before testing gated controls, and use
+  Volt's supported finale skip/handoff before entering Blackout. The target
+  check passes; the full all-level cycle passes in 12.1 minutes with 12 mode
+  changes, switching/fades and nine restarts. No new live programs, program
+  inspections or GL errors. The prior attempts stopped at fixture assumptions,
+  not a rendering failure. Raw logs: `graphics-corrections.log` and
+  `graphics-finale-handoff.log`; final evidence: `graphics-finale-handoff-results/`.
+
 ## Evidence limits and excluded attempts
 
 The first loading attempt missed Blackout's assigned constructor and observed
@@ -176,6 +186,33 @@ The additional bounded-clear experiment scissored all 70 hidden draws. Ready
 was 103.575 s versus the retained viewport's 103.600 / 103.615 s; rehearsal was
 19.49 + 24.41 s. This is no useful improvement within measurement noise. No
 production scissor change was made. Raw control: `scissored-warmup-probe/`.
+
+## Current investigation and validation
+
+The same-shader shadow-profile test reproduces a pre-existing Cultivation
+failure on the untouched `08d9a5e` build. After the preparation gate, it allocates
+a 512×512 `cultivation-room-1-greybox-fixture-shadow-1` target while paused, then
+a 1×1 padding spotlight target in play. Measured API submission is 0–0.1 ms;
+that does not measure GPU completion cost. No new program or GL error accompanies
+the allocations. No production change is justified by a claimed timing gain.
+Raw evidence: `shadow-allocation-baseline-results/` and
+`shadow-allocation-baseline-retry.log`. The initial artifact server attempt used
+the wrong working directory and never launched the test; it is excluded.
+
+CPU/heap attribution covers 13 regular room views at Medium/1080p. The final
+boss probe rejected an invalid zero-length diagnostic update; only that missing
+view is queued again with a valid fixed step. Readback waits dominate this
+software renderer. Three's program-parameter/cache-key work and uniform-array
+flattening are prominent sampled allocation sites. Cultivation Room 3's sampled
+fixed updates have a 5.7 ms median versus roughly 2–4 ms in its other rooms.
+These profiler-assisted samples are diagnostic main-thread wall time, including
+blocking native calls, not evaluation-machine frame pacing. A frozen A/B/A
+experiment will test prepacked static lighting arrays before a source edit.
+Raw data: `runtime-cpu-baseline/` (partial; see its recorded final error).
+
+Manual capture review confirms the intended Containment doorway view, controlled
+research-to-combat camera and ending daylight view are present in the retained
+exact-image comparisons. New sunlight work still requires its own comparisons.
 
 ## Next work
 
