@@ -91,13 +91,28 @@ test('Medium 1080p Blackout prepares and switches Specimen detail without new GP
     expect(viewport[2]*pixelRatio).toBeLessThanOrEqual(320);
     expect(viewport[3]*pixelRatio).toBeLessThanOrEqual(180);
   }
-  expect(result.preparation.retainedTargets).toContainEqual([1440,810]);
+  expect(result.preparation.retainedTargets).toContainEqual([960,540]);
   expect(result.preparation.liveStorage).toEqual([]);expect(result.preparation.liveInspections).toBe(0);
   expect(result.viewport).toEqual([0,0,1920,1080]);expect(result.scissor).toBe(false);
-  expect(result.transmissionScale).toBe(.75);expect(result.canvasVisibility).not.toBe('hidden');
+  expect(result.transmissionScale).toBe(.5);expect(result.canvasVisibility).not.toBe('hidden');
   expect(result.endingPreparation.complete).toBe(true);expect(result.endingPreparation.frames).toBeGreaterThanOrEqual(20);
   expect(result.lod.map((row:any)=>row.level)).toEqual(['full','distant','full']);
   expect(result.lod.map((row:any)=>row.triangles)).toEqual([81040,20232,81040]);
   expect(result.lod[2].memory).toEqual(result.lod[0].memory);
   expect(result.lod.map((row:any)=>row.error)).toEqual([0,0,0]);expect(result.error).toBe(0);expect(errors).toEqual([]);
+
+  const scales=await page.evaluate(()=>{
+    const runtime=(window as any).__mediumRuntime,layer=runtime.renderLayer,scales:number[]=[];
+    // The level budget follows balanced gel through setting changes, survives
+    // restart, and releases independently of the session's graphics settings.
+    for(const mode of ['physical','reduced-transmission','minimum','reduced-transmission']){
+      layer.gelRendering.setMode(mode);scales.push(layer.renderer.transmissionResolutionScale);
+    }
+    runtime.restartLevel();scales.push(layer.renderer.transmissionResolutionScale);
+    runtime.unload();scales.push(layer.renderer.transmissionResolutionScale);
+    runtime.unload();scales.push(layer.renderer.transmissionResolutionScale);
+    return scales;
+  });
+  expect(scales).toEqual([1,.5,1,.5,.5,.75,.75]);
+  expect(errors).toEqual([]);
 });

@@ -290,6 +290,7 @@ export class BlackoutLevelRuntime {
   private completionEmitted = false;
   private presentationPreparation: Promise<void> | undefined;
   private programPreparation: BlackoutPresentationPreparation | undefined;
+  private releaseReducedTransmissionCap: (() => void) | undefined;
   private hiddenMaterialCulling: HiddenMaterialCulling | undefined;
   private shutterOcclusion: BlackoutShutterOcclusion | undefined;
   private readonly drawRenderLayer = (): void => { this.renderLayer.render(); };
@@ -465,6 +466,9 @@ export class BlackoutLevelRuntime {
 
   preparePresentation(): Promise<void> {
     const resources = this.requireResources();
+    // Bound Medium's second scene draw before preparation allocates the live
+    // refraction buffer. Full physical gel keeps its requested resolution.
+    this.releaseReducedTransmissionCap ??= this.renderLayer.gelRendering.requestReducedTransmissionCap(0.5);
     resources.bobReflectionEnvironment ??= new BobReflectionEnvironment(
       this.renderLayer.renderer,
     );
@@ -2582,6 +2586,8 @@ export class BlackoutLevelRuntime {
   };
 
   private readonly unloadResources = (): void => {
+    this.releaseReducedTransmissionCap?.();
+    this.releaseReducedTransmissionCap = undefined;
     this.companions.reset();
     this.gameplayAudio?.dispose();
     this.gameplayAudio = undefined;
