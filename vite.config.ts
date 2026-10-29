@@ -4,6 +4,10 @@ const build=createBuildMetadata();
 
 export default defineConfig(({ mode }) => ({
   base: './',
+  // Local experiment snapshots can contain their own HTML and node_modules.
+  // Scan only the shipped entry and keep addons on the application's Three.js.
+  optimizeDeps: { entries: ['index.html'] },
+  resolve: { dedupe: ['three'] },
   define: {__SPECIMEN_BUILD__:JSON.stringify(build)},
   // Resolve the optional movie to an empty module before Vite emits assets.
   // Keep it available in development and explicit backup builds.

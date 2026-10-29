@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import * as THREE from 'three';
 import { CameraOcclusion } from '../../../src/render/CameraOcclusion.ts';
 import { exterminationOccluders } from '../../../src/boss/ExterminationOcclusion.ts';
@@ -22,6 +23,39 @@ function fixture() {
   const draw = () => { scene.updateMatrixWorld(true); helper.render(camera, () => submit()); };
   return { scene, frame, door, hidden, camera, calls, renderer, helper, submit, draw };
 }
+
+test('camera occlusion accepts foreign BufferAttributes and invalidates their changed bounds', () => {
+  // The CJS entry gives a genuinely distinct constructor, as a duplicate Vite
+  // dependency chunk does, without depending on a local experiment checkout.
+  const foreign = createRequire(import.meta.url)('three') as typeof THREE;
+  const f = fixture();
+  const position = new foreign.BufferAttribute(f.hidden.geometry.attributes.position!.array.slice(), 3);
+  assert.equal(position instanceof THREE.BufferAttribute, false);
+  f.hidden.geometry.setAttribute('position', position);
+  const helper = new CameraOcclusion(f.renderer, [], [f.hidden]);
+  const draw = () => helper.render(f.camera, () => f.submit());
+  f.scene.updateMatrixWorld(true); draw();
+  const before = f.hidden.geometry.boundingBox!.min.x;
+  for (let i = 0; i < position.count; i++) position.setX(i, position.getX(i) + 12);
+  position.needsUpdate = true; draw();
+  assert.equal(f.hidden.geometry.boundingBox!.min.x, before + 12);
+  assert.equal(f.calls.length, 2);
+});
+
+test('camera occlusion tracks the backing version of interleaved positions', () => {
+  const f = fixture();
+  const data = new THREE.InterleavedBuffer(new Float32Array(f.hidden.geometry.attributes.position!.array), 3);
+  const position = new THREE.InterleavedBufferAttribute(data, 3, 0);
+  f.hidden.geometry.setAttribute('position', position);
+  const helper = new CameraOcclusion(f.renderer, [], [f.hidden]);
+  f.scene.updateMatrixWorld(true);
+  helper.render(f.camera, () => f.submit());
+  const before = f.hidden.geometry.boundingBox!.min.x;
+  for (let i = 0; i < position.count; i++) position.setX(i, position.getX(i) + 12);
+  data.needsUpdate = true;
+  helper.render(f.camera, () => f.submit());
+  assert.equal(f.hidden.geometry.boundingBox!.min.x, before + 12);
+});
 
 test('arena camera occlusion keeps shadows, authoritative visibility and renderer ownership', () => {
   const f = fixture(); f.scene.updateMatrixWorld(true);
