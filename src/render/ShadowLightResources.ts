@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /** Keep comparison samplers valid, then skip the maps of unpowered sources. */
-export function setShadowMapUpdatesActive(light: THREE.SpotLight | THREE.PointLight, active: boolean): void {
+export function setShadowMapUpdatesActive(light: THREE.SpotLight | THREE.PointLight | THREE.DirectionalLight, active: boolean): void {
   light.shadow.autoUpdate = active;
   light.shadow.needsUpdate = active || light.shadow.map === null;
 }

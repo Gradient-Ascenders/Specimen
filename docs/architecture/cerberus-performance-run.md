@@ -133,7 +133,8 @@ visual qualification. The repeated routed pair and both baselines match exactly.
 Pooled steady-view medians differ by about 1%; no frame-rate gain is claimed.
 
 Build, production layout and 28 focused units pass. The Medium/1080p five-room
-travel/restart browser check passes in 4.4 minutes. High coverage remains queued. The corrected all-level graphics cycle passes
+travel/restart browser check passes in 4.4 minutes. The High-profile five-room travel/restart check also passes (3.1 minutes).
+The corrected all-level graphics cycle passes
 in 12.1 minutes: 12 mode changes, switching/fades and nine restarts, with no
 new live programs, inspections or GL errors. No production room visibility or simulation changes.
 
@@ -142,6 +143,34 @@ Raw evidence: `containment-reflection-{before,loop}[-repeat]/`,
 The extended upper-observation view adds 17 geometries / 51 buffer-storage calls
 in both versions: 13,056 bytes, 0.1–0.3 ms of measured submission time. This is
 outside the earlier entry-view coverage and is a lower-priority first-use item.
+
+## Retained inactive ending-sun shadow policy
+
+The ending sun retains its allocated shadow sampler while its intensity is
+zero. It updates whenever daylight becomes positive, including the first lit
+frame, and returns to the inactive policy on reset. Its 1024-square map,
+projection, shadow settings and authored intensity curve are unchanged.
+
+- Eight built Medium/1080p room images match exactly. Six ordinary views save
+  101 calls / 102,004 triangles per frame; two actual boss-combat views save
+  95 calls / 26,612 triangles. Counts include shadow and transmission passes.
+- All 74 cinematic checkpoints match exactly, including controlled research
+  handoff and first positive daylight. No new storage, programs or inspections
+  occur in the room or cinematic probes; the full-size sun map is retained.
+- Build/layout, 28 focused units and the full 512-unit suite pass. Medium
+  preparation/LOD and the complete ending journey pass (4.0 minutes). Blackout
+  shadow-profile resizing passes (8.8 minutes), with 12 ordinary draws and no
+  late allocation/program/inspection event. That focused test records, but
+  does not excuse, the known Cultivation allocation failure below.
+- Ready is 104.748 s versus 107.326 s; software frame-completion differences
+  of -1.3% to +0.3% are not a supported timing improvement. Work reduction is
+  the supported result.
+
+Raw evidence: `inactive-sun-rooms-built/` against `directional-shader-before/`,
+`inactive-sun-cinematics-{before,built}/`, `inactive-sun-functional.log`,
+`inactive-sun-profile-switch.log` and `sun-milestone-unit.log`. The original
+runtime control's two entries labelled Room 4 reused the Room 3 shortcut and
+are excluded; built comparisons use `teleportToFinalBoss()` and actual combat.
 
 ## Test and instrumentation corrections
 
@@ -187,7 +216,23 @@ was 103.575 s versus the retained viewport's 103.600 / 103.615 s; rehearsal was
 19.49 + 24.41 s. This is no useful improvement within measurement noise. No
 production scissor change was made. Raw control: `scissored-warmup-probe/`.
 
+The additional Containment irradiance-loop control matches all 21 room/doorway
+images, program counts and first-use events. Ready changes from 146.808 to
+145.148 s, while lighting preparation rises from 95.707 to 97.167 s and room
+completion timings move in both directions. This does not establish a useful
+gain; no production change is retained. Raw data: `containment-probe-{before,loop}/`.
+
 ## Current investigation and validation
+
+The generated-asset milestone stops at stale Containment radiance inputs.
+Untouched `08d9a5e`, using the same pinned dependencies, reproduces the failure:
+the checker omits four duct lights present in the committed bake input; all
+other input fields and remaining lights match. The standalone 512-unit suite
+passes. Cultivation's radiance check also reports stale inputs; an audit of
+every generated check on both revisions is queued. No lighting bake is changed.
+Raw evidence: `baseline-containment-provenance.log`,
+`containment-bake-input-{expected,actual,delta}.json` and
+`sun-milestone-generated*.log`.
 
 The same-shader shadow-profile test reproduces a pre-existing Cultivation
 failure on the untouched `08d9a5e` build. After the preparation gate, it allocates
@@ -199,30 +244,24 @@ Raw evidence: `shadow-allocation-baseline-results/` and
 `shadow-allocation-baseline-retry.log`. The initial artifact server attempt used
 the wrong working directory and never launched the test; it is excluded.
 
-CPU/heap attribution covers 13 regular room views at Medium/1080p. The final
-boss probe rejected an invalid zero-length diagnostic update; only that missing
-view is queued again with a valid fixed step. Readback waits dominate this
+CPU/heap attribution covers all 14 rooms at Medium/1080p. The first boss probe
+rejected an invalid zero-length diagnostic update; its dedicated retry passes
+in combat with a valid fixed step and no new programs or GL errors. Readback waits dominate this
 software renderer. Three's program-parameter/cache-key work and uniform-array
 flattening are prominent sampled allocation sites. Cultivation Room 3's sampled
 fixed updates have a 5.7 ms median versus roughly 2–4 ms in its other rooms.
 These profiler-assisted samples are diagnostic main-thread wall time, including
 blocking native calls, not evaluation-machine frame pacing. A frozen A/B/A
 experiment will test prepacked static lighting arrays before a source edit.
-Raw data: `runtime-cpu-baseline/` (partial; see its recorded final error).
+Text-typing work after staged room placement is expected and is not a steady
+playback baseline. Raw data: `runtime-cpu-baseline/` (13 valid views; see its
+recorded final error), `runtime-cpu-boss-baseline/` and `runtime-cpu-summary.json`.
 
 Manual capture review confirms the intended Containment doorway view, controlled
 research-to-combat camera and ending daylight view are present in the retained
-exact-image comparisons. New sunlight work still requires its own comparisons.
+exact-image comparisons, including the separate ending-sun comparisons above.
 
 ## Next work
-
-The zero-directional-shadow control removes 101 calls / 102,004 triangles per
-frame in six ordinary Blackout views, with identical pixels and unchanged body
-positions. The retained ending sun updates a 1024-square map while intensity is
-zero. Software wall-time differences are small/noisy; draw reduction is the
-supported result. Production adoption still needs daylight/first-use checks.
-The control's two entries labelled Room 4 incorrectly reused the Room 3 shortcut
-and are excluded; the actual boss shortcut is `teleportToFinalBoss()`.
 
 Tighter authored boxes in Cultivation Room 3 remove no triangles in the forward
 view and 6,420 / 1,169,504 (0.55%) in reverse, without pixel changes. That small
@@ -234,8 +273,13 @@ identical pixels but no useful timing gain. No camera-culling change is retained
 Raw controls: `zero-directional-shadows/`, `authored-box-control/` and
 `blackout-box-control/` beneath the artifact root.
 
-Next broader validation should exercise graphics changes and first-use coverage
-through those changes across levels. CPU/allocation attribution is queued for
-all rooms. Preserve independently positioned companions and authoritative
+A separate zero-radiance directional shader control matches all eight room
+images exactly, with unchanged draws/programs and no first-use changes.
+Software completion medians improve 5.2–8.2% in regular rooms and 2.2–2.6% in
+combat. A reverse-order repeat is queued; no production shader change yet.
+Raw evidence: `directional-shader-{before,guard}/`.
+
+Next: assess static uniform packing and repeated directional controls, and
+finish the generated-asset provenance audit. Preserve independently positioned companions and authoritative
 simulation. Real Alder Lake GPU loading, frame pacing, first-use behavior and
 visual checks remain outstanding.
