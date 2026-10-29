@@ -14,6 +14,10 @@ export interface CameraOccluder {
 }
 
 type Submit = THREE.WebGLRenderer['renderBufferDirect'];
+// Attributes produced by addons can come from another module instance. Test
+// the storage kind explicitly rather than treating a failed instanceof as interleaved.
+const positionVersion = (position: THREE.BufferAttribute | THREE.InterleavedBufferAttribute): number =>
+  'isInterleavedBufferAttribute' in position ? position.data.version : position.version;
 const unsafeMaterial = (material: THREE.Material): boolean => !material.depthTest || material instanceof THREE.ShaderMaterial ||
   !!('displacementMap' in material && material.displacementMap);
 const unsafeMaterials = (material: THREE.Material | THREE.Material[]): boolean =>
@@ -55,7 +59,7 @@ export class CameraOcclusion {
       if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
       const position = object.geometry.getAttribute('position');
       this.sources.set(object, { epoch: -1, hidden: false, geometry: object.geometry,
-        positionVersion: position instanceof THREE.BufferAttribute ? position.version : position.data.version,
+        positionVersion: positionVersion(position),
         instanceVersion: -1, count: -1 });
     });
   }
@@ -129,7 +133,7 @@ export class CameraOcclusion {
     if (geometry !== source.geometry || Object.keys(geometry.morphAttributes).length) return false;
     if (unsafeMaterials(mesh.material)) return false;
     const position = geometry.getAttribute('position');
-    const version = position instanceof THREE.BufferAttribute ? position.version : position.data.version;
+    const version = positionVersion(position);
     if (!geometry.boundingBox || source.positionVersion !== version) {
       geometry.computeBoundingBox(); source.positionVersion = version;
       source.instanceVersion = -1;
