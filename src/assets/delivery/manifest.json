@@ -1,0 +1,32 @@
+[
+  {
+    "source": "environments/containment-room-two/room-two-hall.glb",
+    "output": "room-two.bin",
+    "sourceBytes": 2345668,
+    "sourceSHA256": "ea8874e100143a53888ab0e47550442c92ac95ab544c235e98fb907438724167"
+  },
+  {
+    "source": "environments/containment-room-three/room-three-laboratory.glb",
+    "output": "room-three.bin",
+    "sourceBytes": 3509852,
+    "sourceSHA256": "06c6435c6a907db8f9fe7080243b285817ce009eff69d0f1753aece990c00293"
+  },
+  {
+    "source": "environments/containment-room-four/room-four-lift.glb",
+    "output": "room-four.bin",
+    "sourceBytes": 1358252,
+    "sourceSHA256": "9cab25baa31afe58f19e35a0a254d14b383b2799c8757501ab5fa6870fb4d440"
+  },
+  {
+    "source": "environments/containment-room-five/room-five-atrium.glb",
+    "output": "room-five.bin",
+    "sourceBytes": 2668084,
+    "sourceSHA256": "83c631c66308cf3bef0da7ed395f4fb8918d1fcf08a0e2f2646b6e584a56510c"
+  },
+  {
+    "source": "characters/specimen/variants/lightning-only/specimen-lightning-only.glb",
+    "output": "specimen.bin",
+    "sourceBytes": 9801168,
+    "sourceSHA256": "f2ce712cc4dc09195378a683771df4b77660e490258649120de2c34b0d5313ab"
+  }
+]

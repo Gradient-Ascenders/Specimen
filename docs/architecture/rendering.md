@@ -36,7 +36,10 @@ preserving borrowed shared resources.
 
 Environment geometry is authored in Blender and supplemented by generated
 surface, geometry and radiance banks. These are prepared offline and loaded by
-the runtime. Substantial opaque surfaces must not overlap; moving assemblies
+the runtime. Delivery banks losslessly compress selected GLBs; the original GLBs
+remain the authoring source. Shared shader programs and prepacked lighting
+layouts reduce repeated preparation. The Containment vent retains its own art,
+collision contract and visibility branch. Substantial opaque surfaces must not overlap; moving assemblies
 must retain their authored pivots and material bindings. Keep emission,
 transparency, lighting and real shadow ownership explicit.
 

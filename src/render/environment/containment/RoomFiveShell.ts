@@ -1,10 +1,11 @@
 import * as THREE from 'three';
+import { readGzipResponse } from '../ReadGzipResponse.ts';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import type {ContainmentArtMaterials} from './ContainmentArtResources.ts';
 import type {AuthoredLaserEmitter,LaserHazardPresentation} from '../../hazards/LaserHazardPresentation.ts';
 
 const PARTS=['Architecture','Escape','Cell','Front','Rear','Left','Right','CarriageOne','CarriageTwo','Locks','Status','ButtonCap'] as const;
-export const ROOM_FIVE_SHELL_URL=new URL('../../../../assets/environments/containment-room-five/room-five-atrium.glb',import.meta.url).href;
+export const ROOM_FIVE_SHELL_URL=new URL('../../../assets/delivery/room-five.bin',import.meta.url).href;
 export type RoomFiveShellLoader=(signal:AbortSignal)=>Promise<THREE.Group>;
 
 export async function parseRoomFiveShell(bytes:ArrayBuffer):Promise<THREE.Group>{
@@ -17,7 +18,7 @@ export async function parseRoomFiveShell(bytes:ArrayBuffer):Promise<THREE.Group>
 async function loadShell(signal:AbortSignal):Promise<THREE.Group>{
   const response=await fetch(ROOM_FIVE_SHELL_URL,{signal});
   if(!response.ok)throw new Error('Could not load Room 5 atrium art.');
-  return parseRoomFiveShell(await response.arrayBuffer());
+  return parseRoomFiveShell(await readGzipResponse(response,signal));
 }
 
 /** Geometry consumes the existing panel, platform and button transforms.

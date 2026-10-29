@@ -11,6 +11,9 @@ import { disposeSpecimenAsset, loadSpecimenAsset, SPECIMEN_RESTING_SOLE, SPECIME
 import { SpecimenMaterials } from './SpecimenMaterials.ts';
 import { SpecimenTrail } from './SpecimenTrail.ts';
 import { SpecimenActionEffects } from './SpecimenActionEffects.ts';
+import { CharacterDetail, loadCharacterDetail, type CharacterDetailIndices } from '../slime/CharacterDetail.ts';
+
+export const SPECIMEN_DETAIL_URL = new URL('../../assets/characters/specimen-lod.bin', import.meta.url).href;
 
 export interface SpecimenCharacterState {
   readonly position: Vector3State;
@@ -78,6 +81,7 @@ export class SpecimenCharacterPresentation {
   private readonly shotDirection = new THREE.Vector3(0, 0, -1);
   private asset: SpecimenAsset | undefined;
   private materials: SpecimenMaterials | undefined;
+  private detail: CharacterDetail | undefined;
   private pending: Promise<void> | undefined;
   private disposed = false;
   private visible = false;
@@ -139,11 +143,17 @@ export class SpecimenCharacterPresentation {
       meshCount: this.asset?.meshes.length ?? 0, soleOffset: -this.radiusMetres,
       meshes: this.asset?.meshes.map(mesh => ({ name: mesh.name, weights: [...mesh.morphTargetInfluences!] })) ?? [] };
   }
-  prepare(loader: () => Promise<THREE.Group> = loadSpecimenAsset): Promise<void> {
+  prepare(loader: () => Promise<THREE.Group> = loadSpecimenAsset,
+    detailLoader: (() => Promise<readonly CharacterDetailIndices[]>) | undefined = loader === loadSpecimenAsset
+      ? () => loadCharacterDetail(SPECIMEN_DETAIL_URL) : undefined): Promise<void> {
     if (this.disposed) return Promise.reject(new Error('Cannot prepare disposed Specimen'));
     if (this.ready) return Promise.resolve();
     if (this.pending) return this.pending;
-    const pending = Promise.resolve().then(loader).then(root => {
+    // Optional detail failure retains the complete authored model. Fetch both
+    // together, then install the one immutable index buffer before any draw.
+    const detailReady = detailLoader ? Promise.resolve().then(detailLoader).catch(() => undefined) : undefined;
+    const pending = Promise.resolve().then(loader).then(async root => {
+      const indices = await detailReady;
       if (this.disposed) { disposeSpecimenAsset(root); return; }
       try {
         const asset = validateSpecimenAsset(root);
@@ -156,9 +166,14 @@ export class SpecimenCharacterPresentation {
           mesh.geometry.computeBoundingSphere();
           mesh.geometry.boundingSphere!.radius += 0.35;
         }
+        if (indices) {
+          try { this.detail = new CharacterDetail(root, asset.meshes, indices); }
+          catch { /* Optional detail must not prevent the final form loading. */ }
+        }
         this.shape.add(root); this.asset = asset; this.materials = materials;
         this.applyVisibility(); this.present(1);
       } catch (error) {
+        this.detail?.dispose(); this.detail = undefined;
         this.cameraVisibility.dispose(); disposeSpecimenAsset(root, this.environment); throw error;
       }
     });
@@ -167,6 +182,8 @@ export class SpecimenCharacterPresentation {
     return pending;
   }
   setCameraView(rig: CameraRig, target: CameraFollowTarget): void { this.cameraVisibility.configure(rig, target); }
+  updateDetail(camera: THREE.Camera, combatBudget = false): void { this.detail?.update(camera, combatBudget ? 1.4 : .1, combatBudget); }
+  get detailDiagnostics() { return this.detail?.diagnostics; }
   setPosition(position: Vector3State): void { this.placement.position.set(position.x, position.y, position.z); }
   /** Level heading restored on recovery, independent of temporary cinematic turns. */
   setSpawnYaw(yaw: number): void { this.spawnYaw = yaw; this.setYaw(yaw); }
@@ -388,6 +405,7 @@ export class SpecimenCharacterPresentation {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true; this.cameraVisibility.dispose();
+    this.detail?.dispose(); this.detail = undefined;
     if (this.asset) disposeSpecimenAsset(this.asset.root, this.environment);
     this.asset = undefined; this.materials = undefined; this.burst.dispose(); this.trail.dispose(); this.effects.dispose(); this.root.removeFromParent(); this.root.clear();
   }

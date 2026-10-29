@@ -151,6 +151,7 @@ test('boss defeat plays the balanced struggle, unmerge, last stand, daylight and
       r.render(1, { frameDeltaSeconds: 1 / 60 });
       const ray = new (l.cameraRig.camera.position.constructor)(); l.cameraRig.camera.getWorldDirection(ray);
       return { png: l.canvas.toDataURL('image/png'), metrics: { ...r.resources.defeatFinale.diagnostics,
+        effectsDensity: l.graphicsConfiguration.effectsDensity,
         camera: l.cameraRig.camera.position.toArray(), direction: ray.toArray(), glError: l.renderer.getContext().getError(),
         programs: l.renderer.info.programs.length, calls: l.renderer.info.render.calls, triangles: l.renderer.info.render.triangles } };
     });
@@ -161,7 +162,7 @@ test('boss defeat plays the balanced struggle, unmerge, last stand, daylight and
     if (t === endingGoopHitTime(2) + .08) { expect(frame.metrics.effects.directHits).toBeGreaterThan(0); expect(frame.metrics.effects.incoming).toBeGreaterThan(0); }
     if (t >= T.destruction && t < T.black) {
       expect(frame.metrics.visibleDrones).toBe(0); expect(frame.metrics.actors.find((a: any) => a.id === 'goop').visible).toBe(false);
-      expect(frame.metrics.effects.smoke).toBeGreaterThan(120); expect(frame.metrics.effects.explosions).toBeGreaterThan(0);
+      expect(frame.metrics.effects.smoke).toBeGreaterThan(120 * frame.metrics.effectsDensity); expect(frame.metrics.effects.explosions).toBeGreaterThan(0);
     }
     metrics.push(frame.metrics); await writeFile(info.outputPath(`${name}.png`), Buffer.from(frame.png.split(',')[1]!, 'base64'));
     if (t === T.black + 2) expect(await page.locator('.ending-flash').evaluate(e => getComputedStyle(e).opacity)).toBe('1');

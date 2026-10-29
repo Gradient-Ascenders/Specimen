@@ -699,3 +699,17 @@ test('elevator stopping activates the Room 5 entry checkpoint before the player 
   collisionWorld.clear();
   scene.dispose();
 });
+
+test('vent lining remains visible when completed Room 1 art is culled at the exit', () => {
+  const scene = new ContainmentLevelScene(() => {});
+  try {
+    scene.lighting.setActiveRoom(2);
+    scene.withEnclosedRoomOcclusion({x:-8.4,y:10.95,z:28.8},{x:-8.4,y:11.7,z:30.6},()=>{
+      assert.equal(scene.teaching.roomOneArt.root.visible, false);
+      for (let object: THREE.Object3D | null = scene.teaching.ventArt.root; object; object = object.parent) {
+        assert.equal(object.visible, true, `${object.name} hides the connecting vent`);
+      }
+    });
+    assert.equal(scene.teaching.roomOneArt.root.visible, true);
+  } finally { scene.dispose(); }
+});

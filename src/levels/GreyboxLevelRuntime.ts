@@ -2222,6 +2222,7 @@ export class GreyboxLevelRuntime {
       programsBefore: number; programsAfterCompile: number;
     }>();
     const programBindings = new ProgramBindingPrewarm();
+    const preparedDepthVariants = new Set<string>();
     const isCurrent = (): boolean =>
       this.resources === resources &&
       this.lightingPrewarmGeneration === generation;
@@ -2280,7 +2281,7 @@ export class GreyboxLevelRuntime {
             // caster. Compile their actual depth materials independently.
             // Depth programs are independent of the visible light layout.
             if (!chamberScope) {
-              const depthBatch = createDepthPrewarmGroup(compileSubset);
+              const depthBatch = createDepthPrewarmGroup(compileSubset, preparedDepthVariants);
               this.depthPrewarmGroups.push(depthBatch);
               this.compilingDepthGroups.add(depthBatch);
               const shadowScene = new THREE.Scene();
@@ -2324,7 +2325,8 @@ export class GreyboxLevelRuntime {
               // That smaller layout can already see the new hall's finishes.
               const saved=prewarmCamera.clone();
               const ductSubset=createCompileSubset('containment-duct-exit-shader-prewarm-subset',
-                [...resources.testScene.teaching.roomTwoArt.shell.renderMeshes,
+                [resources.testScene.teaching.ventArt.root,
+                  ...resources.testScene.teaching.roomTwoArt.shell.renderMeshes,
                   ...(resources.testScene.roomThree.art.shell.ready?resources.testScene.roomThree.renderSources:[])]);
               try{
                 prewarmCamera.position.set(-8.289,11.671,24.008);
@@ -2690,6 +2692,9 @@ function createRoomPrewarmSources(
   );
   const sources: THREE.Object3D[] = [
     lightingRoot,
+    // The connecting duct survives Room 1 occlusion. Prepare its fixed-shading
+    // materials for later room layouts and both output colour spaces as well.
+    resources.testScene.teaching.ventArt.root,
     ...(!chamberScope ? [resources.testScene.roomFive.goopPresentation.root] : []),
     resources.slimePairPresentation.root,
     resources.goopAcidPresentation.root,
@@ -2848,6 +2853,8 @@ function compileObjectSignature(
     morphAttributes,
     object.receiveShadow ? 'receiver' : 'non-receiver',
     object.castShadow ? 'caster' : 'non-caster',
+    object.customDepthMaterial?.uuid ?? '',
+    object.customDistanceMaterial?.uuid ?? '',
   ].join('|');
 }
 
@@ -2869,9 +2876,16 @@ function cloneCompileObject(
     clone.castShadow = object.castShadow;
     clone.receiveShadow = object.receiveShadow;
     clone.layers.mask = object.layers.mask;
+    clone.customDepthMaterial = object.customDepthMaterial;
+    clone.customDistanceMaterial = object.customDistanceMaterial;
     return clone;
   }
-  return object.clone(false);
+  const clone = object.clone(false);
+  // Object3D.copy does not carry custom shadow materials. Keep the live
+  // deformation/dissolve programs in the compiler pass, before real primers.
+  clone.customDepthMaterial = object.customDepthMaterial;
+  clone.customDistanceMaterial = object.customDistanceMaterial;
+  return clone;
 }
 
 function disposeCompileInstances(root: THREE.Object3D): void {

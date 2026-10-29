@@ -5,8 +5,10 @@ import {BLACKOUT_RADIANCE_LAYOUT as ZONES,BLACKOUT_ATLAS_WIDTH as WIDTH,BLACKOUT
 
 let offset=0;
 const offsets=ZONES.map(z=>{const start=offset;offset+=z.grid[2]+2;return start;});
-const layout={bkMin:{value:ZONES.map(z=>new THREE.Vector3(...z.min))},bkMax:{value:ZONES.map(z=>new THREE.Vector3(...z.max))},
-  bkGrid:{value:ZONES.map(z=>new THREE.Vector3(...z.grid))},bkCapture:{value:ZONES.map(z=>new THREE.Vector3(...z.capture))},bkOffset:{value:offsets}};
+// Immutable layout vectors already match WebGL storage; avoid flattening
+// Vector3 arrays again for every material draw.
+const layout={bkMin:{value:new Float32Array(ZONES.flatMap(z => z.min))},bkMax:{value:new Float32Array(ZONES.flatMap(z => z.max))},
+  bkGrid:{value:new Float32Array(ZONES.flatMap(z => z.grid))},bkCapture:{value:new Float32Array(ZONES.flatMap(z => z.capture))},bkOffset:{value:offsets}};
 export interface BlackoutRadianceUniforms {
   bkVolume:THREE.IUniform<THREE.Data3DTexture>;
   bkPower:THREE.IUniform<number[]>;

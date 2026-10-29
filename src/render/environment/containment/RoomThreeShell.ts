@@ -1,9 +1,10 @@
 import * as THREE from 'three';
+import { readGzipResponse } from '../ReadGzipResponse.ts';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import type {ContainmentArtMaterials} from './ContainmentArtResources.ts';
 import type {AuthoredLaserEmitter,LaserHazardPresentation} from '../../hazards/LaserHazardPresentation.ts';
 
-export const ROOM_THREE_SHELL_URL=new URL('../../../../assets/environments/containment-room-three/room-three-laboratory.glb',import.meta.url).href;
+export const ROOM_THREE_SHELL_URL=new URL('../../../assets/delivery/room-three.bin',import.meta.url).href;
 export type RoomThreeShellLoader=(signal:AbortSignal)=>Promise<THREE.Group>;
 
 export async function parseRoomThreeShell(bytes:ArrayBuffer):Promise<THREE.Group>{
@@ -20,7 +21,7 @@ export async function parseRoomThreeShell(bytes:ArrayBuffer):Promise<THREE.Group
 async function loadShell(signal:AbortSignal):Promise<THREE.Group>{
   const response=await fetch(ROOM_THREE_SHELL_URL,{signal});
   if(!response.ok)throw new Error('Could not load Room 3 architecture.');
-  return parseRoomThreeShell(await response.arrayBuffer());
+  return parseRoomThreeShell(await readGzipResponse(response,signal));
 }
 
 /** Geometry and a vertex-wear material only. Existing owners retain the acid,

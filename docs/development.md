@@ -18,8 +18,7 @@ npm run test:smoke
 
 `build` includes TypeScript checking. Generated-asset checks compare checked-in
 banks, geometry and provenance against their sources. Keep the curated unit
-suite within its 500 expanded-case cap and replace overlapping coverage when
-adding regressions.
+suite focused and replace overlapping coverage when adding regressions.
 
 Smoke tests serve the build at `/group-folder/` with one software-rendering
 worker. `npm run test:integration` runs longer graphics, HUD, audio and fallback
@@ -71,6 +70,8 @@ are separate from a complete human playthrough and hardware acceptance.
 `node scripts/diagnostics/benchmark-level-two-performance.mjs` uses `SPECIMEN_CDP_URL` to connect to a hardware
 Chrome debug endpoint. Compare matched builds, settings, viewport and hardware
 without concurrent GPU workloads.
+`node scripts/diagnostics/benchmark-first-loading.mjs` captures initial loading;
+`node scripts/assets/generate-delivery-assets.mjs` reproduces lossless GLB banks.
 `scripts/diagnostics/performance-budgets.proposed.json` contains planning targets,
 not approved requirements. Performance qualification consumes explicit evidence
 and budgets; do not treat a proposed file as hardware acceptance.

@@ -15,6 +15,7 @@ const generators = [
   'generate-cultivation-radiance.ts',
   'generate-blackout-maintenance-art.ts',
   'generate-blackout-radiance.ts',
+  'generate-delivery-assets.mjs',
 ];
 
 for (const generator of generators) {

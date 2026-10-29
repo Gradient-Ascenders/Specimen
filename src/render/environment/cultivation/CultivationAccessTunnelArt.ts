@@ -27,11 +27,13 @@ export class CultivationAccessTunnelArt {
       material.emissiveMap = source.map;
       // Retain established runoff, floor wear and membrane hooks on these copies.
       material.onBeforeCompile = (shader, renderer) => source.onBeforeCompile(shader, renderer);
-      material.customProgramCacheKey = () => `${source.customProgramCacheKey()}:access-${name}-v1`;
+      material.customProgramCacheKey = () => source.customProgramCacheKey();
       this.materials.push(material);
       return material;
     };
     this.wall = finish(contamination.finishes.wall, 'stained-panels', 0x929383, .96);
+    const wallKey = this.wall.customProgramCacheKey;
+    this.wall.customProgramCacheKey = () => `${wallKey()}:access-stained-panels-v1`;
     this.wall.userData.tileSizeMetres = [2, 1.1];
     const wallHook = this.wall.onBeforeCompile;
     this.wall.onBeforeCompile = (shader, renderer) => {
@@ -45,6 +47,8 @@ export class CultivationAccessTunnelArt {
       `);
     };
     this.floor = finish(contamination.finishes.floor, 'greasy-deck', 0x7b8071, .83, .012);
+    const floorKey = this.floor.customProgramCacheKey;
+    this.floor.customProgramCacheKey = () => `${floorKey()}:access-greasy-deck-v1`;
     this.floor.userData.tileSizeMetres = [1.6, 1.6];
     const floorHook = this.floor.onBeforeCompile;
     this.floor.onBeforeCompile = (shader, renderer) => {
@@ -67,6 +71,8 @@ export class CultivationAccessTunnelArt {
     this.sticky.normalScale.set(.42, .42);
     this.sticky.userData.tileSizeMetres = [3.5, 5];
     this.waste = finish(lab.acid, 'stagnant-waste', 0x46501a, .46);
+    const wasteKey = this.waste.customProgramCacheKey;
+    this.waste.customProgramCacheKey = () => `${wasteKey()}:access-stagnant-waste-v1`;
     const acidHook = this.waste.onBeforeCompile;
     // Borrow the shared liquid clock and ripple pool, while tinting only these
     // shallow deposits. Goop wakes still use the same authoritative surface bounds.

@@ -18,8 +18,8 @@ link its issue or agreed task in the pull request.
 - Store local captures, reports and benchmarks under ignored `artifacts/`.
   Attach review evidence to issues/PRs or retain it in CI artifacts.
 - Keep local configuration in ignored `.env` files and safe examples only.
-- Add proportionate coverage for meaningful behavior changes. Keep the curated
-  unit suite within its 500 expanded-case cap by replacing overlapping coverage.
+- Add proportionate coverage for meaningful behavior changes. Keep the unit
+  suite focused and replace overlapping coverage when adding regressions.
 
 ## Validation and delivery
 

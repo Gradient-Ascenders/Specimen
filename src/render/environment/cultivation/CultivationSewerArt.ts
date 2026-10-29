@@ -24,7 +24,7 @@ export class CultivationSewerArt {
       m.name = `cultivation-sewer-${name}`; m.color.setHex(color); m.roughness = roughness;
       m.emissive.setHex(0); m.emissiveIntensity = 0;
       m.onBeforeCompile = source.onBeforeCompile;
-      const key = source.customProgramCacheKey(); m.customProgramCacheKey = () => `${key}:sewer-${name}`;
+      const key = source.customProgramCacheKey(); m.customProgramCacheKey = () => key;
       this.materials.push(m); return m;
     };
     this.lining = finish(contamination.finishes.wall, 'acid-etched-lining', 0xb7b39b, .94);
@@ -39,6 +39,8 @@ export class CultivationSewerArt {
     this.rubber = finish(lab.metal, 'oil-black-machinery', 0x282e29, .86);
     this.mineral = finish(lab.pole, 'mineral-crust', 0xb5ae82, 1);
     this.waste = finish(lab.acid, 'industrial-effluent', 0xffffff, lab.acid.roughness);
+    const wasteKey = this.waste.customProgramCacheKey();
+    this.waste.customProgramCacheKey = () => `${wasteKey}:sewer-industrial-effluent`;
     const liquidHook = lab.acid.onBeforeCompile;
     this.waste.onBeforeCompile = (shader, renderer) => {
       liquidHook.call(lab.acid, shader, renderer);
@@ -55,6 +57,8 @@ export class CultivationSewerArt {
     };
     // Keep original drainage visibility under the existing lights; this is surface finish only.
     for (const m of [this.lining, this.bank]) {
+      const sourceKey = m.customProgramCacheKey();
+      m.customProgramCacheKey = () => `${sourceKey}:sewer-runoff-v1`;
       // Most of the finish stays matte; the shader's wet patches still need
       // the local environment even though the base roughness is high.
       m.userData.cultivationLocalReflection = true;

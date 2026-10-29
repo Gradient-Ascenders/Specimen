@@ -36,11 +36,11 @@ test('Room 1 keeps prepared chamber and vent lighting through looking, climbing,
     };
     const poses=[
       ['chamber',[1.8,.46,-3.3],[2.375,1.565,-5.55],[1.8,.8,-3.3],3],
-      ['look into vent',[0,.46,-2.6],[0,1.7,-4],[-4.8,5.9,5.9],10],
-      ['climb approach',[-4.8,4.6,5],[-4.8,4.2,2.7],[-4.8,5.9,6],10],
-      ['vent entry',[-4.8,5.7,6.5],[-4.8,6.2,3.6],[-4.8,6,7],10],
-      ['low duct',[-4.8,5.7,10.5],[-4.8,6.25,7],[-4.8,5.9,11.5],10],
-      ['retreat trailing camera',[-4.8,4.4,5.1],[-4.8,6,6.5],[-4.8,4.4,5.1],10],
+      ['look into vent',[0,.46,-2.6],[0,1.7,-4],[-4.8,5.9,5.9],3],
+      ['climb approach',[-4.8,4.6,5],[-4.8,4.2,2.7],[-4.8,5.9,6],3],
+      ['vent entry',[-4.8,5.7,6.5],[-4.8,6.2,3.6],[-4.8,6,7],3],
+      ['low duct',[-4.8,5.7,10.5],[-4.8,6.25,7],[-4.8,5.9,11.5],3],
+      ['retreat trailing camera',[-4.8,4.4,5.1],[-4.8,6,6.5],[-4.8,4.4,5.1],3],
       ['turn away',[0,.46,-2.6],[0,1.7,-4],[1,.8,0],3],
     ] as const;
     const samples=[];
@@ -74,6 +74,6 @@ test('Room 1 keeps prepared chamber and vent lighting through looking, climbing,
   expect(result.preparation.roomOneChamberPrepared).toBe(true);
   for(const sample of result.samples){expect(sample.spots,sample.name).toBe(sample.expected);expect(sample.programs,sample.name).toBe(result.baseline);expect(sample.error,sample.name).toBe(0);}
   expect(result.pixels.maxDifference).toBeLessThanOrEqual(1);expect(result.pixels.changed).toBe(0);
-  expect(result.maps).toHaveLength(7);expect(result.maps.every(Boolean)).toBe(true);expect(result.restartMaps).toEqual(result.maps);
+  expect(result.maps).toHaveLength(3);expect(result.maps.every(Boolean)).toBe(true);expect(result.restartMaps).toEqual(result.maps);
   expect(result.restart.spots).toBe(3);expect(result.restart.programs).toBe(result.baseline);expect(result.restart.error).toBe(0);expect(errors).toEqual([]);
 });

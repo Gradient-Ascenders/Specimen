@@ -4,7 +4,7 @@ import {finishOpening} from '../helpers/OpeningHandoff.ts';
 import {GRAPHICS_PROFILES} from '../../src/render/GraphicsProfiles.ts';
 
 test('recorded duct, Room 2 and Room 3 entry views create no programs after preparation',async({page})=>{
-  test.setTimeout(300_000);await page.setViewportSize({width:800,height:500});
+  test.setTimeout(300_000);await page.setViewportSize({width:1083,height:400});
   const errors:string[]=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
@@ -34,7 +34,15 @@ test('recorded duct, Room 2 and Room 3 entry views create no programs after prep
     // Actor/camera positions from the reported hardware capture. Room 1 remains
     // the checkpoint during Room 2 traversal, just as in the original recording.
     const poses=[
+      ['vent-look-back',1,[-8.4,10.95,28.8],[-8.4,11.7,30.6]],
       ['duct',1,[-8.797,10.945,25.98],[-8.289,11.671,24.008]],
+      // Crossing the room boundary inside the temporary scope, then letting
+      // the camera leave it, used to restore six-point padding while keeping
+      // the same cache key as the prepared seven-point Room 2 layout.
+      ['vent-drop-inside-scope',1,[-8.8,10.95,29],[-8.8,11.7,27]],
+      ['vent-drop-outside-scope',1,[-8.8,10.95,29],[-8.8,11.7,31]],
+      ['vent-drop-look-left',1,[-8.8,10.95,29],[-10.8,11.7,29]],
+      ['vent-drop-look-right',1,[-8.8,10.95,29],[-6.8,11.7,29]],
       ['lower-route',1,[.256,3.26,35.572],[-3.143,5.197,39.649]],
       ['side-jump',1,[4.951,6.21,32.55],[5.439,5.384,27.847]],
       ['sticky-wall',1,[14.215,10.005,39.983],[14.293,4.6,39.287]],

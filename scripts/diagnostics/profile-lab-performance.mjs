@@ -334,7 +334,7 @@ try {
 			// Expose the composition roots before load; preserve all production code.
 			body = body.replace(/\{initialRuntime:([\w$]+)/, '{initialRuntime:globalThis.__attach($1,"__one")');
 			body = body.replace(/return new ([\w$]+)\.CultivationLevelRuntime\((\{[^;]*?\})\)/, "return globalThis.__attach(new $1.CultivationLevelRuntime($2),\"__two\")");
-			body = body.replace(/return new ([\w$]+)\.BlackoutLevelRuntime\((\{[^;]*?\})\)/, "return globalThis.__attach(new $1.BlackoutLevelRuntime($2),\"__three\")");
+			body = body.replace(/new ([\w$]+)\.BlackoutLevelRuntime\((\{[^;]*?\})\)/, "globalThis.__attach(new $1.BlackoutLevelRuntime($2),\"__three\")");
 			await route.fulfill({
 				response,
 				body

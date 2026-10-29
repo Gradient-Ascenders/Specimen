@@ -7,6 +7,10 @@ import { SpecimenDash } from '../combat/SpecimenDash.ts';
 import type { AudioPlayback } from '../audio/AudioManager.ts';
 import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import * as THREE from 'three';
+import { CinematicCompileCache } from '../render/CinematicCompileCache.ts';
+import { HiddenMaterialCulling } from '../render/HiddenMaterialCulling.ts';
+import { BlackoutShutterOcclusion } from '../render/environment/blackout/BlackoutShutterOcclusion.ts';
+import { CameraOcclusion } from '../render/CameraOcclusion.ts';
 import { GoopCharacterPresentation, type GoopCharacterPresentationState } from '../render/goop/GoopCharacterPresentation.ts';
 import { GelReflectionLighting } from '../render/slime/GelReflectionLighting.ts';
 import {BlackoutLightingPass} from '../render/environment/blackout/BlackoutLightingPass.ts';
@@ -287,6 +291,16 @@ export class BlackoutLevelRuntime {
   private completionEmitted = false;
   private presentationPreparation: Promise<void> | undefined;
   private programPreparation: BlackoutPresentationPreparation | undefined;
+  private releaseReducedTransmissionCap: (() => void) | undefined;
+  private releaseBossTransmissionCap: (() => void) | undefined;
+  private hiddenMaterialCulling: HiddenMaterialCulling | undefined;
+  private shutterOcclusion: BlackoutShutterOcclusion | undefined;
+  private arenaOcclusion: CameraOcclusion | undefined;
+  private readonly drawRenderLayer = (): void => { this.renderLayer.render(); };
+  private readonly drawPreparedScene = (): void => {
+    if (this.hiddenMaterialCulling) this.hiddenMaterialCulling.render(this.drawRenderLayer);
+    else this.drawRenderLayer();
+  };
   private readonly preparationCamera = new THREE.PerspectiveCamera();
   private readonly authoredRoomOne: boolean;
   private readonly playArrival:boolean;
@@ -455,6 +469,9 @@ export class BlackoutLevelRuntime {
 
   preparePresentation(): Promise<void> {
     const resources = this.requireResources();
+    // Bound Medium's second scene draw before preparation allocates the live
+    // refraction buffer. Full physical gel keeps its requested resolution.
+    this.releaseReducedTransmissionCap ??= this.renderLayer.gelRendering.requestReducedTransmissionCap(0.5);
     resources.bobReflectionEnvironment ??= new BobReflectionEnvironment(
       this.renderLayer.renderer,
     );
@@ -486,6 +503,16 @@ export class BlackoutLevelRuntime {
       resources.researchFinale?.ready,
     ]).then(async () => {
       if (this.resources !== resources) return;
+      this.hiddenMaterialCulling = new HiddenMaterialCulling(this.renderLayer.scene);
+      const ascentRearGate = resources.scene.bossStaging?.ascentLift?.rearGate;
+      if (ascentRearGate) this.shutterOcclusion = new BlackoutShutterOcclusion(
+        this.renderLayer.renderer, ascentRearGate, resources.scene.root,
+      );
+      if (resources.scene.finalArena) this.arenaOcclusion = new CameraOcclusion(
+        this.renderLayer.renderer, resources.scene.finalArena.cameraOccluders,
+        [resources.scene.maintenanceBay?.root, resources.scene.transitRoom?.root,
+          resources.scene.bossStaging?.root, resources.transit?.root].filter((root): root is THREE.Group => !!root),
+      );
       resources.researchFinale?.connectArenaCutout(this.renderLayer.renderer);
       // The retained light layout includes distant and unpowered fixtures.
       // Reuse the tested finite-light guard before warming all material forms;
@@ -527,6 +554,7 @@ export class BlackoutLevelRuntime {
         const layer = this.renderLayer, renderer = layer.renderer;
         const yieldFrame = () => new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()));
         const current = () => this.resources === resources;
+        const cinematicPrograms = new CinematicCompileCache();
         const visibility = layer.canvas.style.visibility;
         layer.canvas.style.visibility = 'hidden';
         try { const warmFrame = async (camera: THREE.PerspectiveCamera) => {
@@ -534,20 +562,32 @@ export class BlackoutLevelRuntime {
           const shadows = renderer.shadowMap.enabled;
           const withLights = <T>(action: () => T): T => resources.lighting?.lightLayout
             ? resources.lighting.lightLayout.withLayout(camera, camera.position, action) : action();
-          await withLights(() => layer.withShadowPreparation(shadows, () => renderer.compileAsync(layer.scene, camera)));
+          await withLights(() => layer.withShadowPreparation(shadows, () => cinematicPrograms.compile(renderer, layer.scene, camera)));
           if (!current()) return;
           const viewport = renderer.getViewport(new THREE.Vector4()), transmissionScale = renderer.transmissionResolutionScale;
           withLights(() => withIsolatedPrewarmState(renderer, () => {
             // Each shot can select previously unused lamps. Allocate their
             // depth samplers before the receiver draw freezes shadow updates.
             if (shadows) prepareShadowSamplerMaps(renderer, layer.scene, camera);
-            renderer.setViewport(viewport); renderer.setScissorTest(false); renderer.transmissionResolutionScale = transmissionScale;
-            layer.withShadowPreparation(shadows, () => renderer.render(layer.scene, camera));
+            // These temporary cinematic cameras only rehearse programs/uploads.
+            // The retained gameplay camera's full-size transmission target was
+            // already primed by BlackoutPresentationPreparation. Keep that
+            // storage and the full-size shadow maps; bound only the hidden
+            // rehearsal raster work, drawing every shot and fencing below.
+            const ratio = renderer.getPixelRatio();
+            const scale = Math.min(1, 16 / (viewport.z * ratio), 9 / (viewport.w * ratio));
+            const minimumSpan = Math.ceil(1 / transmissionScale) / ratio;
+            renderer.setViewport(0, 0, Math.max(minimumSpan, viewport.z * scale), Math.max(minimumSpan, viewport.w * scale));
+            renderer.setScissorTest(false); renderer.transmissionResolutionScale = transmissionScale;
+            layer.withShadowPreparation(shadows, () => this.hiddenMaterialCulling!.render(() => renderer.render(layer.scene, camera)));
           }));
-          await waitForGpuPreparation(renderer.getContext(), yieldFrame, current);
         };
           await resources.researchFinale?.primePresentationFrames(layer.scene, warmFrame, current);
           await resources.defeatFinale?.primePresentationFrames(warmFrame, current);
+          // Every rehearsal submits to the same context. One fence drains all
+          // preceding shots, allowing their uploads and CPU preparation to
+          // overlap instead of stopping the pipeline at each camera pose.
+          await waitForGpuPreparation(renderer.getContext(), yieldFrame, current);
         } finally {
           const clearColor = renderer.getClearColor(new THREE.Color()), clearAlpha = renderer.getClearAlpha();
           withIsolatedPrewarmState(renderer, () => {
@@ -1587,6 +1627,7 @@ export class BlackoutLevelRuntime {
 
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void {
     const resources = this.resources;
+    resources?.defeatFinale?.effects.setDensity(this.renderLayer.graphicsConfiguration.effectsDensity);
     if (resources) {
       this.renderLayer.cameraRig.setThirdPersonOverride(!resources.deathSequence.isPlaying || !!resources.ventArrival?.active || !!resources.elevatorAscent?.active || !!resources.researchFinale?.active || !!resources.finalBoss?.cinematic ||
         resources.phase.phase === 'merging' || resources.phase.phase === 'splitting' ||
@@ -1695,6 +1736,16 @@ export class BlackoutLevelRuntime {
       camera.position.set(-7,4.5,191);camera.lookAt(FINAL_MERGE_ANCHOR);camera.updateMatrixWorld(true);
     }
     this.gameplayAudio?.updateListener();
+    // Keep the lower capture for the whole encounter (including phase changes)
+    // so attacks cannot repeatedly resize Three's retained transmission target.
+    const bossCapture = resources?.phase.phase === 'boss' && !resources.researchFinale?.active && !resources.defeatFinale?.active;
+    if (bossCapture) this.releaseBossTransmissionCap ??= this.renderLayer.gelRendering.requestReducedTransmissionCap(.25);
+    else { this.releaseBossTransmissionCap?.(); this.releaseBossTransmissionCap = undefined; }
+    const bossBudget = !!bossCapture && !resources?.finalBoss?.cinematic &&
+      this.renderLayer.graphicsConfiguration.graphicsProfile !== 'high';
+    // Select after all cinematic cameras/actor poses have been presented.
+    resources?.specimenCharacter.updateDetail(this.renderLayer.cameraRig.camera, bossBudget);
+    resources?.scene.finalArena?.lighting.moonlight.setShaftEnabled(!bossBudget);
     if (resources && !resources.researchFinale?.active && !resources.defeatFinale?.active) {
       resources.goopPresentation.updateDetail(this.renderLayer.cameraRig.camera);
       resources.voltPresentation.updateDetail(this.renderLayer.cameraRig.camera);
@@ -1728,9 +1779,21 @@ export class BlackoutLevelRuntime {
     }
     resources?.transit?.updatePresentation(stats.frameDeltaSeconds, this.renderLayer.cameraRig.camera);
     resources?.hallwayShadows?.prepareFrame(resources.hallwayShadowParticipants);
-    if (resources) resources.scene.finalArena?.lighting.prepareFrame(resources.renderedSpecimenPosition, this.lifecycle.state === 'running');
+    if (resources) resources.scene.finalArena?.lighting.prepareFrame(resources.renderedSpecimenPosition,
+      this.lifecycle.state === 'running', stats.frameDeltaSeconds, bossBudget);
     resources?.lighting?.prepareCamera(this.renderLayer.cameraRig.camera,resources.specimenForm.readModel.controlledForm==='specimen'?resources.specimenBody.position:resources.group.activeBody.position);
-    try{this.renderLayer.render();}finally{resources?.lighting?.restoreCamera();}
+    try {
+      // Preparation and every cinematic keep their complete authored draws.
+      // Ordinary cameras may reject only geometry proven behind the shutter.
+      if (this.shutterOcclusion && this.lifecycle.state === 'running' && this.input.enabled && resources &&
+          resources.phase.phase !== 'merging' && !resources.ventArrival?.active &&
+          !resources.elevatorAscent?.active && !resources.researchFinale?.active &&
+          !resources.defeatFinale?.active && !resources.finalBoss?.cinematic) {
+        if (this.arenaOcclusion && resources.phase.phase === 'boss') {
+          this.arenaOcclusion.render(this.renderLayer.cameraRig.camera, this.drawPreparedScene);
+        } else this.shutterOcclusion.render(this.renderLayer.cameraRig.camera, this.drawPreparedScene);
+      } else this.drawPreparedScene();
+    } finally { resources?.lighting?.restoreCamera(); }
   }
 
   getSpeedEffectStrength(): number {
@@ -2467,6 +2530,7 @@ export class BlackoutLevelRuntime {
   };
 
   private readonly restartResources = (): void => {
+    this.releaseBossTransmissionCap?.(); this.releaseBossTransmissionCap = undefined;
     this.gameplayAudio?.reset();
     const resources = this.requireResources();
     resources.defeatFinale?.reset();
@@ -2542,6 +2606,9 @@ export class BlackoutLevelRuntime {
   };
 
   private readonly unloadResources = (): void => {
+    this.releaseBossTransmissionCap?.(); this.releaseBossTransmissionCap = undefined;
+    this.releaseReducedTransmissionCap?.();
+    this.releaseReducedTransmissionCap = undefined;
     this.companions.reset();
     this.gameplayAudio?.dispose();
     this.gameplayAudio = undefined;
@@ -2553,6 +2620,9 @@ export class BlackoutLevelRuntime {
     resources.researchFinale?.dispose();
     resources.lighting?.dispose();
     this.programPreparation?.dispose(); this.programPreparation = undefined;
+    this.hiddenMaterialCulling = undefined;
+    this.shutterOcclusion = undefined;
+    this.arenaOcclusion = undefined;
     this.input.setEnabled(false);
     this.input.resetState();
     this.input.releasePointerLock();

@@ -94,7 +94,7 @@ test('Goop releases all three nursery cradles and Bob crosses them through the r
 // Combat/detection clocks have their independent encounter tests; this fixture
 // checks that installed presentation children do not change locomotion, real
 // projectile contacts, release ownership, the inactive partner or scene reset.
-test('the integrated Room 5 split, parkour, controls and return work without teleporting between route beats',()=>{
+test('the integrated Room 5 split, parkour, controls and rescue work without teleporting between route beats',()=>{
   const failures:unknown[]=[],scene=new LevelTwoPreviewScene(f=>failures.push(f),cultivationAssets);
   const room=scene.roomFive,world=new CollisionWorld(),surfaces=new SurfaceRegistry();
   scene.root.updateWorldMatrix(true,true);
@@ -219,11 +219,13 @@ test('the integrated Room 5 split, parkour, controls and return work without tel
       for(const [i,jump]of jumps.entries())jumpTo(jump[0],jump[2],`room-5-route-${section}-jump-${i+1}`);
       const next=ROOM_FIVE_SAFE_STATIONS[section+1];jumpTo(next[0],next[2],`room-5-safe-${section+1}-floor`);
     }
+    const parkedGoop=goop.position.clone();
     walk(bob,0,34);walk(bob,0,30);walk(bob,0,27.7);
     for(let i=0;i<360;i++)step(bob);
     assert.equal(room.controller.rescued,true,'the real held-button volume releases Volt');
-    walk(goop,44,124);walk(goop,25,124);walk(goop,25,62);
-    assert.ok(local(goop).y>.4,'Goop walks the sloped return to the reunion landing');
+    // Rescue hands off to the upper-vent cinematic. The old service return
+    // is sealed; the inactive companion remains at the sewer controls.
+    assert.ok(goop.position.distanceTo(parkedGoop)<.01,'rescue preserves the independently parked companion');
     assert.deepEqual(failures,[],'the inactive partner remains on its protected safe surface');
     assert.ok(acid.getDiagnostics().solubleImpactCount>=9,'all three core hits and six network changes used real shots');
     scene.reset();

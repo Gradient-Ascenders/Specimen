@@ -4,7 +4,7 @@ import {finishOpening} from '../helpers/OpeningHandoff.ts';
 import {GRAPHICS_PROFILES} from '../../src/render/GraphicsProfiles.ts';
 
 test('all five authored rooms render prepared lighting through travel and restart',async({page})=>{
-  test.setTimeout(300_000);await page.setViewportSize(process.env.CONTAINMENT_LIGHTING_PROFILE==='high'?{width:640,height:400}:{width:960,height:600});
+  test.setTimeout(300_000);await page.setViewportSize(process.env.CONTAINMENT_LIGHTING_1080==='1'?{width:1920,height:1080}:process.env.CONTAINMENT_LIGHTING_PROFILE==='high'?{width:640,height:400}:{width:960,height:600});
   const errors:string[]=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('console',message=>{if(message.type()==='error'||/GL_INVALID_|CONTEXT_LOST_WEBGL/.test(message.text()))errors.push(message.text());});
@@ -60,7 +60,24 @@ test('all five authored rooms render prepared lighting through travel and restar
       const stats={fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:.08,frameDeltaSeconds:.08,stepsThisFrame:0,interpolationAlpha:1,droppedSimulationTimeSeconds:0,renderFps:60};
       for(let frame=0;frame<5;frame++)runtime.render(1,stats);
       const renderer=layer.renderer;
+      let cullingChangedChannels:number|undefined;
+      if(roomId===5){
+        const gl=renderer.getContext(),branches=scene.lowerFloorOccludedBranches;
+        const pixels=()=>{
+          scene.withEnclosedRoomOcclusion(r.body.position,layer.cameraRig.camera.position,()=>layer.render());
+          const data=new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);
+          gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,data);return data;
+        };
+        try{
+          // Compare the new atrium scope to its previous behaviour while
+          // keeping the pre-existing completed-pod mask and frame state.
+          scene.lowerFloorOccludedBranches=[];pixels();const full=pixels();
+          scene.lowerFloorOccludedBranches=branches;const scoped=pixels();
+          cullingChangedChannels=full.reduce((count,value,i)=>count+Number(value!==scoped[i]),0);
+        }finally{scene.lowerFloorOccludedBranches=branches;}
+      }
       return {name,programs:host.__lightingPrograms,cold:renderer.info.programs.filter((p:any)=>!host.__preparedLightingPrograms.has(p)).map((p:any)=>({name:p.name,key:p.cacheKey})),
+        cullingChangedChannels,
         lighting:scene.lightingDiagnostics,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,
         geometry:renderer.info.memory.geometries,textures:renderer.info.memory.textures,glError:renderer.getContext().getError(),
         camera:layer.cameraRig.camera.position.toArray(),png:layer.canvas.toDataURL('image/png').split(',')[1]};
@@ -97,6 +114,7 @@ test('all five authored rooms render prepared lighting through travel and restar
   expect(initial.radiance.textureBytes).toBeLessThan(4_000_000);
   expect(initial.shafts.extraShadowMaps).toBe(0);expect(initial.shafts.fullScreenPasses).toBe(0);
   expect(initial.shadowType).toBe(process.env.CONTAINMENT_LIGHTING_PROFILE==='high'?0:1);
-  for(const sample of samples){expect(sample.glError,sample.name).toBe(0);expect(sample.programs,`${sample.name}: cold program`).toBe(initial.programs);}
+  for(const sample of samples){expect(sample.glError,sample.name).toBe(0);expect(sample.programs,`${sample.name}: cold program`).toBe(initial.programs);
+    if(sample.cullingChangedChannels!==undefined)expect(sample.cullingChangedChannels,`${sample.name}: atrium culling pixels`).toBe(0);}
   expect(restart.ready).toBe(true);expect(restart.error).toBe(0);expect(errors).toEqual([]);
 });

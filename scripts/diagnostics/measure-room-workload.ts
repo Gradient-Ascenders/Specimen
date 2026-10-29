@@ -6,7 +6,7 @@ import { cpus } from 'node:os';
 import { readCultivationBakedAssets } from '../../src/render/environment/cultivation/CultivationBakedAssets.ts';
 import { LevelTwoPreviewScene } from '../../src/levels/LevelTwoPreviewScene.ts';
 
-const bytes = gunzipSync(readFileSync(new URL('../../src/assets/cultivation/authored-assets.bin', import.meta.url)));
+const bytes = gunzipSync(readFileSync(process.env.WORKLOAD_ASSET_FILE ?? new URL('../../src/assets/cultivation/authored-assets.bin', import.meta.url)));
 const assets = readCultivationBakedAssets(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
 const scene = new LevelTwoPreviewScene(() => {}, assets);
 const report = { environment: { node: process.version, cpu: cpus()[0].model, logicalProcessors: cpus().length },
