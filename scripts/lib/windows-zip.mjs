@@ -10,7 +10,7 @@ export const windowsZip = (operation, archive, directory) => {
         foreach ($file in (Get-ChildItem -LiteralPath $base -File -Recurse | Sort-Object FullName)) {
           $name = $file.FullName.Substring($base.Length).Replace([char]92, [char]47);
           $entry = $zip.CreateEntry($name, [IO.Compression.CompressionLevel]::Optimal);
-          $entry.LastWriteTime = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero);
+          $entry.LastWriteTime = [DateTimeOffset]$file.LastWriteTime;
           $source = [IO.File]::OpenRead($file.FullName);
           try {
             $destination = $entry.Open();

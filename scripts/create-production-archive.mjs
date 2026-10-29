@@ -20,7 +20,6 @@ const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const buildDirectory = join(projectRoot, 'dist');
 const artifactDirectory = join(projectRoot, 'artifacts');
 const archivePath = join(artifactDirectory, 'specimen-production.zip');
-const archiveTimestamp = new Date('1980-01-01T00:00:00.000Z');
 
 const run = (command, args, options = {}) => {
   const result = spawnSync(command, args, {
@@ -56,7 +55,11 @@ const main = async () => {
       const destination = join(stagingDirectory, file);
       await mkdir(dirname(destination), { recursive: true });
       await copyFile(source, destination);
-      await utimes(destination, archiveTimestamp, archiveTimestamp);
+      // Static hosts use mtime (often with size) for Last-Modified/ETag.
+      // A fixed timestamp can keep a cached index.html pointing to removed
+      // bundles after a same-sized replacement. Retain the build's mtime.
+      const { mtime } = await stat(source);
+      await utimes(destination, mtime, mtime);
     }
 
     let listing;
