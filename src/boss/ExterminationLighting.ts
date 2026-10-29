@@ -20,6 +20,8 @@ export class ExterminationLighting {
   private powered = false;
   private roofOpening = 0;
   private disposed = false;
+  private shadowElapsed = Infinity;
+  private shadowBudget = false;
 
   constructor() {
     this.root.name = 'extermination-lighting';
@@ -64,9 +66,25 @@ export class ExterminationLighting {
 
   /** Translation never changes the key's direction. Quantise in light space,
    * keeping sub-texel player motion from crawling across stationary cover. */
-  prepareFrame(position: Pick<THREE.Vector3, 'x' | 'z'>, animate = true): void {
+  prepareFrame(position: Pick<THREE.Vector3, 'x' | 'z'>, animate = true,
+    deltaSeconds = 0, combatBudget = false): void {
     if (this.disposed) return;
+    const shadow = this.key.shadow;
+    if (this.shadowBudget !== combatBudget) { shadow.needsUpdate = true; this.shadowElapsed = Infinity; }
+    this.shadowBudget = combatBudget;
+    if (animate) this.shadowElapsed += Math.max(0, deltaSeconds);
     this.focus.set(position.x, FINAL_ARENA.floorY, position.z);
+    // Medium combat refreshes moving casters at 30 Hz. Hold both the map and
+    // its light-space origin between refreshes; moving only the origin would
+    // slide a stale map across the floor. Teleports/invalidations draw now.
+    const refresh = !combatBudget || this.shadowElapsed >= 1 / 30 || shadow.needsUpdate ||
+      shadow.map === null || this.focus.distanceToSquared(this.key.target.position) > 9;
+    shadow.autoUpdate = this.powered && animate && !combatBudget;
+    if (combatBudget && !refresh) return;
+    if (combatBudget && animate && this.powered) {
+      shadow.needsUpdate = true;
+      this.shadowElapsed = Number.isFinite(this.shadowElapsed) ? this.shadowElapsed % (1 / 30) : 0;
+    }
     const texel = 60 / this.key.shadow.mapSize.x;
     const x = this.focus.dot(this.right), y = this.focus.dot(this.up);
     this.focus.addScaledVector(this.right, Math.round(x / texel) * texel - x);
@@ -75,9 +93,10 @@ export class ExterminationLighting {
     this.key.target.position.copy(this.focus);
     this.key.position.copy(this.focus).add(this.offset);
     this.key.target.updateWorldMatrix(true, false);
-    this.key.shadow.autoUpdate = this.powered && animate;
     this.key.shadow.needsUpdate ||= this.powered && moved || this.key.shadow.map === null;
   }
+
+  invalidateShadows(): void { this.key.shadow.needsUpdate = true; }
 
   get diagnostics() {
     return { shadowMaps: 1, pointShadowMaps: 0, pointLights: 2, spotLights: 2, shaftDraws: 1, shadowWidthMetres: 60,

@@ -10,6 +10,7 @@ export class ExterminationMoonlight {
   readonly shaft: THREE.Mesh<THREE.CylinderGeometry, THREE.ShaderMaterial>;
   private readonly strength = { value: 0 };
   private disposed = false;
+  private shaftEnabled = true;
 
   constructor() {
     this.root.name = 'extermination-roof-moonlight';
@@ -53,7 +54,13 @@ export class ExterminationMoonlight {
     if (this.disposed) return;
     this.strength.value = THREE.MathUtils.clamp(value, 0, 1);
     this.light.intensity = this.strength.value * 45000;
-    this.shaft.visible = this.strength.value > .001;
+    this.shaft.visible = this.shaftEnabled && this.strength.value > .001;
+  }
+
+  /** Medium combat retains the actual spill light without the cosmetic haze. */
+  setShaftEnabled(enabled: boolean): void {
+    this.shaftEnabled = enabled;
+    this.shaft.visible = !this.disposed && enabled && this.strength.value > .001;
   }
 
   dispose(): void {

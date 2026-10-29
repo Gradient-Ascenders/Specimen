@@ -182,7 +182,7 @@ export class SpecimenCharacterPresentation {
     return pending;
   }
   setCameraView(rig: CameraRig, target: CameraFollowTarget): void { this.cameraVisibility.configure(rig, target); }
-  updateDetail(camera: THREE.Camera): void { this.detail?.update(camera); }
+  updateDetail(camera: THREE.Camera, combatBudget = false): void { this.detail?.update(camera, combatBudget ? 1.4 : .1, combatBudget); }
   get detailDiagnostics() { return this.detail?.diagnostics; }
   setPosition(position: Vector3State): void { this.placement.position.set(position.x, position.y, position.z); }
   /** Level heading restored on recovery, independent of temporary cinematic turns. */
