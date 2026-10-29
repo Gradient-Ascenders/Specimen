@@ -278,6 +278,36 @@ test('unallocated drone beam shadows bind a matching fallback without becoming v
   mesh.geometry.dispose(); map.depthTexture.dispose(); map.dispose();
 });
 
+test('Blackout shares material variants but uploads every distinct geometry in bounded batches', async () => {
+  const {renderer,borrowedTarget}=fixture(),scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera();
+  const material=new THREE.MeshStandardMaterial(),geometries=Array.from({length:270},()=>new THREE.BoxGeometry());
+  for(const geometry of geometries){const mesh=new THREE.Mesh(geometry,material);mesh.castShadow=true;scene.add(mesh);}
+  const instance=new THREE.InstancedMesh(geometries[0],material,2);scene.add(instance);
+  const morphGeometry=geometries[1].clone();morphGeometry.morphAttributes.position=[morphGeometry.getAttribute('position').clone()];
+  scene.add(new THREE.Mesh(morphGeometry,material));
+  const light=new THREE.SpotLight();light.castShadow=true;scene.add(light);
+  const submitted=new Set<THREE.Material>(),uploaded=new Set<THREE.BufferGeometry>();
+  let borrowedInstances=false;
+  renderer.compileAsync=async group=>{assert.ok(group.children.length<=128);group.traverse(object=>{
+    if(object instanceof THREE.Mesh)for(const m of [object.material].flat())submitted.add(m);
+  });};
+  renderer.render=(root,view)=>root.traverseVisible(object=>{
+    if(!(object instanceof THREE.Mesh)||!object.layers.test(view.layers))return;
+    uploaded.add(object.geometry);
+    if(object instanceof THREE.InstancedMesh&&object.instanceMatrix===instance.instanceMatrix)borrowedInstances=true;
+  });
+  const policy=new RenderShadowPolicy(renderer.shadowMap),layer={renderer,scene,cameraRig:{camera},withShadowPreparation:policy.withPreparation.bind(policy)} as unknown as RenderLayer;
+  const preparation=new BlackoutPresentationPreparation();
+  try{
+    await preparation.prepare(layer,camera);
+    assert.equal(preparation.diagnostics.visibleVariants,3,'ordinary, instanced and morph variants stay distinct');
+    assert.ok(submitted.size<10,'shared finishes are not cloned once per mesh');
+    for(const geometry of [...geometries,morphGeometry])assert.ok(uploaded.has(geometry));
+    assert.equal(borrowedInstances,true);assert.ok(preparation.diagnostics.maxPrimeObjects<=16);
+    assert.equal(scene.children.length,273,'all live owners remain attached');
+  }finally{preparation.dispose();instance.dispose();for(const geometry of [...geometries,morphGeometry])geometry.dispose();material.dispose();borrowedTarget.dispose();}
+});
+
 test('instance primers upload both live buffers sharing a geometry and never dispose borrowed storage', async () => {
   const { renderer, borrowedTarget } = fixture();
   const scene = new THREE.Scene(), preview = new LevelTwoPreviewScene(() => {}, cultivationAssets);

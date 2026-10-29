@@ -1582,7 +1582,7 @@
   border-radius: var(--ui-radius-sm);
   background: linear-gradient(145deg, rgb(16 28 35 / 92%), rgb(9 13 24 / 90%));
   box-shadow: 0 0.8rem 2rem rgb(0 0 0 / 20%);
-  backdrop-filter: blur(0.35rem);
+  /* The dark panel stays readable without filtering the moving game canvas. */
 }
 
 .hud-roster-content::before {

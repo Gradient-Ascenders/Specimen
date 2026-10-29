@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import { readGzipResponse } from '../ReadGzipResponse.ts';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import type {ContainmentArtMaterials} from './ContainmentArtResources.ts';
 
-export const ROOM_TWO_SHELL_URL=new URL('../../../../assets/environments/containment-room-two/room-two-hall.glb',import.meta.url).href;
+export const ROOM_TWO_SHELL_URL=new URL('../../../assets/delivery/room-two.bin',import.meta.url).href;
 export type RoomTwoShellLoader=(signal:AbortSignal)=>Promise<THREE.Group>;
 
 export async function parseRoomTwoShell(bytes:ArrayBuffer):Promise<THREE.Group>{
@@ -16,7 +17,7 @@ export async function parseRoomTwoShell(bytes:ArrayBuffer):Promise<THREE.Group>{
 async function loadShell(signal:AbortSignal):Promise<THREE.Group>{
   const response=await fetch(ROOM_TWO_SHELL_URL,{signal});
   if(!response.ok)throw new Error('Could not load Room 2 architecture.');
-  return parseRoomTwoShell(await response.arrayBuffer());
+  return parseRoomTwoShell(await readGzipResponse(response,signal));
 }
 
 /** Owns only Blender geometry. Room 1 owns the shared finish maps/materials;

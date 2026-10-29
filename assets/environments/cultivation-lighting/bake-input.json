@@ -1,12 +1,12 @@
 {
   "version": "SPCR0001",
   "sources": {
-    "authoredAssetsSha256": "5eff6147c5fcad4a0ee48a333e0f1f3a91eec79411492a48f38e6473037bf341",
+    "authoredAssetsSha256": "6dc6616330bc0992c05196ce38992d816ba385650d4ff2391084cd557f167d5a",
     "generatorSha256": "af9ce7520e4440085ef1b407e347ac2298c38e446553661de5779ed56d364c97"
   },
-  "geometrySha256": "b481c2c90f388add3b6a1e76d8d7518b8822453b00ae0880f1f217573c8e34ac",
-  "triangles": 787245,
-  "meshCount": 331,
+  "geometrySha256": "c4dbced5432a2c2547e490f4c8bb5d465a48ab5a2a8fef83826698fd7be52e01",
+  "triangles": 787349,
+  "meshCount": 333,
   "lights": [
     {
       "name": "cultivation-room-1-radiation-light-near",

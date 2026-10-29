@@ -84,7 +84,8 @@ export class CultivationLightingPass {
       let material = clones.get(key);
       if (!material) {
         material = original.clone(); material.onBeforeCompile = original.onBeforeCompile;
-        const sourceKey = original.customProgramCacheKey(); material.customProgramCacheKey = () => `${sourceKey}:zoned-practical`;
+        // A zone changes emissive uniforms, not shader source.
+        const sourceKey = original.customProgramCacheKey(); material.customProgramCacheKey = () => sourceKey;
         material.name = `${original.name}-zone-${zone}-lighting`; clones.set(key, material); this.practicalMaterials.add(material);
       }
       this.practicals.push({ mesh, original, material, zone, colour: original.emissive.clone(), intensity: original.emissiveIntensity });

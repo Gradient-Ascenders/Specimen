@@ -32,6 +32,8 @@ export class BossDefeatEffects {
   private readonly lightning: THREE.LineSegments;
   private readonly arcVertices = new Float32Array(8 * 30 * 2 * 3);
   private sparkCount = 0; private boltCount = 0; private smokeCount = 0; private ringCount = 0;
+  private density=1;
+  setDensity(value:number):void { this.density=Number.isFinite(value)?THREE.MathUtils.clamp(value,.5,1):1; }
   constructor() {
     this.root.name = 'boss-ending-preallocated-effects';
     const cylinder = this.geometry(new THREE.CylinderGeometry(1, 1, 1, 32, 1, true));
@@ -69,7 +71,10 @@ export class BossDefeatEffects {
         gl_FragColor=vec4(hot*vTint.r,edge*fire*.8);}` }));
     this.explosions = new THREE.InstancedMesh(sphere, this.explosionMaterial, 24); this.explosions.setColorAt(0, this.color.setRGB(1, 1, 1));
     this.rings = new THREE.InstancedMesh(this.geometry(new THREE.TorusGeometry(1, .018, 5, 64)), this.material(new THREE.MeshBasicMaterial({ color: 0x96ffea, transparent: true, opacity: .38, depthWrite: false, blending: THREE.AdditiveBlending })), 24);
-    for (const pool of [this.smoke, this.sparks, this.bolts, this.incoming, this.explosions, this.rings]) { pool.count = 0; pool.frustumCulled = false; this.root.add(pool); }
+    for (const pool of [this.smoke, this.sparks, this.bolts, this.incoming, this.explosions, this.rings]) {
+      pool.count = 0; pool.frustumCulled = false; pool.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.root.add(pool);
+    }
+    this.explosions.instanceColor?.setUsage(THREE.DynamicDrawUsage);
     const arcs = this.geometry(new THREE.BufferGeometry()); arcs.setAttribute('position', new THREE.BufferAttribute(this.arcVertices, 3).setUsage(THREE.DynamicDrawUsage));
     this.lightning = new THREE.LineSegments(arcs, this.material(new THREE.LineBasicMaterial({ color: 0xd9fff1, transparent: true, opacity: .8, blending: THREE.AdditiveBlending })));
     this.lightning.frustumCulled = false; this.root.add(this.lightning);
@@ -223,9 +228,18 @@ export class BossDefeatEffects {
         }
       }
     }
-    this.smoke.count = this.smokeCount; this.bolts.count = this.boltCount; this.sparks.count = this.sparkCount; this.rings.count = this.ringCount;
-    for (const pool of [this.smoke, this.bolts, this.incoming, this.explosions, this.sparks, this.rings]) pool.instanceMatrix.needsUpdate = true;
-    if (this.explosions.instanceColor) this.explosions.instanceColor.needsUpdate = true;
+    this.smoke.count = Math.ceil(this.smokeCount*this.density); this.bolts.count = this.boltCount;
+    this.sparks.count = Math.ceil(this.sparkCount*this.density); this.rings.count = Math.ceil(this.ringCount*this.density);
+    // Upload the active prefix, not the complete dormant pool. Clear ranges
+    // each sample because a hidden/cull-skipped frame may not consume them.
+    for (const pool of [this.smoke, this.bolts, this.incoming, this.explosions, this.sparks, this.rings]) {
+      pool.instanceMatrix.clearUpdateRanges();
+      if(pool.count){pool.instanceMatrix.addUpdateRange(0,pool.count*16);pool.instanceMatrix.needsUpdate=true;}
+    }
+    if (this.explosions.instanceColor) {
+      this.explosions.instanceColor.clearUpdateRanges();
+      if(this.explosions.count){this.explosions.instanceColor.addUpdateRange(0,this.explosions.count*3);this.explosions.instanceColor.needsUpdate=true;}
+    }
   }
   get diagnostics() { return { smoke: this.smoke.count, sparks: this.sparks.count, bolts: this.bolts.count, rings: this.rings.count,
     beamVisible: this.core.visible, beamsLaunched: this.beams[3]!.visible, specimenBeamLaunched: this.beams[0]!.visible,

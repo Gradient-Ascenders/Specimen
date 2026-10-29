@@ -1,4 +1,5 @@
 import { finishOpening } from '../helpers/OpeningHandoff.ts';
+import { finishLevelArrival } from '../helpers/LevelArrival.ts';
 import { expect, test } from './fixtures.ts';
 import { writeFile } from 'node:fs/promises';
 
@@ -42,7 +43,7 @@ test('Standard prepares the retained transmission target at the first gameplay c
   await page.waitForFunction(()=>(window as any).__targetSession.runtime.__firstTargetDraw);
   const sample=await page.evaluate(()=>(window as any).__targetSession.runtime.__firstTargetDraw);
   await info.attach('first-target-draw',{body:JSON.stringify(sample,null,2),contentType:'application/json'});
-  expect(sample).toEqual({storage:[],inspections:0,newPrograms:0,buffer:[960,600],scale:.5,error:0});
+  expect(sample).toEqual({storage:[],inspections:0,newPrograms:0,buffer:[960,600],scale:.75,error:0});
   expect(errors).toEqual([]);
 });
 
@@ -75,6 +76,8 @@ test('all levels retain first-use coverage through graphics cycles, fades, switc
       gl.getProgramInfoLog=(program:any)=>{if(live)rt.__inspections.push(renderer.info.programs.find((p:any)=>p.program===program)?.cacheKey);return inspect(program);};
       (window as any).__restoreProbe=()=>{layer.render=originalLayer;gl.getProgramInfoLog=originalInspect;};
     });
+    // Arrival keeps Input available for pause, but still gates switching.
+    if(level>1) await finishLevelArrival(page,'__settingsSession');
     for(const mode of ['reduced-transmission','minimum','physical','minimum'] as const) {
       await page.keyboard.press('KeyP');
       await page.locator('[data-flow-panel="paused"] [data-action="settings"]').click();
@@ -87,7 +90,7 @@ test('all levels retain first-use coverage through graphics cycles, fades, switc
       if(level>1) {
         const active=await page.evaluate(()=>(window as any).__settingsSession.runtime.captureProgressionSnapshot().activeSlimeId);
         await page.keyboard.press('Tab',{delay:80});
-        await page.waitForFunction(previous=>(window as any).__settingsSession.runtime.captureProgressionSnapshot().activeSlimeId!==previous,active);
+        await page.waitForFunction(previous=>(window as any).__settingsSession.runtime.captureProgressionSnapshot().activeSlimeId!==previous,active,{timeout:30_000});
       }
       await page.keyboard.press('F1');await page.keyboard.press('F1');
       await page.waitForTimeout(200);
@@ -107,6 +110,7 @@ test('all levels retain first-use coverage through graphics cycles, fades, switc
       await page.keyboard.press('KeyP');
       await page.locator('[data-flow-panel="paused"] [data-action="restart"]').click();
       await expect(page.locator('.game-flow')).toHaveAttribute('data-state','playing');
+      if(level>1) await finishLevelArrival(page,'__settingsSession');
       await page.waitForTimeout(100);
       const result=await page.evaluate(()=>{
         const rt=(window as any).__settingsSession.runtime;return {cold:rt.__cold,inspections:rt.__inspections,depthGroups:rt.depthPrewarmGroups?.length};
@@ -119,7 +123,9 @@ test('all levels retain first-use coverage through graphics cycles, fades, switc
         const rt=(window as any).__settingsSession.runtime;
         if(level===1)rt.resources.containmentLevel.completeForDebug();
         else {rt.teleportToAuthoredPreviewRoom(5);const r=rt.resources,c=r.authoredPreview.roomFive.controller;
-          c.reset('controls');c.update(1.5,false,false,false,true);c.update(4,false,false,false,false);rt.updateRoomFive(1/60,r);}
+          c.reset('controls');c.update(1.5,false,false,false,true);c.update(4,false,false,false,false);rt.updateRoomFive(1/60,r);
+          if(!r.roomFiveFinale.active) throw new Error('Volt release did not start its finale');
+          r.roomFiveFinale.requestSkip();rt.fixedUpdate(1/60);}
       },level);
       await page.locator('[data-action="enter-level"]').click({timeout:240_000});
     }

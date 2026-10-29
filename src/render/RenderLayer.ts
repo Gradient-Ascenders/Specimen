@@ -3,6 +3,8 @@ import { DEFAULT_USER_KEY_BINDINGS, type UserKeyBindings } from '../core/KeyBind
 import * as THREE from 'three';
 import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
 import { GelRendering, type GelRenderingMode } from './slime/GelRendering.ts';
+import { SharedOutputPrograms } from './SharedOutputPrograms.ts';
+import { ProgramCompilation } from './ProgramCompilation.ts';
 
 import type { PerformanceRenderSnapshot } from '../core/PerformanceSnapshot.ts';
 import { CameraRig } from './CameraRig.ts';
@@ -179,6 +181,8 @@ export class RenderLayer {
   readonly gelRendering: GelRendering;
   private readonly shadowPolicy: RenderShadowPolicy;
   private readonly graphicsResources: GraphicsResourcePolicy;
+  private readonly outputPrograms: SharedOutputPrograms;
+  private readonly programCompilation: ProgramCompilation;
 
   private readonly host: HTMLElement;
   private readonly hostWindow: Window;
@@ -228,6 +232,8 @@ export class RenderLayer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = RENDER_EXPOSURE;
+    this.outputPrograms = new SharedOutputPrograms(this.renderer);
+    this.programCompilation = new ProgramCompilation(this.renderer);
     this.shadowPolicy = new RenderShadowPolicy(this.renderer.shadowMap,()=>this.graphicsResources.invalidateShadowMaps());
     this.renderer.setClearColor(BACKGROUND_COLOUR, 1);
     this.renderer.domElement.setAttribute('aria-hidden', 'true');
@@ -508,6 +514,8 @@ export class RenderLayer {
     this.graphicsResources.dispose();
     this.graphicsListeners.clear();
     this.shadowPolicy.dispose();
+    this.programCompilation.dispose();
+    this.outputPrograms.dispose();
     this.renderer.dispose();
   }
 

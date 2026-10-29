@@ -144,7 +144,10 @@ export class ContainmentLightLayout {
       culledIndices.push(index);
       light.visible = false;
     }
-    this.cameraCullKeyValue = culledIndices.join(',');
+    // An empty culled set still owns temporary padding. Its restoration can
+    // expose the previous room's padding, so it must differ from an unscoped
+    // draw and trigger the runtime's light-state refresh on scope exit.
+    this.cameraCullKeyValue = `camera:${culledIndices.join(',')}`;
     try {
       this.sync();
       return draw();

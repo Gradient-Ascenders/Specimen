@@ -1,7 +1,8 @@
 import * as THREE from 'three';
+import { readGzipResponse } from '../environment/ReadGzipResponse.ts';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-export const SPECIMEN_ASSET_URL = new URL('../../../assets/characters/specimen/variants/lightning-only/specimen-lightning-only.glb', import.meta.url).href;
+export const SPECIMEN_ASSET_URL = new URL('../../assets/delivery/specimen.bin', import.meta.url).href;
 export const SPECIMEN_ASSET_VERSION = 'specimen-lightning-only-v1';
 export const SPECIMEN_RESTING_SOLE = -0.45;
 export const SPECIMEN_TRIANGLES = 81040;
@@ -14,7 +15,7 @@ export interface SpecimenAsset {
 export async function loadSpecimenAsset(): Promise<THREE.Group> {
   const response = await fetch(SPECIMEN_ASSET_URL);
   if (!response.ok) throw new Error(`Specimen asset request failed: ${response.status}`);
-  return parseSpecimenAsset(await response.arrayBuffer());
+  return parseSpecimenAsset(await readGzipResponse(response));
 }
 
 export async function parseSpecimenAsset(bytes: ArrayBuffer): Promise<THREE.Group> {

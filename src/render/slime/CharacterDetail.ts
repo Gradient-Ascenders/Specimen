@@ -76,12 +76,15 @@ export class CharacterDetail {
       triangles: this.entries.reduce((sum, entry) => sum + entry.geometry.drawRange.count / 3, 0) };
   }
 
-  update(camera: THREE.Camera): void {
+  update(camera: THREE.Camera, distantBelow = 0.1, scaleWithAnchor = false): void {
     this.anchor.getWorldPosition(this.centre);
     camera.getWorldPosition(this.eye);
-    const projectedDiameter = this.radius * camera.projectionMatrix.elements[5] /
-      Math.max(0.001, this.centre.distanceTo(this.eye) - this.radius);
-    const distant = camera instanceof THREE.PerspectiveCamera && projectedDiameter < (this.distant ? 0.125 : 0.1);
+    // Existing distant thresholds are calibrated to authored asset space.
+    // The larger combat budget accounts for scaling to retain close-up detail.
+    const radius = this.radius * (scaleWithAnchor ? this.anchor.matrixWorld.getMaxScaleOnAxis() : 1);
+    const projectedDiameter = radius * camera.projectionMatrix.elements[5] /
+      Math.max(0.001, this.centre.distanceTo(this.eye) - radius);
+    const distant = camera instanceof THREE.PerspectiveCamera && projectedDiameter < distantBelow * (this.distant ? 1.25 : 1);
     if (distant === this.distant) return;
     this.distant = distant;
     for (const entry of this.entries) entry.geometry.setDrawRange(distant ? entry.fullCount : 0, distant ? entry.distantCount : entry.fullCount);

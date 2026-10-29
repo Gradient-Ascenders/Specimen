@@ -2,6 +2,7 @@ import type { GelRendering } from '../render/slime/GelRendering.ts';
 import { createContainmentPlatformBoosters } from '../render/environment/containment/ContainmentPlatformBoosters.ts';
 import type { PlatformBoosters } from '../render/environment/PlatformBoosters.ts';
 import * as THREE from 'three';
+import { prepareTogether } from '../render/PreparationTasks.ts';
 
 import type { BobCharacterPresentation } from '../render/bob/BobCharacterPresentation.ts';
 import type { Vector3State } from '../render/slime/SlimePresentationContract.ts';
@@ -321,19 +322,22 @@ export class ContainmentLevelScene {
 
   async prepareEnvironmentArt(roomTwoLoader?:RoomTwoShellLoader,roomThreeLoader?:RoomThreeShellLoader,
     cameraLoader?:ContainmentSurveillanceModelLoader,roomFourLoader?:RoomFourShellLoader,roomFiveLoader?:RoomFiveShellLoader):Promise<void>{
-    await this.teaching.roomOneArt.prepare();
+    await prepareTogether([this.teaching.roomOneArt.prepare(), this.teaching.ventArt.prepare()]);
     if(this.disposed)return;
-    await this.teaching.roomTwoArt.prepare(name=>this.teaching.roomOneArt.shell.borrowFinish(name),roomTwoLoader);
+    const finish=(name:string)=>this.teaching.roomOneArt.shell.borrowFinish(name);
+    // Three independent borrowers; bound concurrency rather than serializing
+    // network requests. Join failures before the runtime can unload owners.
+    await prepareTogether([
+      this.teaching.roomTwoArt.prepare(finish,roomTwoLoader),
+      this.surveillanceCameras.prepare(finish,cameraLoader),
+      this.roomThree.prepareArt(finish,roomThreeLoader),
+    ]);
     if(this.disposed)return;
-    await this.surveillanceCameras.prepare(name=>this.teaching.roomOneArt.shell.borrowFinish(name),cameraLoader);
-    if(this.disposed)return;
-    await this.roomThree.prepareArt(name=>this.teaching.roomOneArt.shell.borrowFinish(name),roomThreeLoader);
-    if(this.disposed)return;
-    await this.roomFour.prepareArt(name=>this.teaching.roomOneArt.shell.borrowFinish(name),
-      this.roomThree.art.shell.borrowLaserEmitter()!,roomFourLoader);
-    if(this.disposed)return;
-    await this.roomFive.prepareArt(name=>this.teaching.roomOneArt.shell.borrowFinish(name),
-      this.roomThree.art.shell.borrowLaserEmitter()!,roomFiveLoader);
+    const emitter=this.roomThree.art.shell.borrowLaserEmitter()!;
+    await prepareTogether([
+      this.roomFour.prepareArt(finish,emitter,roomFourLoader),
+      this.roomFive.prepareArt(finish,emitter,roomFiveLoader),
+    ]);
     if(this.disposed)return;
     this.lightingArt.prepare(this.root);
     for(const owner of this.lightingArt.movingOwners)this.lighting.trackShadowOwner(owner.root,owner.radius,owner.localCentre);
@@ -442,7 +446,12 @@ export class ContainmentLevelScene {
           activePosition.z >= 80.2 && activePosition.z <= 91 &&
           cameraPosition.z >= 80.2 && cameraPosition.z <= 91 &&
           activePosition.y >= 36 && cameraPosition.y >= 36
-          ? this.lowerFloorOccludedBranches : undefined;
+          ? this.lowerFloorOccludedBranches
+          // Above the sealed lower chambers, retain the adjoining lift but
+          // stop submitting Rooms 1–3 during ordinary atrium gameplay too.
+          : roomId===5&&activePosition.y>=75&&cameraPosition.y>=75&&
+            activePosition.z>=96&&cameraPosition.z>=96
+            ? this.lowerFloorOccludedBranches : undefined;
     // Past the two opaque duct bends, the old pod is fully occluded. Keeping
     // it submitted creates otherwise-unused material variants under later rigs.
     const completedRoomOne = (roomId <= 3 &&
@@ -482,7 +491,12 @@ export class ContainmentLevelScene {
 
   update(deltaSeconds: number, bobPosition?: Vector3State, activePosition = bobPosition): void {
     if (activePosition) this.lighting.setTraversalPosition(activePosition);
-    this.surveillanceCameras.update(deltaSeconds, bobPosition, this.lighting.visibleRoomMask);
+    const visibleRooms=this.lighting.visibleRoomMask;
+    this.surveillanceCameras.update(deltaSeconds, bobPosition, visibleRooms);
+    this.roomOneMonitor.setPresentationActive(!!(visibleRooms&(1<<1)));
+    this.roomTwoMonitor.setPresentationActive(!!(visibleRooms&(1<<2)));
+    this.roomThreeMonitor.setPresentationActive(!!(visibleRooms&(1<<3)));
+    this.roomFiveMonitor.setPresentationActive(!!(visibleRooms&(1<<5)));
     this.roomOneMonitor.update(deltaSeconds);
     this.roomTwoMonitor.update(deltaSeconds, activePosition);
     this.roomThreeMonitor.update(deltaSeconds, activePosition);

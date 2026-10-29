@@ -154,7 +154,7 @@ test('Performance production loads Cultivation and Blackout and restarts each at
     if (/\/authored-assets-[^/]+\.bin$/.test(new URL(response.url()).pathname) && response.ok()) cultivationAssets.add(response.url());
     // Use the catalog so every effects folder counts, while streamed music does not.
     if (soundEffectUrls.has(response.url()) && response.ok()) audioAssets.add(response.url());
-    if (/\/(goop|volt)-lod-[^/]+\.bin$/.test(new URL(response.url()).pathname) && response.ok()) detailAssets.add(response.url());
+    if (/\/(goop|volt|specimen)-lod-[^/]+\.bin$/.test(new URL(response.url()).pathname) && response.ok()) detailAssets.add(response.url());
   });
   await page.goto('./?debug=1', { waitUntil: 'domcontentloaded' });
   const start = page.locator('[data-flow-panel="title"] [data-action="start"]');
@@ -190,7 +190,7 @@ test('Performance production loads Cultivation and Blackout and restarts each at
     await expect.poll(() => [...audioAssets].sort(), {
       message: `Level ${level} must preload exactly its declared effects bank`,
     }).toEqual(effectUrlsFor(level === 2 ? SOUND_BANKS.cultivation : SOUND_BANKS.blackout));
-    expect(detailAssets.size).toBe(2);
+    expect(detailAssets.size).toBe(level===2?2:3);
     if (level === 2) {
       expect(cultivationAssets.size, 'Cultivation must load its baked assets before playing').toBe(1);
       expect([...cultivationAssets][0]).toContain('/group-folder/assets/authored-assets-');

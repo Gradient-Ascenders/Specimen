@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { ExterminationMaterials } from './ExterminationMaterials.ts';
 import { ExterminationLighting } from './ExterminationLighting.ts';
+import { exterminationOccluders } from './ExterminationOcclusion.ts';
+import type { CameraOccluder } from '../render/CameraOcclusion.ts';
 import { applyExterminationShadowRoles } from './ExterminationShadowRoles.ts';
 import { EXTERMINATION_LAIR_COVER } from './ExterminationLairLayout.ts';
 import { applyLairMaterials, loadExterminationLairAsset, type ExterminationLairAsset } from './ExterminationLairAsset.ts';
@@ -26,6 +28,7 @@ export class ExterminationArena {
   readonly armourFragments:THREE.Mesh[]=[];
   readonly surfaceMaterials=new ExterminationMaterials();
   readonly lighting=new ExterminationLighting();
+  readonly cameraOccluders:CameraOccluder[]=[];
   private readonly geometries=new Set<THREE.BufferGeometry>();
   private readonly materials=new Set<THREE.Material>();
   private readonly boxGeometries=new Map<string,THREE.BoxGeometry>();
@@ -139,6 +142,7 @@ export class ExterminationArena {
     }
     asset.root.clear();this.placeholder.removeFromParent();this.artReady=true;this.setPowered(this.powered,this.phaseTwo);
     this.root.updateMatrixWorld(true);
+    this.cameraOccluders.push(...exterminationOccluders(asset));
   }
   get artDiagnostics(){return {...this.surfaceMaterials.diagnostics,ready:this.artReady,coverCount:this.cover.length};}
   private disposeUnadoptedAsset(asset:ExterminationLairAsset):void {
@@ -230,8 +234,10 @@ export class ExterminationArena {
     u.uWarning!.value=state==='warning'?1:0;u.uActive!.value=state==='active'?1:0;
   }
   setDoors(closed:boolean,exitOpen=false):void {
+    const changed=this.entryDoor.position.y!==(closed?4.4:12)||this.exitDoor.position.y!==(exitOpen?18:5.4);
     this.entryDoor.position.y=closed?4.4:12;this.exitDoor.position.y=exitOpen?18:5.4;
     this.entryDoor.updateMatrixWorld(true);this.exitDoor.updateMatrixWorld(true);
+    if(changed)this.lighting.invalidateShadows();
   }
   deployment(progress:number):void {
     // Lift through the aperture before sliding above the roof/cradle.
@@ -251,6 +257,7 @@ export class ExterminationArena {
   }
   private destroyCover(index:number,onBreak?:(at:THREE.Vector3)=>void):void {
     const state=this.coverStates[index]!;state.health=0;state.mesh.visible=false;this.coverAssemblies[index]!.visible=false;onBreak?.(state.mesh.position);
+    this.lighting.invalidateShadows();
   }
   breakCoverAlong(start:THREE.Vector3,end:THREE.Vector3,radius:number,onBreak?:(at:THREE.Vector3)=>void):number {
     this.coverLine.set(start,end);let count=0;
@@ -261,6 +268,7 @@ export class ExterminationArena {
     });return count;
   }
   reset():void {
+    this.lighting.invalidateShadows();this.lighting.moonlight.setShaftEnabled(true);
     this.setDoors(false);this.deployment(0);this.setDamaged(false);this.setPowered(false);this.resetPlatforms();
     for(let i=0;i<6;i++)this.setSector(i,'inactive');this.cover.forEach((mesh,i)=>{mesh.visible=true;this.coverAssemblies[i]!.visible=true;const state=this.coverStates[i]!;state.health=state.maximumHealth;state.lastBeamSerial=undefined;});
   }

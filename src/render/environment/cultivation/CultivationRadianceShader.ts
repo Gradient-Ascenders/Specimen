@@ -5,11 +5,13 @@ import { CULTIVATION_RADIANCE_LAYOUT as ZONES, CULTIVATION_ATLAS_WIDTH as WIDTH,
 
 let offset = 0;
 const offsets = ZONES.map(zone => { const first = offset; offset += zone.grid[2] + 2; return first; });
+// Immutable layout vectors already match WebGL storage; avoid flattening
+// Vector3 arrays again for every material draw.
 const layout = {
-  cvMin: { value: ZONES.map(p => new THREE.Vector3(...p.min)) },
-  cvMax: { value: ZONES.map(p => new THREE.Vector3(...p.max)) },
-  cvGrid: { value: ZONES.map(p => new THREE.Vector3(...p.grid)) },
-  cvCapture: { value: ZONES.map(p => new THREE.Vector3(...p.capture)) }, cvOffset: { value: offsets },
+  cvMin: { value: new Float32Array(ZONES.flatMap(p => p.min)) },
+  cvMax: { value: new Float32Array(ZONES.flatMap(p => p.max)) },
+  cvGrid: { value: new Float32Array(ZONES.flatMap(p => p.grid)) },
+  cvCapture: { value: new Float32Array(ZONES.flatMap(p => p.capture)) }, cvOffset: { value: offsets },
 };
 export interface CultivationRadianceUniforms {
   cvVolume: THREE.IUniform<THREE.Data3DTexture>;
@@ -82,18 +84,23 @@ vec3 cultivationStateIrradiance(vec3 uv,vec3 n,int zone,float state){
   }
   return max(energy/max(base.a,.025),vec3(0.0));
 }
-vec3 cultivationZoneIrradiance(vec3 p,vec3 n,int zone){
-  vec3 uv=clamp((p-cvMin[zone])/(cvMax[zone]-cvMin[zone]),0.0,1.0);
-  float power=clamp(cvPower[zone],0.0,1.0);
-  vec3 energy=cultivationStateIrradiance(uv,n,zone,0.0);
-  if(power<.999)energy=mix(cultivationStateIrradiance(uv,n,zone,1.0),energy,power);
-  return energy;
-}
 vec3 cultivationIndirect(vec3 n){
   vec3 p=cvWorld+n*.17;int a,b;float f;cultivationZones(p,a,b,f);
   if(f>=1.0)a=b;
-  vec3 energy=cultivationZoneIrradiance(p,n,a);
-  if(f>0.0&&f<1.0)energy=mix(energy,cultivationZoneIrradiance(p,n,b),f);
+  int zoneCount=f>0.0&&f<1.0?2:1;
+  vec3 energy=vec3(0.0);
+  for(int zoneIndex=0;zoneIndex<zoneCount;zoneIndex++){
+    int zone=zoneIndex==0?a:b;
+    vec3 uv=clamp((p-cvMin[zone])/(cvMax[zone]-cvMin[zone]),0.0,1.0);
+    float power=clamp(cvPower[zone],0.0,1.0);
+    int stateCount=power<.999?2:1;
+    vec3 result=vec3(0.0);
+    for(int stateIndex=0;stateIndex<stateCount;stateIndex++){
+      vec3 sampleValue=cultivationStateIrradiance(uv,n,zone,float(stateIndex));
+      result=stateIndex==0?sampleValue:mix(sampleValue,result,power);
+    }
+    energy=zoneIndex==0?result:mix(energy,result,f);
+  }
   return energy;
 }
 vec3 cultivationLiquidBounce(vec3 n){
@@ -157,17 +164,24 @@ function reflections(tileWidth: number, tileHeight: number): string {
     return mix(cultivationBilinear(envMap,projected,level,tile),
       cultivationBilinear(envMap,projected,min(level+1.0,CUBEUV_MAX_MIP),tile),fract(mip));
   }
-  vec3 cultivationReflectionZone(vec3 direction,float roughness,int zone,vec3 p){
-    vec3 projected=cultivationProjected(direction,zone,p);
-    vec3 result=cultivationReflectionSample(projected,roughness,float(zone));
-    float power=clamp(cvPower[zone],0.0,1.0);
-    if(power<.999)result=mix(cultivationReflectionSample(projected,roughness,float(zone+${ZONES.length})),result,power);
-    return result;
-  }
   vec4 cultivationRoomRadiance(vec3 direction,float roughness){
     vec3 p=cvWorld;int a,b;float f;cultivationZones(p,a,b,f);if(f>=1.0)a=b;
-    vec3 energy=cultivationReflectionZone(direction,roughness,a,p);
-    if(f>0.0&&f<1.0)energy=mix(energy,cultivationReflectionZone(direction,roughness,b,p),f);
+    // Runtime bounds keep one sampling body instead of inlining it once for
+    // every zone/power combination. Preserve the original mix order.
+    int zoneCount=f>0.0&&f<1.0?2:1;
+    vec3 energy=vec3(0.0);
+    for(int zoneIndex=0;zoneIndex<zoneCount;zoneIndex++){
+      int zone=zoneIndex==0?a:b;
+      vec3 projected=cultivationProjected(direction,zone,p);
+      float power=clamp(cvPower[zone],0.0,1.0);
+      int stateCount=power<.999?2:1;
+      vec3 result=vec3(0.0);
+      for(int stateIndex=0;stateIndex<stateCount;stateIndex++){
+        vec3 sampleValue=cultivationReflectionSample(projected,roughness,float(zone+stateIndex*${ZONES.length}));
+        result=stateIndex==0?sampleValue:mix(sampleValue,result,power);
+      }
+      energy=zoneIndex==0?result:mix(energy,result,f);
+    }
     return vec4(energy,1.0);
   }
   #endif
@@ -198,6 +212,6 @@ export function installCultivationRadianceShader(material: THREE.MeshStandardMat
         #endif`)
       .replace('#include <tonemapping_fragment>', 'gl_FragColor.rgb=cultivationAtmosphere(gl_FragColor.rgb);\n#include <tonemapping_fragment>');
   };
-  material.customProgramCacheKey = () => `${key}:cultivation-radiance-v4`;
+  material.customProgramCacheKey = () => `${key}:cultivation-radiance-v5`;
   material.needsUpdate = true;
 }

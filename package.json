@@ -23,7 +23,7 @@
     "generate:room-one-compressed-maps": "node scripts/generate-room-one-compressed-maps.mjs",
     "generate:signage": "node scripts/generate-signage.ts",
     "generate:acid-noise": "node scripts/generate-acid-noise.ts",
-    "check:generated-assets": "node scripts/generate-blackout-maintenance-maps.ts --check && node scripts/generate-cultivation-assets.ts --check && node scripts/generate-character-lods.ts --check && node scripts/generate-acid-noise.ts --check && node scripts/generate-extermination-maps.ts --check && node scripts/generate-containment-lighting.ts --check && node scripts/generate-containment-radiance.ts --check && node scripts/generate-room-one-compressed-maps.mjs --check && node scripts/generate-escape-drone-model.ts --check && node scripts/generate-laser-emitter-model.ts --check && node scripts/generate-cultivation-radiance.ts --check && node scripts/generate-blackout-maintenance-art.ts --check && node scripts/generate-blackout-radiance.ts --check",
+    "check:generated-assets": "node scripts/generate-blackout-maintenance-maps.ts --check && node scripts/generate-cultivation-assets.ts --check && node scripts/generate-character-lods.ts --check && node scripts/generate-acid-noise.ts --check && node scripts/generate-extermination-maps.ts --check && node scripts/generate-containment-lighting.ts --check && node scripts/generate-containment-radiance.ts --check && node scripts/generate-room-one-compressed-maps.mjs --check && node scripts/generate-escape-drone-model.ts --check && node scripts/generate-laser-emitter-model.ts --check && node scripts/generate-cultivation-radiance.ts --check && node scripts/generate-blackout-maintenance-art.ts --check && node scripts/generate-blackout-radiance.ts --check && node scripts/generate-delivery-assets.mjs --check",
     "test": "node --test --test-concurrency=2 tests/*.test.ts",
     "test:browser": "npm run build && playwright test",
     "test:smoke": "playwright test tests/smoke/ProductionSmoke.spec.ts tests/smoke/OpeningGraphics.spec.ts tests/smoke/LevelSelector.spec.ts --config playwright.smoke.config.ts",
@@ -34,7 +34,9 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "benchmark:loading": "node scripts/benchmark-level-one-loading.mjs",
-    "benchmark:level-two": "node scripts/benchmark-level-two-performance.mjs"
+    "benchmark:first-loading": "node scripts/benchmark-first-loading.mjs",
+    "benchmark:level-two": "node scripts/benchmark-level-two-performance.mjs",
+    "generate:delivery-assets": "node scripts/generate-delivery-assets.mjs"
   },
   "dependencies": {
     "@fontsource-variable/space-grotesk": "^5.3.0",

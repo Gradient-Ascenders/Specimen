@@ -80,7 +80,6 @@ export interface ContainmentLightingRigOptions {
 const ROOM_IDS: readonly ContainmentLightingRoomId[] = [1, 2, 3, 4, 5];
 const PREWARM_ROOM_IDS: readonly ContainmentLightingRoomId[] = [1, 2, 3, 4, 5];
 const CLINICAL_COLOUR = 0xd9efff;
-const DUCT_COLOUR = 0x86aabd;
 const AMBER_COLOUR = 0xffaa2a;
 const ORANGE_COLOUR = 0xff6624;
 const ALARM_COLOUR = 0xff263f;
@@ -138,11 +137,6 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
       roughness: 0.52,
       metalness: 0.58,
     }),
-  );
-  private readonly ductEmitterMaterial = this.emissiveMaterial(
-    'containment-duct-cue-emitter',
-    DUCT_COLOUR,
-    0.8,
   );
   private readonly shaftEmitterMaterials = [
     this.emissiveMaterial('room-4-lower-shaft-emitter', AMBER_COLOUR, 0.5),
@@ -264,36 +258,9 @@ export class ContainmentLightingRig implements ContainmentCutsceneLighting {
     this.roomOnePedestalKey.shadow.autoUpdate = true;
     roomOne.add(this.roomOnePedestalKey, this.roomOnePedestalKey.target);
 
-    const ductLight = this.downlight(
-      'room-1-to-2-duct-reflected-cue',
-      [-8.4, 12.25, 26.5],
-      DUCT_COLOUR,
-      24,
-      11,
-    );
-    roomOne.add(ductLight);
-    roomOne.add(
-      this.fixture(
-        'room-1-to-2-duct-exit-fixture',
-        [-8.4, 12.38, 26.5],
-        [1.15, 0.06, 0.22],
-        this.ductEmitterMaterial,
-      ),
-    );
+    // The authored dark duct uses baked vertex shading and dim emissive
+    // route markers. It needs no live spotlights or shadow maps.
     roomOne.add(this.bobImpactEffect.points);
-    // Dim service luminaires inside the enclosed low run and ramp. These use
-    // the existing duct cue palette, not a character-following light.
-    for (const [name, position, target, distance, angle] of [
-      ['low-run', [-4.8, 7.12, 10.5], [-4.8, 5.2, 10.5], 6.5, 1.25],
-      ['ramp', [-4.8, 11.7, 22], [-4.8, 6.2, 14], 12, 0.65],
-      ['turn', [-4.8, 12.4, 24], [-6.5, 10.5, 24], 6, 1.0],
-    ] as const) {
-      const key = this.spot(`room-1-to-2-duct-${name}-key`, position, target,
-        3, distance, angle, 0.3, DUCT_COLOUR);
-      roomOne.add(key, key.target,
-        this.fixture(`room-1-to-2-duct-${name}-fixture`, position,
-          [0.55, 0.04, 0.16], this.ductEmitterMaterial));
-    }
 
     const roomTwo = this.room(2);
     roomTwo.add(

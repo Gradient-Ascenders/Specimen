@@ -1,5 +1,13 @@
 import * as THREE from 'three';
 
+/** Geometry layout, rather than geometry identity, selects shader features. */
+export function prewarmDrawableFeatures(source: THREE.Mesh | THREE.Points | THREE.Line | THREE.Sprite): string {
+  const geometry = source.geometry;
+  return JSON.stringify([source.type, source instanceof THREE.InstancedMesh && [!!source.instanceColor, !!source.morphTexture],
+    Object.entries(geometry.attributes).map(([name, value]) => [name, value.itemSize, value.normalized]).sort(),
+    Object.entries(geometry.morphAttributes).map(([name, values]) => [name, values.length]).sort()]);
+}
+
 /** Copies own programs, but borrow maps and the presentation's shader uniforms. */
 export function copyPrewarmMaterial(material: THREE.Material): THREE.Material {
   const copy = material instanceof THREE.MeshPhysicalMaterial ? new THREE.MeshPhysicalMaterial().copy(material)
@@ -41,7 +49,7 @@ export function createShadowPrewarmMaterial(
   return shadow;
 }
 
-export function createDepthPrewarmGroup(root: THREE.Object3D): {
+export function createDepthPrewarmGroup(root: THREE.Object3D, prepared?: Set<string>): {
   group: THREE.Group;
   dispose(): void;
 } {
@@ -52,6 +60,13 @@ export function createDepthPrewarmGroup(root: THREE.Object3D): {
     if (!(source instanceof THREE.Mesh) || !source.castShadow) return;
     for (const surface of Array.isArray(source.material) ? source.material : [source.material]) {
       if (!surface.visible) continue;
+      // Depth variants do not depend on room lights. Retain exact geometry,
+      // material and custom shader identities across overlapping room subsets.
+      const key = [source.type, source.geometry.uuid, surface.uuid, surface.version,
+        surface.side, surface.shadowSide, source.customDepthMaterial?.uuid,
+        source.customDepthMaterial?.version, source instanceof THREE.InstancedMesh && !!source.instanceColor].join(':');
+      if (prepared?.has(key)) continue;
+      prepared?.add(key);
       const material = createShadowPrewarmMaterial(source, surface, false);
       const proxy = source.clone(false); proxy.material = material;
       proxy.visible = true; proxy.frustumCulled = false; proxy.castShadow = false;

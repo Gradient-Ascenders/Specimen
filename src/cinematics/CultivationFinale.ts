@@ -405,7 +405,7 @@ export class CultivationFinale {
       if(riding){actor.velocity.set(0,0,0);actor.intent.set(0,0,0);}
       const jump=JUMPS.find(jump=>jump.id===actor.id&&t>=jump.start&&t<jump.end);
       const charge=JUMPS.find(jump=>jump.id===actor.id&&t>=jump.start-.45&&t<jump.start);
-      actor.state.grounded=!jump&&!(actor.id==='volt'&&t>=at(36.6)&&t<at(38.6))&&t<voltFinaleFallTime(actor.id);
+      actor.state.grounded=!jump&&t<voltFinaleFallTime(actor.id);
       actor.state.maximumLocomotionSpeedMetresPerSecond=t>=T.ductRun?5:6;
       actor.state.chargingJump=!!charge;
       actor.state.jumpCharge=charge?finaleSmooth(charge.start-.45,charge.start,t)*.7:0;actor.state.landedThisStep=false;
@@ -420,7 +420,6 @@ export class CultivationFinale {
         }
         if(this.previous<flight.end&&t>=flight.end){actor.presentation.onLanding(UP,8);actor.state.landedThisStep=true;}
       }
-      if(actor.id==='volt'&&this.previous<at(38.6)&&t>=at(38.6))actor.presentation.onLanding(UP,5);
       if(riding)this.direction.copy(this.forward);
       else if(t>=T.ventArrive)this.direction.set(1,0,0);
       else if(actor.id==='bob'&&t>=T.coverRun-1&&t<T.coverLand)this.direction.set(0,0,1);

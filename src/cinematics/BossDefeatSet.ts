@@ -3,6 +3,7 @@ import { FINAL_ARENA } from '../boss/FinalBossConfig.ts';
 import { ENDING_ANCHOR, ENDING_EXIT_Z, ENDING_DRONE_BAYS, ENDING_TIMING as T, endingProgress, sampleEndingBossWreck, endingCollapseBlastTime, endingCollapseBlastPosition } from './BossDefeatTimeline.ts';
 import { BossDefeatTerrain } from './BossDefeatTerrain.ts';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { setShadowMapUpdatesActive } from '../render/ShadowLightResources.ts';
 
 export class BossDefeatSet {
   readonly root = new THREE.Group();
@@ -44,6 +45,8 @@ export class BossDefeatSet {
     this.sun.castShadow = true; this.sun.shadow.mapSize.set(1024, 1024); Object.assign(this.sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 500 });
     this.sun.shadow.bias = -.0003; this.sun.shadow.normalBias = .045; this.passageLight.position.set(0, 5, 150);
     this.sun.shadow.camera.updateProjectionMatrix();
+    // Keep the retained sampler allocated while the ending sun is dark.
+    setShadowMapUpdatesActive(this.sun, false);
     this.lights.add(this.emergency, this.energyLight, this.sun, this.sun.target, this.fill, this.passageLight, this.wreckLight, this.collapseLight);
     this.debris = new THREE.InstancedMesh(this.unitBox, this.white, 224); this.debris.name = 'collapsing-lab-ceiling-and-wall-panels';
     this.debris.frustumCulled = false; this.debris.count = 0; this.root.add(this.debris);
@@ -199,6 +202,7 @@ export class BossDefeatSet {
     this.cracks.position.z = ENDING_ANCHOR.z * (1 - this.cracks.scale.z);
     const daylight = endingProgress(t, T.daylight, T.daylight + 3);
     this.sun.intensity = daylight * 3; this.fill.intensity = .7 + daylight * 1.4;
+    setShadowMapUpdatesActive(this.sun, daylight > 0);
     this.emergency.intensity = t >= T.explosion && t < T.black ? 650 * (.6 + .4 * Math.sin(t * 9)) : 0;
     this.energyLight.intensity = t >= T.charge && t < T.explosion ? (600 + endingProgress(t, T.charge, T.explosion) * 6500) : 0;
     this.doors.forEach((door, i) => { door.position.y = endingProgress(t, T.drones - 1 + i * .48, T.drones + i * .48) * 4.4; });
@@ -250,7 +254,11 @@ export class BossDefeatSet {
     }
     this.structural.instanceMatrix.needsUpdate = true;
   }
-  reset(): void { this.root.visible = false; this.debris.count = this.wreckage.count = this.structural.count = 0; this.sun.intensity = this.fill.intensity = this.energyLight.intensity = this.emergency.intensity = this.passageLight.intensity = this.wreckLight.intensity = this.collapseLight.intensity = 0; }
+  reset(): void {
+    this.root.visible = false; this.debris.count = this.wreckage.count = this.structural.count = 0;
+    this.sun.intensity = this.fill.intensity = this.energyLight.intensity = this.emergency.intensity = this.passageLight.intensity = this.wreckLight.intensity = this.collapseLight.intensity = 0;
+    setShadowMapUpdatesActive(this.sun, false);
+  }
   dispose(): void {
     this.terrain.dispose(); this.root.removeFromParent(); this.lights.removeFromParent(); this.bossDamage.removeFromParent(); this.debris.dispose(); this.wreckage.dispose(); this.sun.shadow.dispose();
     this.root.traverse(o => { if (o instanceof THREE.InstancedMesh && o !== this.debris && o !== this.wreckage) o.dispose(); });

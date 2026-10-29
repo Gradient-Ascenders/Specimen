@@ -35,6 +35,9 @@ export class ContainmentMonitor {
     sound: 'world-sign-tick-01', intervalSeconds: .12, maxDistance: 14,
   });
   protected disposed = false;
+  private presentationActive=true;
+  private textureDirty=false;
+  setPresentationActive(active:boolean):void { this.presentationActive=active; }
 
   constructor(resources: ContainmentMonitorResources, options: ContainmentMonitorOptions) {
     const owner = options.namePrefix ?? `room-${options.roomId}`;
@@ -90,9 +93,11 @@ export class ContainmentMonitor {
 
   update(deltaSeconds: number): void {
     if (this.disposed) return;
-    if (this.dialogue.update(deltaSeconds)) {
+    this.textureDirty=this.dialogue.update(deltaSeconds)||this.textureDirty;
+    if (this.presentationActive&&this.textureDirty) {
       const { text, typing, sectionIndex } = this.dialogue.readModel;
       paintContainmentMonitorTexture(this.texture, text, typing, this.sectionColours[sectionIndex] ?? 'green');
+      this.textureDirty=false;
     }
     this.typingAudio.update(deltaSeconds, this.dialogue.readModel);
   }
@@ -102,6 +107,7 @@ export class ContainmentMonitor {
     // Checkpoint recovery keeps the final page, without repainting or retyping.
     if (preserveCompleted && this.dialogue.readModel.complete) return;
     this.dialogue.reset();
+    this.textureDirty=false;
     this.typingAudio.reset();
     paintContainmentMonitorTexture(this.texture, '', false);
   }

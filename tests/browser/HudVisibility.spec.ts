@@ -110,6 +110,15 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
   await expect(hud).toBeVisible();
   await expect(page.locator('[data-current-objective]')).toBeVisible();
   await expect(page.locator('.hud-roster')).toBeVisible();
+  // Revealing the roster must not filter the continuously changing WebGL
+  // canvas for its five-second hold after a character switch.
+  const rosterContent = page.locator('.hud-roster-content');
+  await expect(rosterContent).toHaveCSS('backdrop-filter', 'none');
+  // The isolated fixture has no gameplay input controller to consume native
+  // Tab navigation; dispatch the switch event without moving browser focus.
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Tab', key: 'Tab', bubbles: true })));
+  await expect(rosterContent).toBeVisible();
+  await expect(rosterContent).toHaveCSS('backdrop-filter', 'none');
   await expect(page.locator('.hud-hint')).toBeVisible();
   await page.evaluate(() => {
     const { settings, flow } = window.__hudTest;
