@@ -27,6 +27,11 @@ uses the live opening when the backup is absent. Music, sound effects, models,
 and baked textures retain their quality. The Unix packager uses maximum ZIP
 compression and still verifies every extracted file against `dist/`.
 
+Archives preserve build modification times so static hosts can invalidate a
+cached `index.html` and `build-manifest.json` after an update. Do not reset all
+ZIP entries to a fixed date: a same-sized launch page can then receive an
+incorrect `304 Not Modified` and keep requesting assets from a removed build.
+
 For an explicit build containing the video backup, run:
 
 ```bash
@@ -109,6 +114,12 @@ extract the verified build contents into the group directory so `index.html`,
 `assets/`, and other emitted directories sit at its root. A ZIP present on the
 server is not a published game. Do not upload the repository or run package
 tools on the static host.
+
+After replacing an older deployment, hard-refresh the page or open
+`index.html?build=<revision>` once to bypass any launch page already cached
+with an old fixed timestamp. If a model request returns 404, compare its exact
+filename with `build-manifest.json`; a retired filename indicates a stale
+launch page or an existing tab still running the previous build.
 
 Open the confirmed public URL in Chrome and repeat a full playthrough. With
 DevTools preserving Network and Console logs, check nested relative paths,
