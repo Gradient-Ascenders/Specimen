@@ -355,5 +355,87 @@
   "localArtifacts": {
     "timing": "artifacts/blackout-refraction/comparison.json",
     "poweredVisuals": "artifacts/blackout-refraction/powered/comparison.json"
+  },
+  "startupComparison": {
+    "baselineCommit": "99147f29f755a51d6a9168e9b1a8aab30cfefcf5",
+    "candidateCommit": "7dac496997c972d882137c8ce613d56e4b7eccd5",
+    "protocol": "Fresh browser/profile per level unless an external CDP endpoint is supplied; Medium, 1920x1080 DPR1; native GPU. Shader disk cache disabled for owned browsers. Immediate opening skip for Containment. Request-to-ready excludes arrival cinematics and user wait at Enter. OS/driver caches uncontrolled.",
+    "configuration": "Unmodified production bundles at Medium, 1920x1080 DPR1. Six fresh Chrome processes/profiles per build, in two opposite orders. Native Intel Iris Xe. Shader disk cache disabled; OS/driver caches uncontrolled.",
+    "baselineSetup": "Isolated checkout of 99147f2 with all build assets restored. Both builds validate 209 production files and their 187 non-JavaScript assets match byte for byte. Baseline dirty flag is from an untracked node_modules symlink; candidate dirty flag is from the user recording. Both have clean tracked source.",
+    "discardedSetupFailure": "An earlier incomplete sparse baseline checkout omitted environment assets and produced a transition error. It produced no valid timing sample. All data below was collected after rebuilding and checking complete asset parity.",
+    "batches": [
+      {
+        "order": [
+          "baseline",
+          "candidate",
+          "candidate",
+          "baseline",
+          "baseline",
+          "candidate"
+        ],
+        "baseline": {
+          "loadingMs": [
+            10716.5,
+            9912.10000000149,
+            9916.699999999255
+          ],
+          "medianMs": 9916.699999999255
+        },
+        "candidate": {
+          "loadingMs": [
+            11275.5,
+            10477.699999999255,
+            10079.39999999851
+          ],
+          "medianMs": 10477.699999999255
+        }
+      },
+      {
+        "order": [
+          "candidate",
+          "baseline",
+          "baseline",
+          "candidate",
+          "candidate",
+          "baseline"
+        ],
+        "baseline": {
+          "loadingMs": [
+            10020.5,
+            10093.800000000745,
+            10613.5
+          ],
+          "medianMs": 10093.800000000745
+        },
+        "candidate": {
+          "loadingMs": [
+            9871.39999999851,
+            10146.5,
+            10514.099999997765
+          ],
+          "medianMs": 10146.5
+        }
+      }
+    ],
+    "combined": {
+      "runsPerBuild": 6,
+      "baselineMedianMs": 10057.150000000373,
+      "candidateMedianMs": 10312.099999999627,
+      "medianIncreaseMs": 254.94999999925494,
+      "medianIncreasePercent": 2.535012404103006,
+      "baselineRangeMs": [
+        9912.10000000149,
+        10716.5
+      ],
+      "candidateRangeMs": [
+        9871.39999999851,
+        11275.5
+      ]
+    },
+    "interpretation": "The candidate combined median is 254.95 ms (2.54 percent) slower. The initial batch differs by 561 ms, while reversing order gives only 52.7 ms. These small samples do not establish a consistent causal startup regression or prove exact equivalence; both remain around 10-11 seconds. All 12 runs loaded without WebGL, asset or browser errors.",
+    "localArtifacts": [
+      "artifacts/blackout-refraction/startup-comparison.json",
+      "artifacts/blackout-refraction/startup-reversed-comparison.json"
+    ]
   }
 }
