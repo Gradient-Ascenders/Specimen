@@ -11,10 +11,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Gradient-Ascenders/Specimen/actions/workflows/submission-build.yml"><img src="https://github.com/Gradient-Ascenders/Specimen/actions/workflows/submission-build.yml/badge.svg?branch=main" alt="Submission build status" /></a>
-  <a href=".nvmrc"><img src="https://img.shields.io/badge/Node.js-24.x-74aca9?logo=nodedotjs&amp;logoColor=e0f3ea&amp;labelColor=101c23" alt="Node.js 24.x" /></a>
-  <a href="package.json"><img src="https://img.shields.io/badge/TypeScript-bddbd5?logo=typescript&amp;logoColor=e0f3ea&amp;labelColor=101c23" alt="Built with TypeScript" /></a>
-  <a href="package.json"><img src="https://img.shields.io/badge/Three.js-74aca9?logo=threedotjs&amp;logoColor=e0f3ea&amp;labelColor=101c23" alt="Rendered with Three.js" /></a>
+  <a href="https://github.com/Gradient-Ascenders/Specimen/actions/workflows/submission-build.yml"><img src="https://img.shields.io/github/actions/workflow/status/Gradient-Ascenders/Specimen/submission-build.yml?branch=main&amp;style=for-the-badge&amp;label=Submission%20build&amp;logo=github&amp;logoColor=e0f3ea&amp;labelColor=101c23" alt="Submission build status" /></a>
+  <a href=".nvmrc"><img src="https://img.shields.io/badge/Node.js-24.x-74aca9?style=for-the-badge&amp;logo=nodedotjs&amp;logoColor=e0f3ea&amp;labelColor=101c23" alt="Node.js 24.x" /></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/TypeScript-7.0.2-bddbd5?style=for-the-badge&amp;logo=typescript&amp;logoColor=e0f3ea&amp;labelColor=101c23" alt="TypeScript 7.0.2" /></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/Three.js-0.185.1-74aca9?style=for-the-badge&amp;logo=threedotjs&amp;logoColor=e0f3ea&amp;labelColor=101c23" alt="Three.js 0.185.1" /></a>
 </p>
 
 <p align="center">
