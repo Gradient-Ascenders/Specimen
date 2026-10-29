@@ -267,10 +267,17 @@ export class ExterminationArena {
       this.destroyCover(i,onBreak);count++;
     });return count;
   }
+  restoreCover():void {
+    this.coverStates.forEach((state,i)=>{
+      state.mesh.visible=true;this.coverAssemblies[i]!.visible=true;
+      state.health=state.maximumHealth;state.lastBeamSerial=undefined;
+    });
+    this.lighting.invalidateShadows();
+  }
   reset():void {
     this.lighting.invalidateShadows();this.lighting.moonlight.setShaftEnabled(true);
     this.setDoors(false);this.deployment(0);this.setDamaged(false);this.setPowered(false);this.resetPlatforms();
-    for(let i=0;i<6;i++)this.setSector(i,'inactive');this.cover.forEach((mesh,i)=>{mesh.visible=true;this.coverAssemblies[i]!.visible=true;const state=this.coverStates[i]!;state.health=state.maximumHealth;state.lastBeamSerial=undefined;});
+    for(let i=0;i<6;i++)this.setSector(i,'inactive');this.restoreCover();
   }
   dispose():void {
     if(this.disposed)return;this.disposed=true;this.abort.abort();
