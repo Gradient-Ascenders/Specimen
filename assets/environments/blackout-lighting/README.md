@@ -45,10 +45,10 @@ reflections and the very faint animated acid bounce. Matte architecture does
 not acquire an unnecessary specular environment lookup.
 
 ```sh
-node scripts/generate-blackout-radiance.ts
+node scripts/assets/generate-blackout-radiance.ts
 blender --background --factory-startup --threads 2 --python-exit-code 1 \
   --python assets/environments/blackout-lighting/bake-radiance.py
-node scripts/generate-blackout-radiance.ts --check
+node scripts/assets/generate-blackout-radiance.ts --check
 ```
 
 The check validates source GLB hashes, actual static geometry, fixtures,
@@ -80,44 +80,3 @@ draws. Graphics changes, pause, checkpoints, restart, skip and unload preserve
 the existing gameplay owners. The lighting owner restores material bindings,
 releases its textures and padded maps, and discards cancelled late loads.
 The boss retains its focused directional shadow and gets a small fill increase.
-
-## Focused verification
-
-```sh
-node tests/BlackoutLightingPass.test.ts
-node --test tests/BlackoutTransitController.test.ts tests/BlackoutElevator.test.ts \
-  tests/MaintenanceDroneLighting.test.ts tests/ExterminationLighting.test.ts
-node --test-name-pattern='Blackout|unallocated drone beam|custom shadow copies|retained-camera|preparation restores' \
-  tests/ShadowPreparation.test.ts
-node scripts/generate-blackout-radiance.ts --check
-npm run build
-```
-
-Five new tests cover finite two-state data, independent circuits, unchanged
-colliders/fixtures, pause and cinematic ownership, quality/map limits,
-cancellation/disposal and stable light counts with a remote active body.
-The nine relevant preparation tests and the existing lift, transit, drone
-lighting and arena-lighting files pass. The complete preparation file also
-has three pre-existing failures in the opening's file-URL asset fixtures and
-an instance-upload expectation. They reproduce against the unchanged helper
-from commit `8b8c04e`; they were not altered in this lighting pass.
-
-Native Chrome captures use Intel Iris Xe / D3D11, Medium at 1,600 by 900.
-Matched views cover the unpowered bay, Volt's local pool, hallway, duct,
-unpowered/powered distribution hall, switch platform and lift landing.
-Observed median GPU time decreased in those views; representative results
-were 7.25 to 5.89 ms in the unpowered bay and 10.13 to 7.19 ms in the powered
-hall. CPU results vary and are not a demonstrated CPU speedup. An initial
-comparison loaded in 9.14 seconds before and 8.54 seconds with bounded lights;
-later shader-cached entries were around 2.1 to 2.5 seconds. These are local
-samples, not a qualification of the Ubuntu i3 laboratory computer or sustained
-gameplay FPS.
-
-The native checks exercise Low/Medium/High transitions, lift repair, ascent,
-arrival, boss entry, restart and unload. No late shader programs or WebGL
-errors were observed. Unload returned to one retained geometry and two
-renderer-owned textures. Accelerated cinematic checks use reduced UI motion
-to avoid interrupting HUD animations during synthetic fast-forwarding.
-Ignored evidence and comparison logs live in
-`artifacts/evidence/blackout-lighting/`. Human review of the final darkness
-and restored-power contrast remains the next acceptance step.

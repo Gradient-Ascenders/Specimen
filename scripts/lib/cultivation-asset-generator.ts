@@ -104,8 +104,8 @@ export class CultivationAssetGenerator implements CultivationAssetSource {
     this.textureData[key] = Object.fromEntries(Object.entries(maps).map(([role, map]) => {
       const bc7 = map instanceof THREE.CompressedTexture ? map.mipmaps.map(mip => ({pixels:this.array(mip.data),width:mip.width,height:mip.height})) : undefined;
       return [role, {
-      pixels: bc7 ? bc7[0].pixels : this.array(map.image.data as Uint8Array), ...(bc7 ? {bc7} : {}), width: map.image.width, height: map.image.height,
-      name: map.name, colorSpace: map.colorSpace, wrapS: map.wrapS, wrapT: map.wrapT,
+      pixels: bc7 ? bc7[0].pixels : this.array((map.image as THREE.DataTextureImageData).data as Uint8Array), ...(bc7 ? {bc7} : {}), width: map.image.width, height: map.image.height,
+      name: map.name, colorSpace: map.colorSpace as THREE.ColorSpace, wrapS: map.wrapS, wrapT: map.wrapT,
       magFilter: map.magFilter, minFilter: map.minFilter, generateMipmaps: map.generateMipmaps,
       anisotropy: map.anisotropy, repeat: map.repeat.toArray(), offset: map.offset.toArray(),
     }];}));

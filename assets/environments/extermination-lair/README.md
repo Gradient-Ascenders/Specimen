@@ -8,7 +8,7 @@ lighting contrast with the neutral light on the walking deck.
 `extermination-lair.blend` is the editable source. The owned scene is
 **Extermination Lair**; the original character assets are independent. The GLB
 contains geometry and base finishes. The game supplies the original metric PBR
-maps described in `src/assets/blackout/extermination-maps.md`. Blender's preview
+maps described in `assets/environments/extermination-lair/surface-maps.md`. Blender's preview
 lights and camera are excluded from the GLB.
 
 ## Rebuild
@@ -18,7 +18,7 @@ With Blender 5.2 or later:
 ```sh
 blender --background assets/environments/extermination-lair/extermination-lair.blend \
   --python assets/environments/extermination-lair/generate-lair.py
-npm run generate:extermination-maps
+node scripts/assets/generate-extermination-maps.ts
 ```
 
 The generator replaces only its architectural scene and owned orphan data. It
@@ -71,24 +71,3 @@ Preparation awaits the GLB and texture bundle before the level's light compilati
 and shader warmup. Geometries, shared template resources and authored lamp materials
 have one arena owner. The reflection environment is borrowed from the level and
 is never disposed by the arena.
-
-## Verification
-
-```sh
-node --test tests/ExterminationLair.test.ts tests/ExterminationMaterials.test.ts
-node --test tests/FinalBoss.test.ts tests/FinalBossMechanics.test.ts tests/FinalBossPhaseTwo.test.ts
-node scripts/generate-extermination-maps.ts --check
-node scripts/audit-extermination-surfaces.ts /tmp/lair-exact.json
-SURFACE_TOLERANCE=.01 node scripts/audit-extermination-surfaces.ts /tmp/lair-clearance.json
-```
-
-The surface audit includes the adjoining staging room, both doors, ten covers and
-the deployment hatch in initial, deployment, combat, escape and reset states.
-It tests submitted opaque triangles, including triangles within a material batch.
-Transparent effects and the separately owned boss/character meshes are outside
-that environment-only scan; the browser review includes the actual encounter.
-
-`tests/browser/ExterminationRoomArt.spec.ts` captures the production game at Medium
-and High, including the entrance, machinery, ceiling, warnings and repeated retries.
-Screenshots are written to `artifacts/evidence/extermination-room/`. Software-WebGL
-captures establish rendering/integration evidence, not hardware frame-rate claims.

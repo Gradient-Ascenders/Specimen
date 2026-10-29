@@ -87,10 +87,3 @@ partly open doors, open doors and reset. Checks use both 0.1 mm and 2 mm plane
 tolerances, with separate Room 3/5 seam checks and roof coverage probes.
 Structural repairs use ownership and physical clearances rather than polygon
 offsets. Transparent beam halos and charging rings are outside the opaque audit.
-
-`tests/RoomFourShell.test.ts` checks the real GLB, collision fingerprint, travel,
-material sharing, moving surfaces, warning timing and disposal. The focused
-browser journey is `tests/browser/RoomFourShell.spec.ts`. Captures and matched
-before/after audit reports are stored under ignored
-`artifacts/evidence/room-four-lift/`. Software WebGL evidence verifies rendering
-and integration; it does not establish hardware frame rates.

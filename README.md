@@ -62,13 +62,14 @@ Use **Return to menu** in the pause menu to end the current trial and choose aga
 
 **Default controls:** WASD to move, mouse to look, Space to jump, Tab to switch
 specimens and P to pause. Change bindings in Settings. Press **F1** to toggle the
-[HUD](docs/architecture/clean-gameplay-mode.md) while keeping aiming overlays.
+[HUD](docs/gameplay.md) while keeping aiming overlays.
 
 ## Build and check
 
 | Command | Purpose |
 | --- | --- |
 | `npm test` | Run unit tests. |
+| `npm run type-check` | Check game, test and tooling TypeScript. |
 | `npm run build` | Type-check and build the static site into `dist/`. |
 | `npm run preview` | Serve the production build locally. |
 | `npm run validate:production` | Check the built layout and asset references. |
@@ -76,17 +77,18 @@ specimens and P to pause. Change bindings in Settings. Press **F1** to toggle th
 | `npm run archive` | Build and validate `artifacts/specimen-production.zip`. |
 
 Before running smoke tests, build the game and install Chromium once with
-`npx playwright install chromium`. See the [CI guide](docs/operations/continuous-integration.md)
+`npx playwright install chromium`. See the [CI guide](docs/development.md)
 for deeper browser checks and required PR checks.
 
 To publish, upload the **contents of `dist/`** to the static host, with `index.html`
 at the site root. Relative asset paths also support hosting under a subdirectory.
 A ZIP upload alone does not publish the game; follow the
-[deployment guide](docs/operations/deployment.md) for packaging and verification.
+[deployment guide](docs/development.md) for packaging and verification.
 
 ## Documentation
 
 - [Project docs](docs/README.md) — architecture, levels and design decisions.
-- [Slimes and abilities](docs/gameplay/slimes-and-abilities.md) — switching and gameplay mechanics.
-- [Playtesting](docs/operations/playtesting.md) — checks for a complete playthrough.
+- [Slimes and abilities](docs/gameplay.md) — switching and gameplay mechanics.
+- [Playtesting](docs/development.md) — checks for a complete playthrough.
 - [Gameplay audio](docs/architecture/gameplay-audio.md) — sound mapping and asset provenance.
+- [Asset sources](assets/README.md) — authoring files, media and repository layout.

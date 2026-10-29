@@ -1,120 +1,46 @@
 # Contributing to Specimen
 
-This guide defines the shared development workflow for the Specimen repository,
-the project workspace for the single-player 3D puzzle-platformer.
+Use the Node version in `.nvmrc`, the npm version in `package.json` and `npm ci`.
+Keep the lockfile synchronized. Follow `.editorconfig`; avoid unrelated formatting
+changes. Start a focused branch from current `main` and link its issue or agreed
+task in the pull request.
 
-Use **Specimen** when referring to the project, repository, or game. Issue-specific
-acceptance criteria and repository `AGENTS.md` instructions take precedence where
-they are more specific.
+## Implementation
 
-## Prepare the repository
+- Preserve the single-player scope and current TypeScript/Three.js/Vite stack.
+- Keep kinematic collision and authoritative game state separate from visual
+  meshes, audio and UI. See [runtime ownership](docs/architecture/runtime.md).
+- Keep source grouped by responsibility. Use descriptive lowercase kebab-case
+  media names; retain established TypeScript module naming.
+- Put source art and recordings in `assets/`, bundled banks in `src/assets/`,
+  and directly served runtime media in `public/`. See [asset sources](assets/README.md).
+- Preserve source inputs, compact provenance and licences. Update [CREDITS](CREDITS.md)
+  when introducing third-party resources.
+- Store local captures, reports and benchmarks under ignored `artifacts/`.
+  Attach review evidence to issues/PRs or retain it in CI artifacts.
+- Keep local configuration in ignored `.env` files and safe examples only.
+- Add proportionate coverage for meaningful behavior changes. Keep the unit
+  suite focused and replace overlapping coverage when adding regressions.
 
-Clone the repository and create work from the current `main` branch:
+## Validation and delivery
 
-```bash
-git clone https://github.com/Gradient-Ascenders/Specimen.git
-cd Specimen
-git switch main
-git pull --ff-only
-```
-
-Use the Node.js version in `.nvmrc` and the npm version in the `packageManager`
-field of `package.json`. CI installs both versions explicitly. Use `npm ci` for
-reproducible installs, keep the manifest and lockfile synchronized, and do not
-replace the package manager or lockfile without an approved project decision.
-
-## Work from an issue
-
-1. Read the complete GitHub issue, comments, dependencies, and acceptance criteria.
-2. Create a short-lived branch from the current `main` branch.
-3. Keep the change inside the issue boundary and coordinate cross-role decisions.
-4. Run the relevant automated and manual verification.
-5. Open a small pull request that links the issue and records verification evidence.
-
-Use descriptive branch names such as `feat/slime-switching` or
-`fix/etch-collision`. Do not work directly on `main` or merge your own pull
-request.
-
-## Follow the shared standards
-
-- Preserve the approved single-player scope. Do not introduce multiplayer,
-  networking, matchmaking, server-hosting, account, or online-service
-  dependencies without an approved scope change.
-- Use TypeScript, Three.js, Vite, DOM/CSS, handwritten GLSL, and Blender/GLB assets
-  consistently with the established project architecture.
-- Keep predictable kinematic gameplay collision separate from the deforming
-  visual slime mesh.
-- Keep changes focused. Record defects and deferred work in follow-up issues
-  instead of silently expanding the current issue.
-- Load local configuration from ignored `.env` files. Commit only safe
-  placeholders in `.env.example` files, and never commit credentials or tokens.
-- Record third-party code, assets, and resources in the project credits ledger.
-- Add proportionate automated tests for meaningful behaviour changes once the
-  relevant test infrastructure exists.
-
-Before committing, run every relevant check exposed by the repository:
-
-```bash
+```sh
 npm run type-check
 npm test
 npm run build
 ```
 
-Do not report a command as passing unless it was actually run. If a required
-check is unavailable, record that limitation in the pull request.
+Run generated-asset checks when changing source assets or generators, and
+relevant browser checks for loading, rendering, audio and lifecycle changes.
+[Development](docs/development.md) covers browser setup, packaging and hosting.
+Record commands actually run and any remaining manual checks. Browser automation
+and software rendering do not establish full playthrough or hardware acceptance.
 
-## Create coherent commits
+Review the diff, stage intended paths selectively and preserve unrelated work.
+Use concise imperative commit subjects with an established prefix: `[feat]`,
+`[fix]`, `[test]`, `[docs]`, `[refactor]` or `[chore]`.
 
-Review both unstaged and staged changes, stage files selectively, and confirm
-that no secrets or unrelated changes are included. Commit subjects must use one
-of the approved prefixes:
-
-```text
-[feat] add slime switching controls
-[fix] prevent duplicate collision resolution
-[test] cover charged bounce timing
-[docs] document repository contribution guidelines
-[refactor] isolate slime movement state
-[chore] configure project quality checks
-```
-
-Keep subjects concise, imperative, and specific to the change. Split unrelated
-work into separate commits.
-
-## Prepare the pull request
-
-Link the issue using `Closes #<number>` or `Refs #<number>`. Explain the problem
-and approach, list the commands actually run, distinguish outstanding manual
-checks, and record accessibility, documentation, performance, resource-disposal,
-asset, and scope impacts.
-
-Visual changes should include screenshots or a short recording. Confirm that the
-affected player journey works and that no unexplained console errors or asset
-404s were introduced.
-
-Every pull request requires approval from at least one teammate who is not its
-author. Resolve review discussions and re-request review after material changes.
-Do not mark the issue complete until the change is merged and all required
-verification is complete.
-
-## Follow the review rotation
-
-Each issue names an owner and a reviewer. The owner coordinates delivery and is
-accountable for satisfying the completion requirements. The reviewer validates
-the scope, implementation, acceptance criteria, and evidence.
-
-Rotate reviews through the other three collaborators. Skip the issue owner and
-anyone unavailable or directly conflicted, then record the substitution on the
-pull request. For Sprint 0, Tyron is the M1 owner for systems and movement, and
-Kevin is the M2 reviewer for graphics and shaders.
-
-## Protect the main branch
-
-All changes reach `main` through pull requests. The intended repository rules
-require a pull request, at least one non-author approval, resolved conversations,
-and all configured status checks before merge.
-
-No required protection is currently recorded as unavailable under the repository's
-GitHub plan. If GitHub cannot enforce a control, the team agreement still applies.
-Document the limitation in the setup issue and revisit the repository settings if
-the plan or repository visibility changes.
+Changes reach `main` through a pull request. Link the task, describe the resulting
+behavior, record validation and obtain a non-author teammate's review. Resolve
+discussions and required checks before merge; repository rules may add further
+requirements. Do not merge your own pull request.

@@ -68,9 +68,9 @@ generator regeneration.
 After every exported edit:
 
 ```bash
-node scripts/register-cultivation-blender.ts
-node scripts/generate-cultivation-assets.ts
-node scripts/generate-cultivation-assets.ts --check
+node scripts/blender/register-cultivation-blender.ts
+node scripts/assets/generate-cultivation-assets.ts
+node scripts/assets/generate-cultivation-assets.ts --check
 npm run build
 ```
 
@@ -143,29 +143,3 @@ Room-scale culling stays in place. Room 5's static exports are split into spatia
 finish batches; moving owners remain separate. Repeated lift cassettes share
 geometry buffers. Resource changes and actual staged-render counts are recorded
 in the local evidence manifests; software-renderer captures do not establish hardware FPS.
-
-## Validation and review
-
-```bash
-node scripts/audit-level-two-surfaces.ts /tmp/level-two-surfaces.json
-SURFACE_TOLERANCE=.01 node scripts/audit-level-two-surfaces.ts /tmp/level-two-clearance.json
-node --test --test-isolation=none tests/OpaqueSurfaceAudit.test.ts \
-  tests/CultivationSurfaceCleanup.test.ts tests/CultivationBlenderArt.test.ts \
-  tests/CultivationBlenderTraversal.test.ts
-```
-
-The assembled fixture includes runtime encounters, same-batch/instance triangles,
-support drops, partly/open/closing doors, descent/arrival, network switches,
-intermediate release, escape floor states and reset. The wider scan also reports
-existing thin fixture details; keep their classification separate from new
-structural findings. Do not add broad exclusions or use camera/render-order bias
-to conceal contacts.
-
-Coverage tests cast against actual front-sided triangles, including curved-vault
-joints and the sliding return's lap; the intentional drop is checked separately.
-Continuous physical traversal checks use real movement, jumps, acid shots and
-mechanism owners. Visual capture staging is labelled separately and does not
-count as an intended-route playthrough.
-
-Local before/after images, native screenshots, contract fingerprints, resource
-records and the review gallery are under `artifacts/evidence/cultivation-blender/`.

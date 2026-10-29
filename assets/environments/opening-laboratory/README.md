@@ -44,8 +44,3 @@ reduced-motion mode, Skip and gameplay handoff remain with the existing code.
 The pod reveal receives a warmer key against a cool rim, plus a restrained
 internal light lift on the crack beats. This pass updates the default live
 intro; the opt-in MP4 backup still contains its previous scenery.
-
-`tests/OpeningLaboratory.test.ts` exercises the actual GLB in plaque occlusion,
-framing, preparation and shared-camera checks. Rendered inspection frames are
-stored under ignored `artifacts/evidence/opening-blender/`. Software WebGL
-captures are visual/integration evidence, not hardware performance measurements.

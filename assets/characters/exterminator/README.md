@@ -57,9 +57,8 @@ remains available for synchronous headless encounter fixtures.
 ## Verification
 
 ```sh
-node --test tests/ExterminatorModels.test.ts tests/FinalBoss.test.ts tests/FinalBossMechanics.test.ts tests/FinalBossPhaseTwo.test.ts
 npm run build
-npx playwright test tests/browser/ExterminatorModels.spec.ts
+npx playwright test tests/browser/rendering/ExterminatorModels.spec.ts
 ```
 
 The model checks exercise actual exported geometry and pivots, real RAM contacts

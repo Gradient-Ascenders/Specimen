@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       extended_checks:
-        description: Run the full shader and lifecycle browser suite before publishing
+        description: Run the scheduled integration journeys before publishing
         type: boolean
         default: false
 
@@ -27,17 +27,9 @@ jobs:
       - name: Check out submission revision
         uses: actions/checkout@v7
 
-      - name: Use pinned Node.js version and cache npm downloads
-        uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - name: Use pinned npm version
-        run: npm install --global npm@11.18.0
-
-      - name: Install locked dependencies
-        run: npm ci
+          browser: chromium
 
       - name: Run tests
         run: npm test
@@ -46,18 +38,15 @@ jobs:
       - name: Build and validate production archive
         run: npm run archive
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
       - name: Smoke-test the extracted submission at a nested path
         env:
           SPECIMEN_SMOKE_ARCHIVE: artifacts/specimen-production.zip
         run: npm run test:smoke
 
-      - name: Run extended shader and lifecycle checks
+      - name: Run scheduled integration checks
         if: github.event_name == 'workflow_dispatch' && inputs.extended_checks
         # Reuse the existing build rather than test:browser, which rebuilds it.
-        run: npx playwright test
+        run: npm run test:integration -- --grep @nightly
 
       - name: Name the verified submission
         id: package
@@ -87,7 +76,7 @@ jobs:
             printf '[Download %s](%s)\n\n' "${ARCHIVE_PATH##*/}" "$DOWNLOAD_URL"
             printf 'ZIP SHA-256: `%s`\n\n' "$archive_sha256"
             printf '%s\n\n' 'Passed: unit tests, TypeScript, production build, archive validation, and smoke checks against the extracted ZIP at a nested path.'
-            printf 'Extended shader/lifecycle checks requested: `%s`\n\n' "$EXTENDED_CHECKS"
+            printf 'Scheduled integration checks requested: `%s`\n\n' "$EXTENDED_CHECKS"
             printf '%s\n' \
               'Upload the ZIP to the Moodle-linked Tiny File Manager only if extraction is supported; otherwise extract locally and upload its contents.' \
               'Verify index.html and assets/ are directly in the group directory, without an enclosing dist/ folder. Uploading a ZIP alone does not deploy the game.' \
