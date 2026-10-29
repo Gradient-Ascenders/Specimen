@@ -287,14 +287,13 @@ software renderer. Three's program-parameter/cache-key work and uniform-array
 flattening are prominent sampled allocation sites. Cultivation Room 3's sampled
 fixed updates have a 5.7 ms median versus roughly 2–4 ms in its other rooms.
 These profiler-assisted samples are diagnostic main-thread wall time, including
-blocking native calls, not evaluation-machine frame pacing. A frozen A/B/A
-experiment will test prepacked static lighting arrays before a source edit.
+blocking native calls, not evaluation-machine frame pacing. Frozen A/B/A controls below test prepacked static lighting arrays before a source edit.
 Text-typing work after staged room placement is expected and is not a steady
 playback baseline. Raw data: `runtime-cpu-baseline/` (13 valid views; see its
 recorded final error), `runtime-cpu-boss-baseline/` and `runtime-cpu-summary.json`.
 
-Static lighting-array packing remains experimental. The profiled Cultivation
-control reduces sampled flattening work, but aggregate allocation estimates
+Packing is retained only for Cultivation and Blackout after the controls below.
+The initial profiled Cultivation control reduces sampled flattening work, but aggregate allocation estimates
 vary. An unprofiled frozen A/B/A run preserves every image and resource count,
 with submission medians as follows:
 
@@ -304,11 +303,40 @@ with submission medians as follows:
 | Cultivation Room 3 | 19.85 ms | 25.75 ms | 26.95 ms |
 | Blackout Room 1 | 26.10 ms | 35.50 ms | 26.10 ms |
 
-These mixed results do not support adoption. A fresh-browser control supplies
-each array format before module initialization to separate steady behavior
-from possible effects of switching hot JavaScript value types. No packing
-change is in production. Raw data: `static-uniform-control/` and
-`static-uniform-repeat/`. Submission wall time includes native blocking calls.
+The hot-switch experiment alone does not support adoption. Fresh browsers
+subsequently supply the array format before module initialization, freeze native
+start synchronously, and finish the real arrival with fixed steps. Both orders
+preserve exact images, uploaded Float32 values, camera state, program counts,
+draw/triangle counts and resource counts:
+
+| Fresh view / order | Original submission median | Packed submission median | Completed-frame change |
+| --- | ---: | ---: | ---: |
+| Cultivation Room 3, original first | 27.40 ms | 24.15 ms | -0.52% |
+| Blackout Room 1, original first | 38.70 ms | 35.65 ms | +2.97% |
+| Cultivation Room 3, packed first | 27.60 ms | 16.95 ms | +0.69% |
+| Blackout Room 1, packed first | 37.30 ms | 35.80 ms | -0.86% |
+
+Each median contains 24 samples after five settling draws. Submission wall time
+includes native blocking calls; the large spread limits the size of the claim.
+The supported mechanism is avoiding repeated Vector3 coercion/flattening in
+Three's uniform upload path. There is no supported GPU or evaluation-FPS gain.
+The production change packs only the four immutable bounds/grid/capture arrays
+in Cultivation and Blackout. The actual build passes all 512 units and production
+layout validation; all three matched captures are exact, with unchanged GPU
+values, program counts, draws and resource counts. Built submission medians are
+24.85 ms for Cultivation and 36.15 ms for Blackout, against 27.60 and 37.30 ms
+controls. Raw build checks: `uniform-{build,layout,unit}.log`; captures and the
+strict value/resource comparison are `static-uniform-built/`,
+`static-uniform-containment-built/` and `static-uniform-built-summary.json`. Containment is
+excluded: its fresh median increases from 16.25 to 16.90 ms (+4.0%), consistent
+with the earlier small hot-switch increase. Its pixels and GPU values match,
+but these measurements do not support changing its five-zone layout.
+Dynamic powers, origins, shader source and quality remain unchanged.
+Raw data: `static-uniform-control/`, `static-uniform-repeat/`,
+`static-uniform-fresh-{before,packed}/`, their `-repeat` counterparts, and
+`static-uniform-containment-{before,packed}/` and
+`static-uniform-fresh-summary.json`. The older profiled allocation totals are
+noisy and do not establish an aggregate allocation reduction.
 
 Manual capture review confirms the intended Containment doorway view, controlled
 research-to-combat camera and ending daylight view are present in the retained
@@ -327,12 +355,44 @@ Raw controls: `zero-directional-shadows/`, `authored-box-control/` and
 `blackout-box-control/` beneath the artifact root.
 
 Cultivation's original load attributes 47.05 s to program-log queries and
-15.47 s to shader-log queries. That time may be compiler waiting, rather than
-avoidable diagnostic overhead. A matched control suppresses the log queries,
-independently checks every program's link status before audited readiness, and
-records six completed live draws. No renderer error-policy change is retained.
+15.47 s to shader-log queries. A matched control suppresses log queries but
+independently checks all 172 programs' link status before audited readiness.
+Readiness changes from 81.520 to 79.184 s, comparable to the original 79.073 s
+baseline. Waiting moves into program-parameter queries (61.738 s); there is no
+supported benefit from removing diagnostics. Both runs pass every link check
+and have no new programs or GL errors in six completed ordinary draws. Shader
+error checks remain enabled. Raw data: `shader-logs-before/` and
+`shader-logs-suppressed/`.
 
-Next: assess the shader-query control, draw attribution and fresh-start uniform
-control, then run the broader integration/graphics milestone. Preserve independently positioned companions and authoritative
-simulation. Real Alder Lake GPU loading, frame pacing, first-use behavior and
-visual checks remain outstanding.
+Draw attribution covers seven heavy views across the three levels, including
+actual boss combat. In early Blackout, distant transit art accounts for 134
+calls / 48,168 triangles, the ascent group 114 / 20,510, and lair static scenery
+40 / 189,400 across all passes. Hiding distant static art cuts the maintenance
+forward view from 719 calls / 433,412 triangles to 501 / 187,950, but changes
+1,473 channels (530 pixels in the upper background). Transit forward changes
+4,483 channels. Restored frames are exact and body positions unchanged.
+This whole-root policy is rejected, regardless of its lower completion times.
+
+The ascent landing reverse view is exact under old-room art hiding, saving
+268 calls / 83,258 triangles. A narrower diagnostic checks bounding boxes
+against the inset opaque rear-shutter rectangle, across 16 camera positions
+and pitches, leaving shadow hooks untouched. No culling source change is
+retained. Per-root controls show why the broad policy is unsafe: transit and
+lair art change maintenance pixels, while ascent and lair art change transit
+pixels. Hiding transit's own art there is only a positive visibility control.
+Raw data: `draw-attribution/`, `draw-attribution-summary.json`,
+`blackout-room-occlusion-control/`, `blackout-occlusion-components/` and
+`blackout-gate-occlusion/`.
+
+A Cultivation reflection mip-sharing control is inconclusive and is not
+retained. Readiness changes from 82.047 to 79.759 s, within the preceding
+control range, and ten room completion medians are mixed (-5.8% to +3.6%).
+All ten images, program-key sets, resource counts, graphics and first-use
+metadata match. The first attempt ended after a baseline browser audio-device
+error and is excluded; both repeated runs are clean. Raw data:
+`cultivation-mip-{before,loop}-retry/` and `cultivation-mip-summary.json`.
+
+Next: integrate and validate the geometric shutter helper, then run the
+broader integration/graphics milestone. Preserve independently positioned
+companions and authoritative simulation. Real Alder Lake GPU loading, frame
+pacing, first-use behavior and visual checks remain outstanding.

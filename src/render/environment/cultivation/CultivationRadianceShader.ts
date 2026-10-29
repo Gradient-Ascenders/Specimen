@@ -5,11 +5,13 @@ import { CULTIVATION_RADIANCE_LAYOUT as ZONES, CULTIVATION_ATLAS_WIDTH as WIDTH,
 
 let offset = 0;
 const offsets = ZONES.map(zone => { const first = offset; offset += zone.grid[2] + 2; return first; });
+// Immutable layout vectors already match WebGL storage; avoid flattening
+// Vector3 arrays again for every material draw.
 const layout = {
-  cvMin: { value: ZONES.map(p => new THREE.Vector3(...p.min)) },
-  cvMax: { value: ZONES.map(p => new THREE.Vector3(...p.max)) },
-  cvGrid: { value: ZONES.map(p => new THREE.Vector3(...p.grid)) },
-  cvCapture: { value: ZONES.map(p => new THREE.Vector3(...p.capture)) }, cvOffset: { value: offsets },
+  cvMin: { value: new Float32Array(ZONES.flatMap(p => p.min)) },
+  cvMax: { value: new Float32Array(ZONES.flatMap(p => p.max)) },
+  cvGrid: { value: new Float32Array(ZONES.flatMap(p => p.grid)) },
+  cvCapture: { value: new Float32Array(ZONES.flatMap(p => p.capture)) }, cvOffset: { value: offsets },
 };
 export interface CultivationRadianceUniforms {
   cvVolume: THREE.IUniform<THREE.Data3DTexture>;
