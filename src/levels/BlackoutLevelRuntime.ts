@@ -9,6 +9,7 @@ import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/
 import * as THREE from 'three';
 import { CinematicCompileCache } from '../render/CinematicCompileCache.ts';
 import { HiddenMaterialCulling } from '../render/HiddenMaterialCulling.ts';
+import { BlackoutShutterOcclusion } from '../render/environment/blackout/BlackoutShutterOcclusion.ts';
 import { GoopCharacterPresentation, type GoopCharacterPresentationState } from '../render/goop/GoopCharacterPresentation.ts';
 import { GelReflectionLighting } from '../render/slime/GelReflectionLighting.ts';
 import {BlackoutLightingPass} from '../render/environment/blackout/BlackoutLightingPass.ts';
@@ -290,6 +291,12 @@ export class BlackoutLevelRuntime {
   private presentationPreparation: Promise<void> | undefined;
   private programPreparation: BlackoutPresentationPreparation | undefined;
   private hiddenMaterialCulling: HiddenMaterialCulling | undefined;
+  private shutterOcclusion: BlackoutShutterOcclusion | undefined;
+  private readonly drawRenderLayer = (): void => { this.renderLayer.render(); };
+  private readonly drawPreparedScene = (): void => {
+    if (this.hiddenMaterialCulling) this.hiddenMaterialCulling.render(this.drawRenderLayer);
+    else this.drawRenderLayer();
+  };
   private readonly preparationCamera = new THREE.PerspectiveCamera();
   private readonly authoredRoomOne: boolean;
   private readonly playArrival:boolean;
@@ -490,6 +497,10 @@ export class BlackoutLevelRuntime {
     ]).then(async () => {
       if (this.resources !== resources) return;
       this.hiddenMaterialCulling = new HiddenMaterialCulling(this.renderLayer.scene);
+      const ascentRearGate = resources.scene.bossStaging?.ascentLift?.rearGate;
+      if (ascentRearGate) this.shutterOcclusion = new BlackoutShutterOcclusion(
+        this.renderLayer.renderer, ascentRearGate, resources.scene.root,
+      );
       resources.researchFinale?.connectArenaCutout(this.renderLayer.renderer);
       // The retained light layout includes distant and unpowered fixtures.
       // Reuse the tested finite-light guard before warming all material forms;
@@ -1747,10 +1758,16 @@ export class BlackoutLevelRuntime {
     resources?.hallwayShadows?.prepareFrame(resources.hallwayShadowParticipants);
     if (resources) resources.scene.finalArena?.lighting.prepareFrame(resources.renderedSpecimenPosition, this.lifecycle.state === 'running');
     resources?.lighting?.prepareCamera(this.renderLayer.cameraRig.camera,resources.specimenForm.readModel.controlledForm==='specimen'?resources.specimenBody.position:resources.group.activeBody.position);
-    try{
-      if(this.hiddenMaterialCulling)this.hiddenMaterialCulling.render(()=>this.renderLayer.render());
-      else this.renderLayer.render();
-    }finally{resources?.lighting?.restoreCamera();}
+    try {
+      // Preparation and every cinematic keep their complete authored draws.
+      // Ordinary cameras may reject only geometry proven behind the shutter.
+      if (this.shutterOcclusion && this.lifecycle.state === 'running' && this.input.enabled && resources &&
+          resources.phase.phase !== 'merging' && !resources.ventArrival?.active &&
+          !resources.elevatorAscent?.active && !resources.researchFinale?.active &&
+          !resources.defeatFinale?.active && !resources.finalBoss?.cinematic) {
+        this.shutterOcclusion.render(this.renderLayer.cameraRig.camera, this.drawPreparedScene);
+      } else this.drawPreparedScene();
+    } finally { resources?.lighting?.restoreCamera(); }
   }
 
   getSpeedEffectStrength(): number {
@@ -2574,6 +2591,7 @@ export class BlackoutLevelRuntime {
     resources.lighting?.dispose();
     this.programPreparation?.dispose(); this.programPreparation = undefined;
     this.hiddenMaterialCulling = undefined;
+    this.shutterOcclusion = undefined;
     this.input.setEnabled(false);
     this.input.resetState();
     this.input.releasePointerLock();

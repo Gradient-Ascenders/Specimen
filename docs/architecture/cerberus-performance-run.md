@@ -10,9 +10,10 @@ software-renderer diagnostics, **not evaluation-machine FPS**.
   `perf/optimisations` work. Isolated branch `perf/cerberus-20261028`, worktree
   `/home/kevin/dev/worktrees/specimen/perf-20261028`. Original worktrees retained.
 - Current server: hostname `login`, 88 logical Xeon Gold 6152 CPUs, 247 GiB RAM,
-  Ubuntu 26.04. `ssh cerberus` does not resolve here. Host confirmation was
-  requested; work continues provisionally on this server, with actual identity
-  recorded in captures. No accelerated GPU is available.
+  Ubuntu 26.04. The user confirmed this is the host to use as Cerberus.
+  `ssh cerberus` does not resolve here; execution is local on this confirmed
+  host, with its actual identity recorded in captures. No accelerated GPU
+  is available.
 - User-local Node 24.14.1, npm 11.18.0, Playwright 1.61.0 and Chromium
   149.0.7827.55. Browser shared libraries extracted into the user account.
   Environment: `artifacts/cerberus-perf/control/env.sh`.
@@ -256,7 +257,7 @@ images, program counts and first-use events. Ready changes from 146.808 to
 completion timings move in both directions. This does not establish a useful
 gain; no production change is retained. Raw data: `containment-probe-{before,loop}/`.
 
-## Current investigation and validation
+## Baseline issues and CPU investigation
 
 All 14 generated-asset checks have identical outcomes on untouched `08d9a5e`
 and the candidate, using the same pinned dependencies: 12 pass; Containment
@@ -291,6 +292,8 @@ blocking native calls, not evaluation-machine frame pacing. Frozen A/B/A control
 Text-typing work after staged room placement is expected and is not a steady
 playback baseline. Raw data: `runtime-cpu-baseline/` (13 valid views; see its
 recorded final error), `runtime-cpu-boss-baseline/` and `runtime-cpu-summary.json`.
+
+## Retained static lighting layouts
 
 Packing is retained only for Cultivation and Blackout after the controls below.
 The initial profiled Cultivation control reduces sampled flattening work, but aggregate allocation estimates
@@ -342,14 +345,14 @@ Manual capture review confirms the intended Containment doorway view, controlled
 research-to-combat camera and ending daylight view are present in the retained
 exact-image comparisons, including the separate ending-sun comparisons above.
 
-## Next work
+## Other experiments
 
 Tighter authored boxes in Cultivation Room 3 remove no triangles in the forward
 view and 6,420 / 1,169,504 (0.55%) in reverse, without pixel changes. That small
 result does not justify production code. The initial Blackout box probe selected
 zero meshes because its art uses different metadata. The corrected control
 selects 246 meshes and removes 0.4–5.9% of triangles across six views, with
-identical pixels but no useful timing gain. No camera-culling change is retained.
+identical pixels but no useful timing gain. No tighter-box change is retained.
 
 Raw controls: `zero-directional-shadows/`, `authored-box-control/` and
 `blackout-box-control/` beneath the artifact root.
@@ -376,8 +379,7 @@ This whole-root policy is rejected, regardless of its lower completion times.
 The ascent landing reverse view is exact under old-room art hiding, saving
 268 calls / 83,258 triangles. A narrower diagnostic checks bounding boxes
 against the inset opaque rear-shutter rectangle, across 16 camera positions
-and pitches, leaving shadow hooks untouched. No culling source change is
-retained. Per-root controls show why the broad policy is unsafe: transit and
+and pitches, leaving shadow hooks untouched. Per-root controls show why the broad policy is unsafe: transit and
 lair art change maintenance pixels, while ascent and lair art change transit
 pixels. Hiding transit's own art there is only a positive visibility control.
 Raw data: `draw-attribution/`, `draw-attribution-summary.json`,
@@ -392,7 +394,100 @@ metadata match. The first attempt ended after a baseline browser audio-device
 error and is excluded; both repeated runs are clean. Raw data:
 `cultivation-mip-{before,loop}-retry/` and `cultivation-mip-summary.json`.
 
-Next: integrate and validate the geometric shutter helper, then run the
-broader integration/graphics milestone. Preserve independently positioned
-companions and authoritative simulation. Real Alder Lake GPU loading, frame
-pacing, first-use behavior and visual checks remain outstanding.
+## Retained Blackout closed-shutter culling
+
+The retained helper rejects only authored maintenance/transit mesh boxes
+whose eight corners project inside the opaque ascent rear shutter's inset
+rectangle. It uses current world transforms and only the fully closed gate.
+The original 8.06 × 5.27 m body and bevel are checked against the authoring
+script; the occlusion rectangle is inset to 7.6 × 4.8 m. Opening/hidden gates, non-perspective cameras
+and cameras behind the gate bypass the helper. A conservative clip-space
+near-plane check keeps all draws if any of the inset shutter volume can be
+clipped, including close or sharply tilted cameras. Shadow-camera submissions,
+actors, lights, scene visibility/layers and authoritative simulation are
+unchanged. The renderer method restores synchronously, including on errors.
+Preparation and all arrival, elevator, research, merging and ending cinematics
+keep their original drawing path.
+
+The revised production build passes all 518 unit tests and production layout
+validation. Six helper cases cover conservative silhouette boundaries,
+independent companions, shadow cameras, opening/hidden gates, camera layers,
+rotated parents, moving art, clipped shutters and throwing-draw restoration. The built A/B/A
+control includes 16 camera positions/pitches, two transit power states and
+native Tab switching through Bob, Goop and Volt. All 20 views and restored
+frames are pixel-identical at 1920×1080 Medium. Body positions and geometry
+ranges match; every measured draw has zero new programs, GPU storage,
+program-log inspections and GL errors.
+
+| View | Calls before → after | Triangles before → after |
+| --- | ---: | ---: |
+| Near rear shutter, camera [0, 2, 177.1] | 316 → 150 | 155,219 → 106,079 |
+| Central landing reverse, camera [0, 2, 189] | 705 → 445 | 411,346 → 340,414 |
+
+The central view removes 260 calls (36.9%) and 70,932 triangles (17.2%).
+Its software completion medians are 1,480.9 → 1,285.5 ms, but only two draws
+per A/B/A phase were taken: the supported result is the deterministic draw
+reduction and exact images, not an evaluation frame-rate claim. Side and
+elevated cameras appropriately retain more scenery. Central and side images
+were also reviewed manually. Raw evidence: `blackout-gate-submission/`,
+`blackout-gate-built/`, `blackout-gate-summary.json` and `gate-{build,layout,unit}.log`.
+
+All 74 cinematic checkpoints and the controlled research/combat handoff are
+pixel-identical against the previously validated directional-light build, with
+matching presentation metadata, program-key sets, resource counts and first-use
+events. This includes the first positive daylight frame and its full 1024-square
+shadow map. Raw evidence: `gate-cinematics-built/` (ready 102.484 s).
+The initial four native elevator/research/ending/Medium preparation cases pass
+(7.8 minutes). The near-plane refinement also passes the native elevator and Medium/1080p
+preparation checks (3.8 minutes) and repeats all 20 image comparisons exactly,
+including unchanged first-use state, body positions and geometry ranges.
+The close, tilted case conservatively retains all 137 calls; the central
+landing still removes 260 calls and 70,932 triangles. This final control is
+`blackout-gate-near-built/`, with `gate-near-{build,layout,unit,functional}.log`.
+Its first capture command referenced a nonexistent runner filename; that setup
+failure is excluded and the corrected capture retry passes. The broader
+smoke/integration/graphics milestone is in progress. Real Alder Lake GPU loading, frame pacing, first-use
+behavior and visual checks remain outstanding.
+
+## Additional browser coverage
+
+User-local Firefox 151.0 / Playwright Firefox 1532 passes the native production
+startup, credits and restart smoke (2.5 minutes), with software WebGL2 under
+Xvfb. Its renderer reports `llvmpipe, or similar`. Dependencies are isolated
+from Chromium in `~/.local/opt/specimen-perf-20261028/firefox-deps/`;
+`control/firefox-env.sh` selects them. Headless Firefox did not provide WebGL2.
+The user-local Xvfb copy needed a same-length keyboard-compiler path relocation;
+the original package binary and both hashes are retained in
+`firefox-xvfb-relocation.json`. No system libraries are replaced. Raw evidence:
+`firefox-renderer.json`, `firefox-smoke.log` and `firefox-smoke-xvfb.log`.
+
+## Remaining evaluation-machine checks
+
+Run on the specified i3-1220P / Alder Lake integrated GPU / 16 GiB / Ubuntu
+24.04 machine, with hardware-accelerated Intel/Mesa WebGL and the actual
+1920×1080 drawing buffer, manual Medium and 100% render scale. Record browser,
+Mesa/kernel, power mode and thermal conditions. Do not use the artifact
+capture runners' forced SwiftShader backend for an evaluation FPS result.
+
+1. Repeat loading from clean navigation and in-session reloads, separately
+   recording cache conditions, asset preparation, program compilation,
+   geometry upload and cinematic preparation. Check the retained full-size
+   transmission target and all shadow variants before readiness.
+2. Traverse every room and doorway with real input. Record p50/p95/p99 frame
+   times, long frames, CPU/GPU timing where available and repeated-cycle
+   memory. Prioritize Cultivation Room 3, Blackout maintenance/transit and
+   both boss phases; software readbacks cannot establish frame pacing.
+3. Compare the Containment reflection loop and zero-directional-light shader
+   branch on Intel's compiler/GPU. Their software results do not establish
+   the same gain, or a gain of the same size, on another driver.
+4. Check close, tilted and side views around the ascent shutter, opening and
+   closing, independently parked companions, power states and native character
+   switching. Repeat abilities, hazards, death/retry and graphics changes.
+5. Watch the complete ascent, research/combat handoff and ending with audio,
+   including the first daylight shadow. Check for first-use hitches and
+   unchanged transmission, shadows, lighting and Medium appearance.
+
+The existing [Medium 1080p hardware protocol](medium-1080-performance-pass.md)
+contains the native hardware loading and staged-route commands. Build a clean
+commit before using those runners; retain both baseline and candidate evidence.
+No visual tradeoff or lower global resolution is adopted in this run.
