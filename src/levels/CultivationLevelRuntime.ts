@@ -1,7 +1,8 @@
 import { CULTIVATION_LEVEL_GAMEPLAY_SUPPORT as gameplay } from './CultivationLevelGameplay.ts';
 import type { SlimeHealthReadModel } from '../systems/SlimeDamageSystem.ts';
 import { CompanionRegroup } from '../slimes/CompanionRegroup.ts';
-import { cultivationCompanionWalk } from './CultivationCompanionWalks.ts';
+import { CompanionIndicators } from '../ui/CompanionIndicators.ts';
+import { cultivationCompanionWalk, cultivationCompanionWaitingReason } from './CultivationCompanionWalks.ts';
 import { goopSpeedEffectStrength } from '../ui/GoopSpeedOverlay.ts';
 import { CultivationVentArrival } from '../cinematics/CultivationVentArrival.ts';
 import { CultivationRoomThreeClearance } from '../cinematics/CultivationRoomThreeClearance.ts';
@@ -215,6 +216,7 @@ interface CultivationRuntimeResources {
 
 export class CultivationLevelRuntime {
   private readonly companions = new CompanionRegroup();
+  private companionIndicators?: CompanionIndicators;
   private readonly companionPosition = new THREE.Vector3();
   private readonly companionLeader = new THREE.Vector3();
   private readonly ventArrival = new CultivationVentArrival();
@@ -715,13 +717,15 @@ export class CultivationLevelRuntime {
     if (this.authoredPreviewRoomId === undefined) {
       this.updateStructuralAssemblies(deltaSeconds, resources);
     }
-    this.updateCompanions(resources, switched || releasingVolt || this.ventArrival.active);
+    this.updateCompanions(resources, switched || releasingVolt || this.ventArrival.active, deltaSeconds);
     resources.pair.bobBody.update(deltaSeconds,
       !switched && activeBody === resources.pair.bobBody ? resources.movement : this.companions.movement.bob,
-      !switched && activeBody === resources.pair.bobBody ? resources.jumpInputState : this.companions.jump.bob);
+      !switched && activeBody === resources.pair.bobBody ? resources.jumpInputState : this.companions.jump.bob,
+      activeBody === resources.pair.bobBody ? undefined : this.companions.locomotion.bob);
     resources.pair.goopBody.update(deltaSeconds,
       !switched && activeBody === resources.pair.goopBody ? resources.movement : this.companions.movement.goop,
-      !switched && activeBody === resources.pair.goopBody ? resources.jumpInputState : this.companions.jump.goop);
+      !switched && activeBody === resources.pair.goopBody ? resources.jumpInputState : this.companions.jump.goop,
+      activeBody === resources.pair.goopBody ? undefined : this.companions.locomotion.goop);
     if (resources.manager.isAvailable('volt')) {
       resources.voltBody.update(deltaSeconds, !switched && activeBody === resources.voltBody ? resources.movement : resources.noMovement,
         activeBody === resources.voltBody ? resources.jumpInputState : undefined);
@@ -839,6 +843,7 @@ export class CultivationLevelRuntime {
   }
 
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void {
+    this.companions.beginFrame();
     const resources = this.resources;
     if (!resources) {
       this.renderLayer.render();
@@ -930,6 +935,11 @@ export class CultivationLevelRuntime {
       this.renderLayer.cameraRig.setContextualCamera(this.roomFourCamera);
     } else this.renderLayer.cameraRig.setContextualCamera(undefined);
     if (!resources.roomFiveFinale?.active) this.renderLayer.cameraRig.update(interpolationAlpha, stats.frameDeltaSeconds);
+    this.companionIndicators ??= new CompanionIndicators(this.host);
+    this.companionIndicators.update(this.renderLayer.cameraRig.camera, this.companions.passiveInteractions,
+      aimPresentationAllowed && !this.host.dataset.cinematic, stats.frameDeltaSeconds);
+    this.companionIndicators.place('bob', resources.renderedBobPosition, this.renderLayer.cameraRig.camera);
+    this.companionIndicators.place('goop', resources.renderedGoopPosition, this.renderLayer.cameraRig.camera);
     this.ventArrival.present(this.renderLayer.cameraRig.camera, interpolationAlpha,
       resources.renderedBobPosition, resources.renderedGoopPosition);
     resources.roomThreeClearance?.present(this.renderLayer.cameraRig.camera,interpolationAlpha);
@@ -982,6 +992,7 @@ export class CultivationLevelRuntime {
         resources.collisionWorld,
         this.renderLayer.cameraRig.aimPresentationWeight > 0.01,
         !!resources.roomFiveFinale?.active,
+        this.companions.passiveInteractions,
       );
       resources.goopPresentation.setOpacity(!resources.roomFiveFinale?.active && resources.manager.activeSlimeId === 'goop' && !this.renderLayer.cameraRig.isFirstPersonForTarget(resources.pair.goopBody)
         ? (this.renderLayer.cameraRig.aimPresentationWeight > 0.01 ? 0 : resolveCameraTargetOpacity(
@@ -1765,6 +1776,7 @@ export class CultivationLevelRuntime {
 
   private readonly unloadResources = (): void => {
     this.companions.reset();
+    this.companionIndicators?.dispose(); this.companionIndicators = undefined;
     this.clearVoltFinaleUi();
     this.clearRoomThreeCinematicUi();
     this.ventArrival.cancel();
@@ -2295,27 +2307,40 @@ export class CultivationLevelRuntime {
   }
 
   private resetCompanions(): void {
-    this.companions.beginStep();
-    if (this.companions.commit()) this.notifyHUD();
+    this.companionIndicators?.hide();
+    if (this.companions.reset()) this.notifyHUD();
   }
 
-  private updateCompanions(resources: CultivationRuntimeResources, blocked: boolean): void {
-    this.companions.beginStep();
+  private updateCompanions(resources: CultivationRuntimeResources, blocked: boolean, deltaSeconds: number): void {
+    this.companions.beginStep(deltaSeconds);
     const preview = resources.authoredPreview;
     if (!blocked && this.input.enabled && preview) {
+      const roomTwoPlatformsReady = preview.roomTwo.blockDrops.every(drop => drop.state === 'landed');
       preview.root.worldToLocal(this.companionLeader.copy(resources.pair.activeBody.position));
       for (const id of ['bob', 'goop'] as const) {
         const body = id === 'bob' ? resources.pair.bobBody : resources.pair.goopBody;
         if (body === resources.pair.activeBody) continue;
+        if (id === 'bob' && body.supportCollider === preview.roomTwo.wallButton) {
+          this.companions.hold(id, 'switch'); continue;
+        }
         preview.root.worldToLocal(this.companionPosition.copy(body.position));
-        const walk = cultivationCompanionWalk({
+        const state = {
           id, position: this.companionPosition, leader: this.companionLeader,
           goopPassageUnlocked: !preview.roomTwoToThreeGoopPassage.entryDoor.locked,
+          roomTwoPlatformsReady,
           groundDronesDisabled: resources.roomThreeEncounter?.readModel.allGroundDronesDisabled === true,
           projectilesClear: resources.roomThreeEncounter?.projectiles.liveCount === 0,
           liftWaiting: preview.roomFour.controller.readModel.state === 'waitingForSlimes',
-        });
-        this.companions.steer(id, body, walk, resources.collisionWorld, preview.root);
+          committedRoute: this.companions.committedWalk(id),
+        };
+        const walk = cultivationCompanionWalk(state);
+        const revision = Number(preview.roomTwoToThreeGoopPassage.entryDoor.locked) |
+          (Number(resources.roomThreeEncounter?.readModel.allGroundDronesDisabled === true) << 1) |
+          (Number(resources.roomThreeEncounter?.projectiles.liveCount === 0) << 2) |
+          (Number(preview.roomFour.controller.readModel.state === 'waitingForSlimes') << 3) |
+          (Number(roomTwoPlatformsReady) << 4);
+        this.companions.steer(id, body, walk, resources.collisionWorld, preview.root,
+          { revision, waitReason: walk ? undefined : cultivationCompanionWaitingReason(state) });
       }
     }
     if (this.companions.commit()) this.notifyHUD();

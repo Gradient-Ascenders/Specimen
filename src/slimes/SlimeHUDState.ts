@@ -1,10 +1,16 @@
 import type { SlimeRosterState } from './SlimeManager.ts';
 import type { SlimeId } from './SlimeRoster.ts';
 
+export type CompanionPhase = 'idle' | 'catching-up' | 'waiting' | 'arrived' | 'holding';
+export type CompanionWaitReason = 'door' | 'obstacle' | 'floor' | 'hazard' | 'route' | 'stalled' |
+  'switch' | 'power' | 'mounted' | 'combat' | 'manual' | 'platforms';
+
 export interface SlimePassiveInteraction {
   readonly slimeId: SlimeId;
   readonly label: string;
   readonly kind?: 'companion';
+  readonly state?: CompanionPhase;
+  readonly reason?: CompanionWaitReason;
 }
 
 export interface SlimePlayerSwitchFeedback {

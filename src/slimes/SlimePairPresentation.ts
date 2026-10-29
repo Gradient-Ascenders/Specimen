@@ -7,6 +7,9 @@ import {
   CollisionWorld,
 } from '../physics/CollisionWorld.ts';
 import type { SlimeId } from './SlimeRoster.ts';
+import type { SlimePassiveInteraction } from './SlimeHUDState.ts';
+
+const NO_INTERACTIONS: readonly SlimePassiveInteraction[] = [];
 
 export interface SlimePairPresentationPosition {
   readonly x: number;
@@ -72,11 +75,19 @@ export class SlimePairPresentation {
     collisionWorld: CollisionWorld,
     _firstPersonAimActive = false,
     cinematic = false,
+    companionInteractions: readonly SlimePassiveInteraction[] = NO_INTERACTIONS,
   ): void {
+    // A live assistance badge takes over this same locator; never stack both on one character.
+    let assistedBob = false, assistedGoop = false;
+    for (const interaction of companionInteractions) {
+      if (interaction.kind !== 'companion' || (interaction.state !== 'catching-up' && interaction.state !== 'waiting')) continue;
+      if (interaction.slimeId === 'bob') assistedBob = true;
+      if (interaction.slimeId === 'goop') assistedGoop = true;
+    }
     this.updateLocator(
       this.bobLocator,
       bobPosition,
-      !cinematic && activeSlimeId !== 'bob',
+      !cinematic && !assistedBob && activeSlimeId !== 'bob',
       camera,
       collisionWorld,
       'bob',
@@ -84,7 +95,7 @@ export class SlimePairPresentation {
     this.updateLocator(
       this.goopLocator,
       goopPosition,
-      !cinematic && activeSlimeId !== 'goop',
+      !cinematic && !assistedGoop && activeSlimeId !== 'goop',
       camera,
       collisionWorld,
       'goop',
@@ -161,7 +172,7 @@ export class SlimePairPresentation {
       0.2,
       1,
     );
-    const opacity = (occluded ? 0.88 : 0.16) * distanceFade;
+    const opacity = (occluded ? 0.92 : 0.55) * distanceFade;
     const size = THREE.MathUtils.clamp(
       distanceMetres * 0.055,
       LOCATOR_MIN_SIZE_METRES,
@@ -198,43 +209,20 @@ export class SlimePairPresentation {
 function createLocatorTexture(
   letter: 'B' | 'G',
   shape: 'diamond' | 'circle',
-): THREE.DataTexture {
-  const size = 32;
-  const centre = (size - 1) / 2;
-  const data = new Uint8Array(size * size * 4);
-  const glyph = letter === 'B'
-    ? ['11110', '10001', '11110', '10001', '10001', '10001', '11110']
-    : ['01110', '10001', '10000', '10111', '10001', '10001', '01110'];
+): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Character locators require a 2D canvas context.');
+  context.beginPath();
+  if (shape === 'circle') context.arc(64, 64, 51, 0, Math.PI * 2);
+  else { context.moveTo(64, 8); context.lineTo(120, 64); context.lineTo(64, 120); context.lineTo(8, 64); context.closePath(); }
+  context.fillStyle = 'rgba(7, 15, 20, .82)'; context.fill();
+  context.strokeStyle = '#ffffff'; context.lineWidth = 4; context.stroke();
+  context.fillStyle = '#ffffff'; context.font = '700 64px sans-serif';
+  context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(letter, 64, 66);
 
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const dx = x - centre;
-      const dy = y - centre;
-      const distance = shape === 'diamond'
-        ? Math.abs(dx) + Math.abs(dy)
-        : Math.hypot(dx, dy);
-      const border = distance >= 11 && distance <= 14;
-      const glyphX = Math.floor((x - 8) / 3);
-      const glyphY = Math.floor((y - 6) / 3);
-      const glyphPixel =
-        glyphY >= 0 && glyphY < glyph.length &&
-        glyphX >= 0 && glyphX < glyph[glyphY].length &&
-        glyph[glyphY][glyphX] === '1';
-      const offset = (y * size + x) * 4;
-      data[offset] = 255;
-      data[offset + 1] = 255;
-      data[offset + 2] = 255;
-      data[offset + 3] = border || glyphPixel ? 255 : 0;
-    }
-  }
-
-  const texture = new THREE.DataTexture(
-    data,
-    size,
-    size,
-    THREE.RGBAFormat,
-    THREE.UnsignedByteType,
-  );
+  const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.magFilter = THREE.LinearFilter;
   texture.minFilter = THREE.LinearFilter;

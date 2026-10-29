@@ -940,9 +940,10 @@ export class GameFlowUI {
           <div class="hud-roster-content">
           <header class="hud-roster-header">
             <p class="system-label" id="hud-roster-heading">Specimens</p>
+            <span class="hud-roster-switch-hint"><kbd data-control-hint="switchSlime">Tab</kbd> Switch</span>
           </header>
           <ul class="hud-roster-list" data-slime-roster aria-label="Unlocked playable slimes"></ul>
-          <p class="system-status hud-passive-status" data-passive-status role="status" aria-live="polite" hidden></p>
+          <p class="system-status hud-passive-status" data-passive-status hidden></p>
           <p class="system-status hud-switch-feedback" data-switch-feedback role="status" aria-live="polite"></p>
           </div>
         </section>
@@ -1693,13 +1694,15 @@ export class GameFlowUI {
     this.switchFeedback.textContent = this.switchFeedbackModel.update(snapshot);
 
     const entries = snapshot.roster.flatMap((entry) => {
-      const view = getSlimeRosterEntryView(entry, keyLabel(this.settings.value.keyBindings.switchSlime));
+      const companion = snapshot.passiveInteractions.find(interaction => interaction.slimeId === entry.id && interaction.kind === 'companion');
+      const view = getSlimeRosterEntryView(entry, keyLabel(this.settings.value.keyBindings.switchSlime), companion);
       if (!view) return [];
 
       const item = this.hostDocument.createElement('li');
       item.className = 'hud-slime-entry';
       item.dataset.slimeId = entry.id;
       item.dataset.state = view.state;
+      if (companion?.state) item.dataset.companionState = companion.state;
       item.setAttribute('aria-label', view.ariaLabel);
 
       const badge = this.hostDocument.createElement('span');
@@ -1734,7 +1737,8 @@ export class GameFlowUI {
     this.slimeRoster.replaceChildren(...entries);
     const passiveStatus = formatPassiveInteractionStatus(snapshot);
     this.passiveStatus.textContent = passiveStatus ?? '';
-    this.passiveStatus.hidden = passiveStatus === undefined;
+    // Companion rows already carry their status; retain the footer for other passive puzzle interactions.
+    this.passiveStatus.hidden = passiveStatus === undefined || snapshot.passiveInteractions.every(interaction => interaction.kind === 'companion');
     this.rosterPresentation.observe(snapshot, passiveStatus);
   };
 }

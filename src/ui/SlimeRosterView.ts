@@ -1,4 +1,4 @@
-import type { SlimeHUDSnapshot } from '../slimes/SlimeHUDState.ts';
+import type { SlimeHUDSnapshot, SlimePassiveInteraction } from '../slimes/SlimeHUDState.ts';
 import type { SlimeRosterState } from '../slimes/SlimeManager.ts';
 import type { SlimeId } from '../slimes/SlimeRoster.ts';
 
@@ -16,6 +16,7 @@ export interface SlimeRosterEntryView {
 export function getSlimeRosterEntryView(
   entry: SlimeRosterState,
   switchKeyLabel = 'Tab',
+  companion?: SlimePassiveInteraction,
 ): SlimeRosterEntryView | undefined {
   if (!entry.betaPlayable) return undefined;
 
@@ -30,6 +31,12 @@ export function getSlimeRosterEntryView(
   }
 
   if (usable) {
+    if (companion?.kind === 'companion') {
+      const status = companion.state === 'waiting' ? 'Waiting' : companion.state === 'holding' ? 'Holding position' : companion.label;
+      return { state: 'switchable', stateLabel: status,
+        controlLabel: companion.state === 'waiting' || companion.state === 'holding' ? companion.label : '',
+        ariaLabel: `${entry.displayName}: ${companion.label}, available with ${switchKeyLabel}` };
+    }
     return {
       state: 'switchable',
       stateLabel: 'Ready',

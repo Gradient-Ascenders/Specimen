@@ -17,7 +17,7 @@ async function openLevel(page: Page, level: number, name: string, manualLoop = t
   if (manualLoop) await page.evaluate(() => (window as any).__companionSession.runtime.renderLayer.setAnimationLoop(null));
 }
 
-test('Level 2 companion catches up through production physics, yields to Tab, pauses and resets on retry', async ({page}) => {
+test('Level 2 companion catches up through production physics, yields to Tab, pauses and resets on retry', async ({page}, info) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await openLevel(page, 2, 'Cultivation');
@@ -30,13 +30,36 @@ test('Level 2 companion catches up through production physics, yields to Tab, pa
     r.pair.goopBody.teleport(r.pair.goopBody.position.clone().set(55, .66, 5.5));
     const bob = r.pair.bobBody.position.clone();
     const goop = r.pair.goopBody.position.clone();
-    for (let i = 0; i < 240; i++) rt.fixedUpdate(1 / 60);
+    for (let i = 0; i < 240; i++) { rt.companions.beginFrame(); rt.fixedUpdate(1 / 60); }
     return {goopMotion: r.pair.goopBody.position.distanceTo(goop),
       bobMotion: r.pair.bobBody.position.distanceTo(bob), status: rt.getSlimeHUDSnapshot().passiveInteractions};
   });
   expect(staged.goopMotion).toBeGreaterThan(5);
   expect(staged.bobMotion).toBeLessThan(.01);
-  expect(staged.status).toContainEqual({slimeId: 'goop', label: 'Catching up', kind: 'companion'});
+  expect(staged.status).toContainEqual(expect.objectContaining({slimeId: 'goop', label: 'Catching up', kind: 'companion', state: 'catching-up'}));
+  await page.evaluate(() => {
+    const rt = (window as any).__companionSession.runtime;
+    rt.renderLayer.cameraRig.reset(); rt.retargetCamera(rt.resources);
+    rt.render(1, {fixedDeltaSeconds:1/60, rawFrameDeltaSeconds:1/60, frameDeltaSeconds:1/60,
+      stepsThisFrame:1, interpolationAlpha:1, droppedSimulationTimeSeconds:0, renderFps:60});
+  });
+  await expect(page.locator('.companion-marker[data-slime-id="goop"]')).toBeVisible();
+  await expect(page.locator('.companion-marker[data-slime-id="goop"] .companion-locator-ring')).toHaveText('G');
+  expect(await page.evaluate(() => {
+    const locator = (window as any).__companionSession.runtime.resources.pairPresentation.root.getObjectByName('goop-inactive-body-locator');
+    return {visible: locator.visible, textureWidth: locator.material.map.image.width};
+  })).toEqual({visible: false, textureWidth: 128});
+  await expect(page.locator('.hud-slime-entry[data-slime-id="goop"] .hud-slime-state')).toHaveText('Catching up');
+  expect(await page.evaluate(() => {
+    const marker = document.querySelector('.companion-marker[data-slime-id="goop"]')!.getBoundingClientRect();
+    return ['.hud-objective-module', '.hud-roster-content'].some(selector => {
+      const r = document.querySelector(selector)!.getBoundingClientRect();
+      return marker.right > r.left && marker.left < r.right && marker.bottom > r.top && marker.top < r.bottom;
+    });
+  }), 'the actual gameplay marker must leave the objective and roster readable').toBe(false);
+  expect(await page.evaluate(() => document.querySelector('.hud-roster-content')!.getBoundingClientRect().bottom <
+    document.querySelector('.hud-hint')!.getBoundingClientRect().top), 'the expanded roster must fit above controls at 640×360').toBe(true);
+  await page.screenshot({path: info.outputPath('catch-up-production-640.png')});
   await page.keyboard.down('Tab');
   const switched = await page.evaluate(() => {
     const rt = (window as any).__companionSession.runtime;
@@ -57,6 +80,7 @@ test('Level 2 companion catches up through production physics, yields to Tab, pa
     rt.start();
     let aiAcidSpeed = 0;
     for (let i = 0; i < 1800; i++) {
+      rt.companions.beginFrame();
       rt.fixedUpdate(1 / 60);
       if (r.pair.goopBody.grounded && r.pair.goopBody.supportCollider?.userData.textureRole === 'acid-floor') {
         aiAcidSpeed = Math.max(aiAcidSpeed, Math.hypot(r.pair.goopBody.velocity.x, r.pair.goopBody.velocity.z));
@@ -82,7 +106,7 @@ test('Level 2 companion catches up through production physics, yields to Tab, pa
   await page.keyboard.down('KeyW');
   const player = await page.evaluate(() => {
     const rt = (window as any).__companionSession.runtime, body = rt.resources.pair.goopBody;
-    for (let i = 0; i < 90; i++) rt.fixedUpdate(1 / 60);
+    for (let i = 0; i < 90; i++) { rt.companions.beginFrame(); rt.fixedUpdate(1 / 60); }
     return {speed: Math.hypot(body.velocity.x, body.velocity.z), maximum: body.maximumLocomotionSpeedMetresPerSecond,
       presentationMaximum: rt.resources.goopPresentationState.maximumLocomotionSpeedMetresPerSecond,
       support: body.supportCollider?.userData.textureRole, playing: rt.resources.deathSequence.isPlaying};
@@ -158,6 +182,7 @@ test('Level 3 companion finishes the safe main corridor while the active charact
     const bob = r.group.bobBody.position.clone();
     let caughtUp = false;
     for (let i = 0; i < 600; i++) {
+      rt.companions.beginFrame();
       rt.fixedUpdate(1 / 60);
       caughtUp ||= rt.getSlimeHUDSnapshot().passiveInteractions.some((entry: any) => entry.slimeId === 'goop' && entry.label === 'Catching up');
     }

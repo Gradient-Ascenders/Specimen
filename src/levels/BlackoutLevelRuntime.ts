@@ -24,8 +24,9 @@ import { BlackoutTransitController } from './BlackoutTransitController.ts';
 import { BLACKOUT_TRANSIT_CHECKPOINTS } from './BlackoutTransitRoom.ts';
 import { BLACKOUT_BOSS_STAGING_CHECKPOINT } from './BlackoutBossStaging.ts';
 import { CompanionRegroup } from '../slimes/CompanionRegroup.ts';
+import { CompanionIndicators } from '../ui/CompanionIndicators.ts';
 import { GOOP_ACID_SPEED_MULTIPLIER } from '../slimes/SlimeRoster.ts';
-import { blackoutCompanionWalk } from './BlackoutCompanionWalks.ts';
+import { blackoutCompanionWalk, blackoutCompanionWaitingReason, type BlackoutCompanionState } from './BlackoutCompanionWalks.ts';
 import { goopSpeedEffectStrength } from '../ui/GoopSpeedOverlay.ts';
 import { MaintenanceDronePresentation } from '../render/environment/blackout/MaintenanceDronePresentation.ts';
 import {BlackoutVentArrival} from '../cinematics/BlackoutVentArrival.ts';
@@ -269,6 +270,7 @@ interface BlackoutRuntimeResources {
 
 export class BlackoutLevelRuntime {
   private readonly companions = new CompanionRegroup();
+  private companionIndicators?: CompanionIndicators;
   readonly events = new EventBus<GameLevelRuntimeEvents>();
 
   private readonly host: HTMLElement;
@@ -1245,40 +1247,46 @@ export class BlackoutLevelRuntime {
     resources.bobMovementIntent.set(0, 0, 0);
     resources.goopMovementIntent.set(0, 0, 0);
     resources.voltMovementIntent.set(0, 0, 0);
-    this.companions.beginStep();
+    this.companions.beginStep(deltaSeconds);
 
     // Switching changes input ownership, not gravity. Keep the other bodies
     // falling and landing; mounted Volt is carried by the drone instead.
     if (!specimenGameplay) {
       resources.movement.set(0, 0, 0);
       for (const passiveBody of resources.group.bodies) {
-        if (passiveBody === resources.group.voltBody && resources.maintenanceDrone.voltMounted) continue;
+        if (passiveBody === resources.group.voltBody && resources.maintenanceDrone.voltMounted) {
+          if (passiveBody !== body && !switched) this.companions.hold('volt', 'mounted');
+          continue;
+        }
         if (passiveBody !== body || switched) {
           const id = passiveBody === resources.group.bobBody ? 'bob'
             : passiveBody === resources.group.goopBody ? 'goop' : 'volt';
           const bay = resources.maintenanceBay?.bay;
-          // With three slimes, the player may return to Volt to power a door
-          // after Bob reaches its far side. Keep Goop's catch-up eligible.
-          let leader = body;
-          for (const candidate of resources.group.bodies) {
-            if (candidate !== passiveBody && candidate.position.z > leader.position.z) leader = candidate;
-          }
-          const walk = !switched && this.input.enabled && this.currentRoom.phase === 'three-slime'
-            ? blackoutCompanionWalk({
-              id, position: passiveBody.position, leader: leader.position,
-              bayAvailable: !!bay,
-              mainRouteReady: !!bay && [resources.group.bobBody, resources.group.goopBody].every(
-                slime => bay.vestibuleAt(slime.position) || bay.transitAt(slime.position)),
-              bridgeLocked: resources.transit?.bridgeLocked === true,
-              transitComplete: resources.transit?.complete === true || this.currentRoom.local.bossStaging === true,
-              conducting: resources.electricalSystem.readModel.connectedTargetId !== undefined,
-              mounted: resources.maintenanceDrone.voltMounted,
-            }) : undefined;
-          const intent = this.companions.steer(id, passiveBody, walk, resources.collisionWorld);
+          const state: BlackoutCompanionState = {
+            id, position: passiveBody.position, leader: body.position, party: resources.group.bodies,
+            committedRoute: this.companions.committedWalk(id),
+            bayAvailable: !!bay,
+            mainRouteReady: !!bay && [resources.group.bobBody, resources.group.goopBody].every(
+              slime => bay.vestibuleAt(slime.position) || bay.transitAt(slime.position)),
+            bridgeLocked: resources.transit?.bridgeLocked === true,
+            transitComplete: resources.transit?.complete === true || this.currentRoom.local.bossStaging === true,
+            conducting: resources.electricalSystem.readModel.connectedTargetId !== undefined,
+            mounted: resources.maintenanceDrone.voltMounted,
+          };
+          const eligible = !switched && this.input.enabled && this.currentRoom.phase === 'three-slime';
+          const walk = eligible ? blackoutCompanionWalk(state) : undefined;
+          const revision = Number(resources.transit?.bridgeLocked === true) |
+            (Number(resources.transit?.complete === true) << 1) |
+            (Number(resources.electricalSystem.readModel.connectedTargetId !== undefined) << 2);
+          const holdingPower = !switched && id === 'volt' &&
+            resources.electricalSystem.readModel.connectedTargetId !== undefined;
+          const intent = this.companions.steer(id, passiveBody, walk, resources.collisionWorld, undefined,
+            { revision, holdReason: holdingPower ? 'power' : undefined,
+              waitReason: eligible && !walk ? blackoutCompanionWaitingReason(state) : undefined });
           const presentationIntent = id === 'bob' ? resources.bobMovementIntent
             : id === 'goop' ? resources.goopMovementIntent : resources.voltMovementIntent;
           presentationIntent.copy(intent);
-          passiveBody.update(deltaSeconds, intent, this.companions.jump[id]);
+          passiveBody.update(deltaSeconds, intent, this.companions.jump[id], this.companions.locomotion[id]);
         }
       }
     }
@@ -1626,6 +1634,7 @@ export class BlackoutLevelRuntime {
   }
 
   render(interpolationAlpha: number, stats: Readonly<LoopStats>): void {
+    this.companions.beginFrame();
     const resources = this.resources;
     resources?.defeatFinale?.effects.setDensity(this.renderLayer.graphicsConfiguration.effectsDensity);
     if (resources) {
@@ -1736,6 +1745,15 @@ export class BlackoutLevelRuntime {
       camera.position.set(-7,4.5,191);camera.lookAt(FINAL_MERGE_ANCHOR);camera.updateMatrixWorld(true);
     }
     this.gameplayAudio?.updateListener();
+    if (resources) {
+      this.companionIndicators ??= new CompanionIndicators(this.host);
+      this.companionIndicators.update(this.renderLayer.cameraRig.camera, this.companions.passiveInteractions,
+        this.lifecycle.state === 'running' && resources.deathSequence.isPlaying && this.input.enabled &&
+        this.currentRoom.phase === 'three-slime' && !this.host.dataset.cinematic, stats.frameDeltaSeconds);
+      this.companionIndicators.place('bob', resources.renderedBobPosition, this.renderLayer.cameraRig.camera);
+      this.companionIndicators.place('goop', resources.renderedGoopPosition, this.renderLayer.cameraRig.camera);
+      this.companionIndicators.place('volt', resources.renderedVoltPosition, this.renderLayer.cameraRig.camera);
+    }
     // Keep the lower capture for the whole encounter (including phase changes)
     // so attacks cannot repeatedly resize Three's retained transmission target.
     const bossCapture = resources?.phase.phase === 'boss' && !resources.researchFinale?.active && !resources.defeatFinale?.active;
@@ -2333,6 +2351,7 @@ export class BlackoutLevelRuntime {
         scene: this.renderLayer.scene,
         host: this.host,
         targetRegistry: electricalTargets,
+        isVoltSelected: () => manager.activeSlimeId === 'volt' && specimenForm.readModel.controlledForm !== 'specimen',
       });
       rollback(() => electricalPresentation.dispose());
 
@@ -2606,6 +2625,7 @@ export class BlackoutLevelRuntime {
   };
 
   private readonly unloadResources = (): void => {
+    this.companionIndicators?.dispose(); this.companionIndicators = undefined;
     this.releaseBossTransmissionCap?.(); this.releaseBossTransmissionCap = undefined;
     this.releaseReducedTransmissionCap?.();
     this.releaseReducedTransmissionCap = undefined;
@@ -2915,8 +2935,8 @@ export class BlackoutLevelRuntime {
 
   private readonly voltAimDirection = new THREE.Vector3();
   private resetCompanions(): void {
-    this.companions.beginStep();
-    if (this.companions.commit()) this.notifyHUD();
+    this.companionIndicators?.hide();
+    if (this.companions.reset()) this.notifyHUD();
   }
 
   private updateBobPresentation(

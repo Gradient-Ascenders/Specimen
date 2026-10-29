@@ -86,7 +86,7 @@ test('AI reaches the player acid speed and brakes before a blocked path or its d
   floor.userData.textureRole = 'acid-floor';
   const door = new THREE.Mesh(new THREE.BoxGeometry(4, 3, .4)); door.position.set(0, 1.5, 20);
   const p = physics([floor, door]), companion = new CompanionRegroup();
-  const walk: CompanionWalk = {points: [[0, 0, 1], [0, 0, 28]], bounds: [[-1, .3, 0], [1, 1, 30]]};
+  const walk: CompanionWalk = {finishPassage: true, points: [[0, 0, 1], [0, 0, 28]], bounds: [[-1, .3, 0], [1, 1, 30]]};
   try {
     const goop = p.body(new THREE.Vector3(0, .46, 1));
     let maximumSpeed = 0;

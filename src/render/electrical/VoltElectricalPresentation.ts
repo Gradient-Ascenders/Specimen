@@ -11,6 +11,7 @@ export interface VoltElectricalPresentationOptions {
   readonly host: HTMLElement;
   readonly document?: Document;
   readonly targetRegistry?: ElectricalTargetRegistry;
+  readonly isVoltSelected: () => boolean;
 }
 
 /** Visual-only electrical arcs and aim UI. Gameplay authority stays in the
@@ -24,9 +25,11 @@ export class VoltElectricalPresentation {
   private readonly status: HTMLElement;
   private disposed = false;
   private readonly highlights?: ElectricalTargetHighlights;
+  private readonly isVoltSelected: () => boolean;
 
   constructor(options: VoltElectricalPresentationOptions) {
     const hostDocument = options.document ?? document;
+    this.isVoltSelected = options.isVoltSelected;
     this.root.name = 'volt-electrical-presentation';
     this.root.add(this.effects.root);
 
@@ -77,7 +80,7 @@ export class VoltElectricalPresentation {
     const crosshairState = readModel.selectedTargetValid ? 'valid' : 'neutral';
     if (this.crosshair.dataset.state !== crosshairState) this.crosshair.dataset.state = crosshairState;
 
-    if (readModel.connectedTargetName) {
+    if (this.isVoltSelected() && readModel.connectedTargetName) {
       if (this.status.hidden) this.status.hidden = false;
       const text = readModel.connectionUnstable
         ? `${readModel.connectedTargetName} · Connection unstable`
