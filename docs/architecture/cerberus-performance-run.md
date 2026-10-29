@@ -112,6 +112,36 @@ and `bounded-handoff-control/`. `warmup-dist/` freezes the tested candidate.
 Retained in local commit `839aa84` after the correctness, image and first-use
 checks above.
 
+## Retained Containment reflection loop
+
+A runtime room loop keeps one CubeUV sampling site, retaining the same one/two
+room samples and blend order. The material cache version changes accordingly.
+
+| Capture | Baseline ready | Candidate ready |
+| --- | ---: | ---: |
+| Routed diagnostic | 160.522 s | 148.430 s |
+| Diagnostic repeat | 160.585 s | 147.668 s |
+| Actual build, aligned fixed steps | 161.276 s | 148.500 s |
+
+The built comparison reduces loading by **7.9%**. Compiler wait falls from
+42.801 to 33.933 s. All 21 built room/doorway images are pixel-identical, with
+identical program-key sets after normalizing the intentional cache-version
+suffix (301 programs), submissions and first-use events. Both captures align to
+20 ordinary fixed steps before posing. The first routed candidate had one fewer
+native simulation step and small image differences; exclude that pair from
+visual qualification. The repeated routed pair and both baselines match exactly.
+Pooled steady-view medians differ by about 1%; no frame-rate gain is claimed.
+
+Build, production layout and 28 focused units pass. The Medium/1080p five-room
+travel/restart browser check passes in 4.4 minutes. Graphics cycles and High
+coverage remain queued. No production room visibility or simulation changes.
+
+Raw evidence: `containment-reflection-{before,loop}[-repeat]/`,
+`containment-aligned-{before,built}/` and `containment-loop-*.log`.
+The extended upper-observation view adds 17 geometries / 51 buffer-storage calls
+in both versions: 13,056 bytes, 0.1–0.3 ms of measured submission time. This is
+outside the earlier entry-view coverage and is a lower-priority first-use item.
+
 ## Test and instrumentation corrections
 
 - `a3e3b03`: the baseline unit suite had 511 passes / one failure. The failing
@@ -149,11 +179,26 @@ production scissor change was made. Raw control: `scissored-warmup-probe/`.
 
 ## Next work
 
-Containment reflection shader expansion is now running as a routed diagnostic
-against the immutable baseline, with 21 matched room/doorway views.
-Directional zero-light work and tighter authored-batch camera bounds still need
-measured controls. Preserve independently positioned companions and simulation.
+The zero-directional-shadow control removes 101 calls / 102,004 triangles per
+frame in six ordinary Blackout views, with identical pixels and unchanged body
+positions. The retained ending sun updates a 1024-square map while intensity is
+zero. Software wall-time differences are small/noisy; draw reduction is the
+supported result. Production adoption still needs daylight/first-use checks.
+The control's two entries labelled Room 4 incorrectly reused the Room 3 shortcut
+and are excluded; the actual boss shortcut is `teleportToFinalBoss()`.
+
+Tighter authored boxes in Cultivation Room 3 remove no triangles in the forward
+view and 6,420 / 1,169,504 (0.55%) in reverse, without pixel changes. That small
+result does not justify production code. The initial Blackout box probe selected
+zero meshes because its art uses different metadata. The corrected control
+selects 246 meshes and removes 0.4–5.9% of triangles across six views, with
+identical pixels but no useful timing gain. No camera-culling change is retained.
+
+Raw controls: `zero-directional-shadows/`, `authored-box-control/` and
+`blackout-box-control/` beneath the artifact root.
 
 Next broader validation should exercise graphics changes and first-use coverage
-through those changes across levels. Real Alder Lake GPU loading,
-frame pacing, first-use behavior and visual checks remain outstanding.
+through those changes across levels. CPU/allocation attribution is queued for
+all rooms. Preserve independently positioned companions and authoritative
+simulation. Real Alder Lake GPU loading, frame pacing, first-use behavior and
+visual checks remain outstanding.

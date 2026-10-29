@@ -89,8 +89,15 @@ function reflectionGLSL(tileHeight:number):string{
   vec4 containmentRoomRadiance(vec3 direction,float roughness){
     int a,b;float blend;containmentRooms(cWorldPosition,a,b,blend);
     if(blend>=1.0)a=b;
-    vec3 radiance=containmentReflectionTile(direction,roughness,a);
-    if(blend>0.0&&blend<1.0)radiance=mix(radiance,containmentReflectionTile(direction,roughness,b),blend);
+    // One sampling site keeps ANGLE from expanding the CubeUV path twice.
+    // Doorways still sample both rooms and blend in the original order.
+    int roomCount=blend>0.0&&blend<1.0?2:1;
+    vec3 radiance=vec3(0.0);
+    for(int roomIndex=0;roomIndex<roomCount;roomIndex++){
+      int room=roomIndex==0?a:b;
+      vec3 sampleValue=containmentReflectionTile(direction,roughness,room);
+      radiance=roomIndex==0?sampleValue:mix(radiance,sampleValue,blend);
+    }
     return vec4(radiance,1.0);
   }
   #endif
@@ -123,6 +130,6 @@ export function installContainmentRadianceShader(material:THREE.MeshStandardMate
         .replace('textureCubeUV( envMap, envMapRotation * reflectVec, roughness )','containmentRoomRadiance( envMapRotation * reflectVec, roughness )'))
       .replace('#include <lights_fragment_maps>',`#include <lights_fragment_maps>\n#if defined(RE_IndirectDiffuse)\nirradiance+=containmentIndirect(transformNormalByInverseViewMatrix(geometryNormal,viewMatrix));\n#endif`);
   };
-  material.customProgramCacheKey=()=>`${key}:containment-radiance-l1-v2`;
+  material.customProgramCacheKey=()=>`${key}:containment-radiance-l1-v3`;
   material.needsUpdate=true;
 }
