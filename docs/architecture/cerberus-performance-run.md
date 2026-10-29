@@ -90,6 +90,10 @@ show no new live GPU storage, programs or program inspections.
 Validation so far:
 
 - Production build and 33 focused performance/shadow/GPU-fence unit cases pass.
+- Milestone on clean commit `839aa84`: all 512 unit cases, production layout
+  validation (209 files) and all eight standard production smoke cases pass
+  (12.2 minutes). This covers opening preparation, all-level selection and
+  nested-path startup/restart. Build manifest records `dirty: false`.
 - Expanded Medium 1080p browser check passes: all 70 bounded rehearsals,
   retained full-size target, viewport/scissor restoration and full/distant/full
   Specimen LOD; no live storage or program inspections.
@@ -105,7 +109,8 @@ Validation so far:
 Raw evidence: `bounded-warmup-loading/`, `baseline-loading-repeat/`,
 `baseline-cinematics/`, `bounded-warmup-cinematics/`, `baseline-handoff-control/`
 and `bounded-handoff-control/`. `warmup-dist/` freezes the tested candidate.
-Retained after the focused correctness, image and first-use checks above.
+Retained in local commit `839aa84` after the correctness, image and first-use
+checks above.
 
 ## Test and instrumentation corrections
 
@@ -137,13 +142,18 @@ The original random combat handoff is excluded from pixel-equivalence claims.
 Raw attempts remain available; the earlier progress journal is retained in
 `artifacts/cerberus-perf/progress-journal-through-0114.md`.
 
+The additional bounded-clear experiment scissored all 70 hidden draws. Ready
+was 103.575 s versus the retained viewport's 103.600 / 103.615 s; rehearsal was
+19.49 + 24.41 s. This is no useful improvement within measurement noise. No
+production scissor change was made. Raw control: `scissored-warmup-probe/`.
+
 ## Next work
 
-The bounded-clear control is running against the frozen validated candidate. Containment reflection shader expansion is the
-next substantial loading candidate; a matched room/doorway diagnostic is ready.
+Containment reflection shader expansion is now running as a routed diagnostic
+against the immutable baseline, with 21 matched room/doorway views.
 Directional zero-light work and tighter authored-batch camera bounds still need
 measured controls. Preserve independently positioned companions and simulation.
 
-At the next milestone, rebuild committed source, rerun the full unit suite and
-exercise graphics changes/restart across levels. Real Alder Lake GPU loading,
+Next broader validation should exercise graphics changes and first-use coverage
+through those changes across levels. Real Alder Lake GPU loading,
 frame pacing, first-use behavior and visual checks remain outstanding.
