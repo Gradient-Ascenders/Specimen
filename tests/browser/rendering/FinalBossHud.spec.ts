@@ -10,7 +10,7 @@ import type { HudFooterLayout } from '../../../src/ui/HudFooterLayout.ts';
 
 declare global {
   interface Window {
-    __bossHudUi: { hud: FinalBossHud; controller: FinalBossController; combat: SpecimenCombatPresentation;
+    __bossHudUi: { hud: FinalBossHud; controller: FinalBossController & { healPlayer(fraction: number): boolean }; combat: SpecimenCombatPresentation;
       controls: HudPanelPresentation;
       footer: HudFooterLayout;
       model: { fireEnabled: boolean; charging: boolean; fullyCharged: boolean; chargeAmount: number; overchargeProgress: number; overchargeReady: boolean };

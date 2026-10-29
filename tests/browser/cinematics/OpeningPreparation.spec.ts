@@ -15,7 +15,8 @@ for(const [profile,skip] of [['minimum',false],['standard',false],['standard',tr
   await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
   await page.evaluate(()=>{
    const rt=(window as any).__openingSession.runtime,layer=rt.renderLayer,renderer=layer.renderer,gl=renderer.getContext();
-   const evidence=(window as any).__openingEvidence={requestedAt:performance.now(),cinematic:[],gameplay:[],stages:[]};
+   type Frame = { at: number; stage?: string; calls: string[]; newPrograms: number; cpuMs: number; error: number };
+   const evidence: { requestedAt: number; cinematic: Frame[]; gameplay: Frame[]; stages: string[] } = (window as any).__openingEvidence={requestedAt:performance.now(),cinematic:[],gameplay:[],stages:[]};
    let current:any;const originals=new Map<string,any>();
    for(const method of ['getProgramInfoLog','getShaderInfoLog','texImage2D','texStorage2D','renderbufferStorage','renderbufferStorageMultisample']){const original=gl[method];originals.set(method,original);gl[method]=function(...args:any[]){if(current)current.calls.push(method);return original.apply(this,args);};}
    const draw=renderer.render;

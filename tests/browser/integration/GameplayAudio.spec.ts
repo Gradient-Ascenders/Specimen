@@ -137,7 +137,7 @@ test('selected Bob and Goop clips decode beneath nested base and follow gameplay
   const reset=await step(1);
   expect(reset.keys).not.toContain('character:charge');
   expect(reset.keys).not.toContain('environment:acid');
-  expect(reset.keys.some(key=>key.startsWith('acid:') || key.startsWith('dissolve:'))).toBe(false);
+  expect(reset.keys.some((key: string)=>key.startsWith('acid:') || key.startsWith('dissolve:'))).toBe(false);
   expect(await page.evaluate(() => (window as any).__audioRuntime.resources.containmentLevel.requestFailure('bob-audio-review'))).toBe(true);
   const dying=await step(1);
   expect(dying.played).toBeGreaterThan(reset.played);

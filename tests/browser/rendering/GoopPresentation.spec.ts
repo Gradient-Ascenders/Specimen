@@ -109,7 +109,7 @@ test('authored Goop owns reveal, normal play, independent death and all-level re
     }, yaw);
     await frames(8); await screenshot(`sweep-${view}`);
   }
-  await hiddenHUD.evaluate(element => element.remove());
+  await hiddenHUD.evaluate(element => element.parentNode!.removeChild(element));
   await page.keyboard.down('w'); await frames(5); await page.keyboard.up('w');
   await page.keyboard.press('Space'); await frames(5);
   await sample('__goopContainment', 'normal-jump');

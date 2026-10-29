@@ -16,7 +16,7 @@ for(const id of Object.keys(layout)){
   parsed.scene.updateMatrixWorld(true);const signatures=new Map<string,string>(),aliases=new Map<string,string>();
   parsed.scene.traverse(object=>{if(!(object instanceof THREE.Mesh))return;
     const hash=createHash('sha256').update(JSON.stringify(object.matrixWorld.toArray()));
-    for(const [name,attribute]of Object.entries(object.geometry.attributes).sort(([a],[b])=>a.localeCompare(b))){
+    for(const [name,attribute]of Object.entries(object.geometry.attributes as THREE.NormalBufferAttributes).sort(([a],[b])=>a.localeCompare(b))){
       if(attribute instanceof THREE.InterleavedBufferAttribute)throw Error('Unexpected interleaved authoring buffer');
       hash.update(JSON.stringify([name,attribute.itemSize,attribute.normalized,attribute.array.constructor.name]));
       hash.update(new Uint8Array(attribute.array.buffer,attribute.array.byteOffset,attribute.array.byteLength));

@@ -18,7 +18,7 @@ function fixture() {
     transmissionResolutionScale: 0.5,
     getPixelRatio: () => 0.75,
     info: {render: {calls: 7, triangles: 42, points:0, lines:0, frame: 12}, programs: []},
-    shadowMap: {enabled: true, autoUpdate: true, needsUpdate: true, type: THREE.PCFShadowMap as THREE.ShadowMapType},
+    shadowMap: {render: () => {}, enabled: true, autoUpdate: true, needsUpdate: true, type: THREE.PCFShadowMap as THREE.ShadowMapType},
     getViewport: (out: THREE.Vector4) => out.copy(viewport), setViewport: (v: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { viewport = v instanceof THREE.Vector4 ? v.clone() : new THREE.Vector4(v, y, w, h); },
     getScissor: (out: THREE.Vector4) => out.copy(scissor), setScissor: (v: THREE.Vector4 | number, y?: number, w?: number, h?: number) => { scissor = v instanceof THREE.Vector4 ? v.clone() : new THREE.Vector4(v, y, w, h); },
     getScissorTest: () => test, setScissorTest: (v: boolean) => { test = v; },
@@ -50,7 +50,7 @@ for (const fail of [false,true]) test(`retained-camera transmission primer isola
   }} as THREE.WebGLRenderer;
   if(fail) assert.throws(()=>renderIsolatedConfiguration(renderer,live,camera,prepared,[proxy]),/driver/);
   else renderIsolatedConfiguration(renderer,live,camera,prepared,[proxy]);
-  assert.deepEqual(objects.map(o=>o.layers.mask),masks);assert.equal(prepared.parent,null);assert.equal(proxy.parent,null);
+  assert.deepEqual(objects.map(o=>o.layers.mask),masks);assert.equal(prepared.parent,null as never);assert.equal(proxy.parent,null as never);
   assert.deepEqual(live.children,[original,liveLight]);geometry.dispose();material.dispose();
 });
 
@@ -137,7 +137,7 @@ for (const mode of ['complete', 'reject', 'cancel']) test(`Blackout prepares hid
   let release: (() => void) | undefined;
   const observed = new Set<THREE.Material>();
   renderer.compileAsync = async (group, _camera, targetScene) => {
-    if (group.children.some(o => o instanceof THREE.Mesh && o.material instanceof THREE.MeshDepthMaterial)) assert.equal(targetScene.fog, null);
+    if (group.children.some(o => o instanceof THREE.Mesh && o.material instanceof THREE.MeshDepthMaterial)) assert.equal(targetScene.fog, null as never);
     group.traverse(object => {
       if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
       const m = object.material;
@@ -200,7 +200,7 @@ for (const type of [THREE.PCFShadowMap, THREE.BasicShadowMap]) test(`cinematic c
     assert.equal(lights[0].shadow.needsUpdate, true, 'the first live frame must capture real casters');
     lights[0].layers.mask = 0; lights[1].layers.mask = 1;
     prepareShadowSamplerMaps(renderer as unknown as THREE.WebGLRenderer, scene, camera);
-    assert.equal(lights[1].shadow.map?.depthTexture?.compareFunction, comparison);
+    assert.equal((lights[1].shadow.map as THREE.WebGLRenderTarget | null)?.depthTexture?.compareFunction, comparison);
     assert.equal(lights[0].shadow.map, first, 'the previous camera keeps its owned map');
     lights[0].layers.mask = 1;
     prepareShadowSamplerMaps(renderer as unknown as THREE.WebGLRenderer, scene, camera);
@@ -255,7 +255,7 @@ test('unallocated drone beam shadows bind a matching fallback without becoming v
   assert.ok(fallback.version > 0, 'fallback must upload before its first draw');
   let disposals = 0; fallback.addEventListener('dispose', () => disposals++);
   const renderer = { shadowMap: { type: THREE.PCFShadowMap } } as THREE.WebGLRenderer;
-  const draw = () => mesh.onBeforeRender(renderer, new THREE.Scene(), new THREE.PerspectiveCamera(), mesh.geometry, material, null);
+  const draw = () => mesh.onBeforeRender(renderer, new THREE.Scene(), new THREE.PerspectiveCamera(), mesh.geometry, material, null as never);
   draw();
   assert.equal(fallback.compareFunction, THREE.LessEqualCompare);
   assert.equal(material.uniforms.beamShadowReady.value, false);
@@ -264,7 +264,7 @@ test('unallocated drone beam shadows bind a matching fallback without becoming v
   assert.equal(fallback.compareFunction, null, 'hidden preparation copies must already have a raw-depth fallback');
   draw();
   assert.equal(disposals, 1, 'switching to raw sampling releases the comparison-mode GPU allocation');
-  assert.equal(fallback.compareFunction, null);
+  assert.equal(fallback.compareFunction, null as never);
   assert.equal(material.defines.SHADOW_COMPARE, undefined);
   const map = new THREE.WebGLRenderTarget(1, 1);
   map.depthTexture = new THREE.DepthTexture(1, 1); light.shadow.map = map; draw();
@@ -355,7 +355,7 @@ test('instance primers upload both live buffers sharing a geometry and never dis
     }
     preview.updatePresentationVisibility({z:0}, {z:0});
     const before = buffers.size;
-    renderer.render(scene);
+    renderer.render(scene, new THREE.PerspectiveCamera());
     assert.equal(buffers.size, before, 'the first live draw creates no instance buffers');
     queue.dispose();
     for (const {matrix, color} of maps) { assert.ok(buffers.has(matrix)); assert.ok(buffers.has(color!)); }

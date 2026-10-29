@@ -68,7 +68,7 @@ test('one Retry recovers after a shared asset outage fails both the opening and 
   await expect(flow).toHaveAttribute('data-state', 'opening');
   await expect(retry).toBeHidden();
   await expect(page.locator('.opening-fade')).toHaveCSS('opacity', '0');
-  expect(recoveredDownloads).toBeGreaterThanOrEqual(2, 'Both prerequisites retry their own Bob load.');
+  expect(recoveredDownloads, 'Both prerequisites retry their own Bob load.').toBeGreaterThanOrEqual(2);
   await page.locator('[data-action="skip-opening"]').click();
   await expect(flow).toHaveAttribute('data-state', 'playing', { timeout: 120_000 });
   await expect(host).not.toHaveAttribute('data-opening-state');

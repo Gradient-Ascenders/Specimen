@@ -12,7 +12,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit && tsc -p tsconfig.tooling.json",
     "test": "node --test --test-concurrency=2 \"tests/unit/**/*.test.ts\"",
     "test:browser": "npm run build && playwright test",
     "test:smoke": "playwright test --project=smoke --project=ui",
@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.61.0",
+    "@types/node": "24.19.2",
     "@types/three": "0.185.4",
     "typescript": "7.0.2",
     "vite": "8.2.1"

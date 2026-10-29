@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { finishOpening } from '../../helpers/OpeningHandoff.ts';
 import { watchBrowserErrors } from '../../helpers/BrowserErrors.ts';
 
-test('level selection preserves every roster, menu return and fresh story in one session', async ({ page }) => {
+test('level selection preserves every roster, menu return and fresh story in one session', { tag: '@extended' }, async ({ page }) => {
   // Preserve each former level case's budget while sharing title/setup work.
   test.setTimeout(900_000);
   const errors = watchBrowserErrors(page);

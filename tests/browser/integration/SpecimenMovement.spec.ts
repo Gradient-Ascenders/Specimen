@@ -204,7 +204,7 @@ test('real Specimen controls drive movement, dash I-frames, charge, overcharge a
   // independent of the moving boss's shield schedule and cover.
   await page.evaluate(anchor => {
     const { resources, layer } = window.__specimenMovementProbe;
-    resources.specimenBody.recoverAt(anchor); resources.specimenCharacter.reset(); resources.specimenDash.reset();
+    resources.specimenBody.recoverAt(layer.cameraRig.camera.position.clone().copy(anchor)); resources.specimenCharacter.reset(); resources.specimenDash.reset();
     resources.specimenAttack.reset();
     const center = layer.cameraRig.camera.position.clone().copy(resources.specimenBody.position); center.y += 12;
     const core = resources.finalBoss.presentation.core;

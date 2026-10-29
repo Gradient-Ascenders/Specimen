@@ -262,8 +262,8 @@ test('F1 hides guidance but preserves aiming overlays and menu/lifecycle ownersh
   await expect(hud).toBeHidden();
 
   // An overlay hidden by its own runtime must stay hidden after restoring HUD.
-  await probes.first().evaluate(overlay => { overlay.hidden = true; });
-  await aimProbes.first().evaluate(overlay => { overlay.hidden = true; });
+  await probes.first().evaluate(overlay => { (overlay as HTMLElement).hidden = true; });
+  await aimProbes.first().evaluate(overlay => { (overlay as HTMLElement).hidden = true; });
   await page.keyboard.press('F1');
   await expect(app).not.toHaveAttribute('data-clean-gameplay');
   await expect(hud).toBeVisible();

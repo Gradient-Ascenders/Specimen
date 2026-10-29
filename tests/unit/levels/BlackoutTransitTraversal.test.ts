@@ -44,7 +44,7 @@ function createTransitFixture() {
     initialPosition: new THREE.Vector3(-16, 2.96, 134),
     config: { adhesionEnabled: false, reboundEnabled: false, chargedJumpEnabled: false },
   });
-  const bodies = [bob, goop, volt];
+  const bodies = [Object.assign(bob, { id: 'bob' }), Object.assign(goop, { id: 'goop' }), Object.assign(volt, { id: 'volt' })];
   const lifts = BLACKOUT_TRANSIT_LIFT_SLOTS.map((slot) => {
     const device = new PoweredLiftDevice({
       id: slot.id,

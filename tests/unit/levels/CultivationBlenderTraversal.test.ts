@@ -22,7 +22,7 @@ test('Goop releases all three nursery cradles and Bob crosses them through the r
   const bob=new KinematicBody({world,surfaces,initialPosition:room.root.localToWorld(new THREE.Vector3(-11,.66,5.5))});
   const goop=new KinematicBody({world,surfaces,initialPosition:room.root.localToWorld(new THREE.Vector3(-9,.66,5.5)),
     config:{adhesionEnabled:false,reboundEnabled:false,chargedJumpEnabled:false,acidSpeedMultiplier:GOOP_ACID_SPEED_MULTIPLIER}});
-  const targets=scene.solubleTargetMeshes.map(mesh=>createAuthoredDissolveTarget(mesh,world,surfaces)),burns=new DissolveSystem(targets);
+  const targets=scene.solubleTargetMeshes.map(mesh=>createAuthoredDissolveTarget(mesh,world,surfaces)!),burns=new DissolveSystem(targets);
   scene.bindDissolveTargets(targets);
   const point=new THREE.Vector3(),zero=new THREE.Vector3(),direction=new THREE.Vector3();
   const acid=new AcidProjectileSystem({slimeManager:{activeSlimeId:'goop',activeBody:goop,canActiveUseAbility:()=>true},
@@ -104,7 +104,7 @@ test('the integrated Room 5 split, parkour, controls and rescue work without tel
   const bob=new KinematicBody({world,surfaces,initialPosition:room.root.localToWorld(new THREE.Vector3(-.3,.66,4))});
   const goop=new KinematicBody({world,surfaces,initialPosition:room.root.localToWorld(new THREE.Vector3(.3,.66,4)),
     config:{adhesionEnabled:false,reboundEnabled:false,chargedJumpEnabled:false,acidSpeedMultiplier:GOOP_ACID_SPEED_MULTIPLIER}});
-  const targets=scene.solubleTargetMeshes.map(mesh=>createAuthoredDissolveTarget(mesh,world,surfaces));
+  const targets=scene.solubleTargetMeshes.map(mesh=>createAuthoredDissolveTarget(mesh,world,surfaces)!);
   const burns=new DissolveSystem(targets);scene.bindDissolveTargets(targets);room.bindBurns(burns);
   const point=new THREE.Vector3(),zero=new THREE.Vector3(),direction=new THREE.Vector3();
   const acid=new AcidProjectileSystem({slimeManager:{activeSlimeId:'goop',activeBody:goop,canActiveUseAbility:()=>true},
@@ -219,13 +219,13 @@ test('the integrated Room 5 split, parkour, controls and rescue work without tel
       for(const [i,jump]of jumps.entries())jumpTo(jump[0],jump[2],`room-5-route-${section}-jump-${i+1}`);
       const next=ROOM_FIVE_SAFE_STATIONS[section+1];jumpTo(next[0],next[2],`room-5-safe-${section+1}-floor`);
     }
-    const parkedGoop=goop.position.clone();
+    const parkedGoop=(goop.position as THREE.Vector3).clone();
     walk(bob,0,34);walk(bob,0,30);walk(bob,0,27.7);
     for(let i=0;i<360;i++)step(bob);
     assert.equal(room.controller.rescued,true,'the real held-button volume releases Volt');
     // Rescue hands off to the upper-vent cinematic. The old service return
     // is sealed; the inactive companion remains at the sewer controls.
-    assert.ok(goop.position.distanceTo(parkedGoop)<.01,'rescue preserves the independently parked companion');
+    assert.ok((goop.position as THREE.Vector3).distanceTo(parkedGoop)<.01,'rescue preserves the independently parked companion');
     assert.deepEqual(failures,[],'the inactive partner remains on its protected safe surface');
     assert.ok(acid.getDiagnostics().solubleImpactCount>=9,'all three core hits and six network changes used real shots');
     scene.reset();

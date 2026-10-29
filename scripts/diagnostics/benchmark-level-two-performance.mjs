@@ -1,20 +1,24 @@
-import {chromium,expect} from '@playwright/test';
+import { DIAGNOSTIC_OPTIONS, diagnosticOptions, launchDiagnosticBrowser } from '../lib/diagnostics.mjs';
+import { parseArgs } from 'node:util';
+import {expect} from '@playwright/test';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {GRAPHICS_PROFILES} from '../../src/render/GraphicsProfiles.ts';
 // Real hardware only: connect to Chrome started with --remote-debugging-port.
-const base=process.env.PERF_BASE??'http://127.0.0.1:4173/group-folder/';
-const label=process.env.PERF_LABEL??new Date().toISOString().replaceAll(':','-'),out=`artifacts/level-two-performance/${label}`;
+const { values } = parseArgs({ options: DIAGNOSTIC_OPTIONS });
+const diagnostic = diagnosticOptions(values, { url: process.env.PERF_BASE, output: `artifacts/level-two-performance/${process.env.PERF_LABEL ?? new Date().toISOString().replaceAll(':', '-')}` });
+const base=diagnostic.url;
+const label=process.env.PERF_LABEL??new Date().toISOString().replaceAll(':','-'),out=diagnostic.output;
 const shaderSalt=Number(process.env.PERF_SHADER_SALT??0);
 if(!Number.isInteger(shaderSalt)||shaderSalt<0||shaderSalt>1_000_000)throw Error('PERF_SHADER_SALT must be an integer from 0 to 1000000 (0 disables the diagnostic).');
 await mkdir(out,{recursive:true});
-const endpoint=process.env.SPECIMEN_CDP_URL;
+const endpoint=diagnostic.cdp;
 if(!endpoint)throw Error('Set SPECIMEN_CDP_URL to your hardware-accelerated Chrome debug endpoint (HTTP or WebSocket).');
 let socket=endpoint;
 if(!endpoint.startsWith('ws')){
  const url=new URL(endpoint),version=await(await fetch(new URL('/json/version',url))).json();
  const target=new URL(version.webSocketDebuggerUrl);target.host=url.host;socket=target.href;
 }
-const browser=await chromium.connectOverCDP(socket);
+const browser=await launchDiagnosticBrowser({ ...diagnostic, cdp: socket });
 const report={label,shaderSalt,build:JSON.parse(await readFile((process.env.PERF_DIST??'dist')+'/build-manifest.json','utf8')),protocol:'Medium 1920x1080 DPR1; fresh contexts and routed module disable HTTP cache; shared uncontrolled driver cache. Optional source-salted fragment shaders exercise uncached variants; they do not reset the driver. Live initial gameplay plus separately labelled staged render-only views. Actual renderer is recorded; results qualify only the measured machine and route.',runs:[],errors:[]};
 const summary=rows=>{const values=rows.filter(Number.isFinite).sort((a,b)=>a-b);return {n:values.length,mean:values.reduce((a,b)=>a+b,0)/values.length,p50:values[Math.floor(values.length*.5)],p95:values[Math.floor(values.length*.95)],p99:values[Math.floor(values.length*.99)],max:values.at(-1)};};
 try{

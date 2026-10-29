@@ -20,7 +20,7 @@ import {addCultivationRoomThreeBoosters,addCultivationButtonPlatformBooster} fro
 export function visitLevelTwoSurfaceStates(scene: LevelTwoPreviewScene, visit: (name: string) => void): void {
   const world = new CollisionWorld(), surfaces = new SurfaceRegistry();
   world.registerAll(scene.collisionMeshes); surfaces.registerAll(scene.collisionMeshes);
-  const targets = scene.solubleTargetMeshes.map(mesh => createAuthoredDissolveTarget(mesh, world, surfaces));
+  const targets = scene.solubleTargetMeshes.map(mesh => createAuthoredDissolveTarget(mesh, world, surfaces)!);
   scene.bindDissolveTargets(targets);
   const bob = new KinematicBody({world, surfaces, initialPosition: scene.copyRoomSpawnPosition(3, 'bob', new THREE.Vector3())});
   const goop = new KinematicBody({world, surfaces, initialPosition: scene.copyRoomSpawnPosition(3, 'goop', new THREE.Vector3())});

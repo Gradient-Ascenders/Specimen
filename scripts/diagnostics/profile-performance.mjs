@@ -1,9 +1,10 @@
-/** Production-build diagnostic. See docs/development.md for scope and limitations.
+import { DIAGNOSTIC_OPTIONS, diagnosticOptions, launchDiagnosticBrowser } from '../lib/diagnostics.mjs';
+import { parseArgs } from 'node:util';
+/** Production-build diagnostic. See docs/development.md for protocol and limitations.
  * Browser instrumentation is never shipped in the game.
  * Do not run concurrent tests or GPU workloads during captures.
  */
 import { createHash } from "node:crypto";
-import { chromium } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { mkdir, writeFile, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
@@ -32,20 +33,29 @@ if (preset === "performance" && Number(resolutionCap) > 1) throw new Error("Perf
 if (transmissionScale && !["1", "0.75", "0.5"].includes(transmissionScale)) throw new Error("Unknown diagnostic PROFILE_TRANSMISSION_SCALE");
 if (!Number.isInteger(runs) || runs < 1 || !Number.isFinite(keyMs) || keyMs <= 0) throw new Error("PROFILE_RUNS must be a positive integer and PROFILE_KEY_MS must be positive");
 if (![width,height].every(v => Number.isInteger(v) && v > 0) || !Number.isFinite(deviceScaleFactor) || deviceScaleFactor <= 0) throw new Error("PROFILE_WIDTH/HEIGHT must be positive integers and PROFILE_DPR must be positive");
-const out = path.resolve(root, "artifacts/performance-overhaul", label);
+const { values } = parseArgs({ options: DIAGNOSTIC_OPTIONS });
+const diagnostic = diagnosticOptions(values, {
+  url: 'http://127.0.0.1:4190/', output: path.resolve(root, 'artifacts/performance-overhaul', label),
+  channel: process.env.PROFILE_BROWSER ?? (process.platform === 'win32' ? 'msedge' : 'chrome'),
+  executable: process.env.PROFILE_EXECUTABLE_PATH, headed: process.env.PROFILE_HEADLESS === '0',
+});
+const ownServer = !values.url && !process.env.SPECIMEN_DIAGNOSTIC_URL && !process.env.SPECIMEN_PRODUCTION_URL;
+const out = diagnostic.output;
 await mkdir(out, { recursive: true });
 let occupied = false;
 try {
-	occupied = (await fetch("http://127.0.0.1:4190")).ok;
+	occupied = (await fetch(diagnostic.url)).ok;
 } catch {}
-if (occupied) throw new Error("Profiling port 4190 is already in use");
+if (ownServer && occupied) throw new Error("Profiling port 4190 is already in use");
 const assets = path.join(root, process.env.PROFILE_DIST ?? "dist", "assets");
 const assetHashes = {};
 for (const name of await readdir(assets)) if (name.endsWith(".js")) assetHashes[name] = createHash("sha256").update(await readFile(path.join(assets, name))).digest("hex");
 const buildManifest=JSON.parse(await readFile(path.join(root,process.env.PROFILE_DIST ?? 'dist','build-manifest.json'),'utf8'));
-if (buildManifest.dirty || buildManifest.sha!==execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim())
-  throw new Error('Build committed source at the current HEAD before collecting benchmark evidence.');
-const server = spawn(process.execPath, [
+const expectedSha=execFileSync('git',['rev-parse',`${process.env.PROFILE_BUILD_REF ?? 'HEAD'}^{commit}`],{cwd:root,encoding:'utf8'}).trim();
+if (buildManifest.dirty || buildManifest.sha!==expectedSha)
+  throw new Error('Build clean committed source at PROFILE_BUILD_REF (default HEAD) before collecting benchmark evidence.');
+for (const [name,hash] of Object.entries(assetHashes)) if (buildManifest.assetHashes['assets/'+name]!==hash) throw new Error('Build manifest asset mismatch: '+name);
+const server = ownServer ? spawn(process.execPath, [
 	path.join(root, "node_modules/vite/bin/vite.js"),
 	"preview",
 	"--host",
@@ -58,16 +68,20 @@ const server = spawn(process.execPath, [
 	cwd: root,
 	stdio: "ignore",
 	windowsHide: true
-});
+}) : undefined;
 const report = {
 	label,
-	gitSha: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
+	gitSha: buildManifest.sha,
+    runnerSourceSha256:createHash('sha256').update(await readFile(new URL(import.meta.url))).digest('hex'),
+    runnerGitSha:execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
 	os: {platform: os.platform(), release: os.release(), version: os.version()},
     hardware:{cpu:os.cpus()[0]?.model ?? 'unavailable',logicalCpus:os.cpus().length,
       totalMemoryBytes:os.totalmem(),powerState:'not observed; record manually',driver:'record chrome://gpu separately'},
 	cacheProtocol:'Instrumented module routing disables HTTP cache. Repeated runs share a browser/driver cache of uncontrolled temperature; these are NOT browser-cold/warm qualification pairs.',
-	protocol: {width,height,deviceScaleFactor,flightRecorder,headless:process.env.PROFILE_HEADLESS !== "0",keyMs},
-	requestedGraphics: {preset, resolutionCap, transmissionScale},
+	protocol: {width,height,deviceScaleFactor,flightRecorder,headless:!diagnostic.headed,keyMs},
+	requestedGraphics: {preset, resolutionCap, transmissionScale,profile:process.env.PROFILE_GRAPHICS_PROFILE,renderScale:process.env.PROFILE_RENDER_SCALE},
+    diagnosticOverrides:{openRoomFive:process.env.PROFILE_OPEN_ROOM5 === "1",tracePrograms:process.env.PROFILE_TRACE_NEW_PROGRAMS === "1"},
+    scope:process.env.PROFILE_SCOPE ?? "all",roomSet:process.env.PROFILE_ROOM_SET ?? "default",stagedRoutes:true,
 	recordedAt: new Date().toISOString(),
 	assetHashes,
     buildManifest,
@@ -79,13 +93,11 @@ let activePage;
 try {
 	for (let i = 0; i < 100; i++) {
 		try {
-			if ((await fetch("http://127.0.0.1:4190")).ok) break;
+			if ((await fetch(diagnostic.url)).ok) break;
 		} catch {}
 		await new Promise((r) => setTimeout(r, 100));
 	}
-	browser = await chromium.launch({
-		channel: process.env.PROFILE_BROWSER ?? (process.platform==='win32' ? 'msedge' : 'chrome'),
-		headless: process.env.PROFILE_HEADLESS !== "0",
+	browser = await launchDiagnosticBrowser(diagnostic, {
 		args: [
 			...(requestedAngle ? [`--use-angle=${requestedAngle}`] : []),
 			...(process.platform==='win32' ? ["--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling,msEfficiencyMode"] : []),
@@ -114,7 +126,8 @@ try {
 			if (r.status() >= 400) report.errors.push(`${r.status()} ${r.url()}`);
 		});
 		await page.addInitScript((gpu) => {
-			globalThis.__enableGpu = gpu;
+			globalThis.__enableGpu = gpu.gpu;
+            globalThis.__labOpenRoomFive = gpu.openRoomFive;
 			globalThis.__profiles = [];
 			globalThis.__instanceArrays = new WeakMap();
 			const upload = WebGL2RenderingContext.prototype.bufferData;
@@ -186,10 +199,15 @@ try {
 					const compileSync = renderer.compile;
 					renderer.compile = function(...args) {
 						const active = globalThis.__activeRuntime;
-						const start = performance.now();
+						const start = performance.now(), before = this.info.programs.length;
 						try { return compileSync.apply(this, args); }
 						finally {
-							if (args[0] === active.preparationLightState) {
+							if (gpu.tracePrograms && this.info.programs.length > before) {
+                                active.__profile.compileProgramCreates ??=[];
+                                active.__profile.compileProgramCreates.push({at:start,state:active.state, object:args[0].name,
+                                    names:this.info.programs.slice(before).map(p=>({name:p.name,key:p.cacheKey}))});
+                            }
+                            if (args[0] === active.preparationLightState) {
 								active.__profile.lightStateRefreshes ??= [];
 								active.__profile.lightStateRefreshes.push({start, ms:performance.now()-start});
 							}
@@ -212,7 +230,24 @@ try {
 							return v;
 						});
 					};
-					const gpuDraw = renderer.render;
+					if (gpu.tracePrograms) {
+                        const direct = renderer.renderBufferDirect;
+                        renderer.renderBufferDirect = function(camera, scene, geometry, material, object, group) {
+                            const before = this.info.programs.length;
+                            try { return direct.call(this, camera, scene, geometry, material, object, group); }
+                            finally {
+                                if (this.info.programs.length > before && globalThis.__activeRuntime?.state === 'running') {
+                                    const p = globalThis.__profiles.at(-1);
+                                    p.directProgramCreates ??=[];
+                                    p.directProgramCreates.push({at:performance.now(), phase:globalThis.__uploadPhase, object:object.name, material:material.name,
+                                        type:material.type, transparent:material.transparent, side:material.side, castShadow:object.castShadow,
+                                        receiveShadow:object.receiveShadow, camera:camera.position.toArray(),
+                                        keys:this.info.programs.slice(before).map(p=>p.cacheKey)});
+                                }
+                            }
+                        };
+                    }
+                    const gpuDraw = renderer.render;
 					renderer.render = function(...args) {
 						const p = globalThis.__profiles.at(-1), n = this.info.programs.length, t = performance.now(), oldPhase = globalThis.__uploadPhase;
 						globalThis.__uploadPhase = args[0] === __activeRuntime.renderLayer.scene && __activeRuntime.state === "running" ? "live" : "preparation";
@@ -221,6 +256,10 @@ try {
 						} finally {
 							globalThis.__uploadPhase = oldPhase;
 							const ms = performance.now() - t;
+                            if (this.info.programs.length>n && globalThis.__activeRuntime?.state === 'running') {
+                                p.liveProgramDraws ??=[];
+                                p.liveProgramDraws.push({at:t,ms,names:this.info.programs.slice(n).map(p=>({name:p.name,key:p.cacheKey})),camera:__activeRuntime.renderLayer.cameraRig.camera.position.toArray()});
+                            }
 							if (ms > 10) p.slowDraws.push({
 								ms,
 								newPrograms: this.info.programs.length - n,
@@ -292,9 +331,9 @@ try {
 					type: "longtask",
 					buffered: true
 				});
-				return r;
+                return r;
 			};
-		}, process.env.PROFILE_GPU === "1" && !flightRecorder);
+		}, {tracePrograms:process.env.PROFILE_TRACE_NEW_PROGRAMS === "1",gpu:process.env.PROFILE_GPU === "1" && !flightRecorder,openRoomFive:process.env.PROFILE_OPEN_ROOM5 === "1"});
 		await page.route("**/assets/*.js", async (route) => {
 			const response = await route.fetch();
 			let body = await response.text();
@@ -315,16 +354,18 @@ try {
 		report.runs.push(data);
 		console.log(label, "run", run, "boot");
 		const t = performance.now();
-		await page.goto("http://127.0.0.1:4190/?debug=1&benchmark=1", { waitUntil: "domcontentloaded" });
+		await page.goto(new URL("?debug=1&benchmark=1", diagnostic.url).href, { waitUntil: "domcontentloaded" });
 		console.log("early GPU", await page.evaluate(() => {
 			const gl = __one.renderLayer.renderer.getContext(), e = gl.getExtension("WEBGL_debug_renderer_info");
 			return gl.getParameter(e ? e.UNMASKED_RENDERER_WEBGL : gl.RENDERER);
 		}));
 		await page.locator("[data-action=\"start\"]").waitFor({ state: "visible" });
 		data.readyMs = performance.now() - t;
-		if (preset || resolutionCap) {
+		if (preset || resolutionCap || process.env.PROFILE_GRAPHICS_PROFILE || process.env.PROFILE_RENDER_SCALE) {
 			await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
-			if (preset) await page.locator('[data-setting="graphics-preset"]').selectOption(preset);
+			if (process.env.PROFILE_GRAPHICS_PROFILE) await page.locator('[data-setting="graphics-profile"]').selectOption(process.env.PROFILE_GRAPHICS_PROFILE);
+            if (process.env.PROFILE_RENDER_SCALE) await page.locator('[data-setting="render-scale"]').selectOption(process.env.PROFILE_RENDER_SCALE);
+            if (preset) await page.locator('[data-setting="graphics-preset"]').selectOption(preset);
 			if (resolutionCap) await page.locator('[data-setting="render-resolution"]').selectOption(resolutionCap);
 			await page.locator('[data-flow-panel="settings"] [data-action="back"]').click();
 		}
@@ -351,7 +392,23 @@ try {
 			};
 		});
 		console.log(data.environment, "boot", data.bootMs);
-		const sample = async (name, room, variant = "") => {
+		const restartCheck = async name => {
+            if (process.env.PROFILE_RESTARTS !== '1') return;
+            data.restarts ??= [];
+            for (let cycle=0;cycle<4;cycle++) {
+                const started=performance.now();
+                await page.keyboard.press('KeyP');
+                await page.locator('[data-flow-panel="paused"] [data-action="restart"]').click();
+                await page.waitForFunction(name=>globalThis[name].state==='running' && globalThis[name].input.enabled,name);
+                await page.locator('canvas').click();
+                await page.waitForTimeout(5000);
+                const sample=await page.evaluate(name=>{const r=globalThis[name],i=r.renderLayer.renderer.info;return {programs:i.programs.length,geometries:i.memory.geometries,textures:i.memory.textures,heap:performance.memory?.usedJSHeapSize,focused:document.hasFocus(),visible:document.visibilityState};},name);
+                data.restarts.push({name,cycle,ms:performance.now()-started,...sample});
+                console.log('restart',name,cycle,JSON.stringify(sample));
+            }
+            await writeFile(path.join(out,'raw.json'),JSON.stringify(report));
+        };
+        const sampleOnce = async (name, room, variant = "") => {
             if (!/^[a-z0-9_-]*$/.test(variant)) throw new Error("Invalid capture variant");
             const captureId = `run${run}-${name}-${room}${variant ? "-"+variant : ""}`;
 			await page.bringToFront();
@@ -364,6 +421,13 @@ try {
                     // Debug staging resets death state but does not resume disabled input.
                     // Use the normal lifecycle before the measured sequence.
                     r.stop(); r.start();
+                    if (globalThis.__labOpenRoomFive && room === 5) {
+                        const resources=r.resources, root=resources.authoredPreview.roomFive.root;
+                        resources.pair.bobBody.teleport(root.localToWorld(resources.pair.bobBody.position.clone().set(0,29.46,37)));
+                        resources.pair.goopBody.teleport(root.localToWorld(resources.pair.goopBody.position.clone().set(46,-10.74,95)));
+                        r.resetRecoveryCamera(resources); r.retargetCamera(resources);
+                        r.renderLayer.cameraRig.setGroundOrbitYawRadians(resources.manager.activeSlimeId === 'goop' ? 0 : Math.PI);
+                    }
                 }
 				else if (room === 2) r.input;
 				return t;
@@ -380,12 +444,13 @@ try {
 				entryMs: performance.now() - entered
 			});
 			await page.waitForTimeout(1e3);
-			await page.locator("canvas").click();
+			await page.waitForFunction(name => globalThis[name].input.enabled, name, {timeout:60000});
+            await page.locator("canvas").click();
             await page.waitForFunction(name => globalThis[name].input.enabled && globalThis[name].input.pointerLocked, name, {timeout:10000});
             if (name === "__three") {
                 // Keep the historical Bob/Goop staged route comparable. The native
                 // seven-scenario lab protocol separately exercises recorded Volt motion.
-                const target = room === 2 ? "goop" : "bob";
+                const target = variant === "volt" ? "volt" : room === 2 ? "goop" : "bob";
                 for (let attempt = 0; attempt < 3; attempt++) {
                     const active = await page.evaluate(() => __three.resources.manager.activeSlimeId);
                     if (active === target) break;
@@ -466,17 +531,32 @@ try {
 				return r.__profile.frames.length;
 			}, name);
 			// Short opposing moves keep a normal room capture close to its safe spawn.
-            for (let elapsed = 0; elapsed < keyMs; elapsed += 500) {
-                const stepMs = Math.min(500, keyMs-elapsed);
+            if (process.env.PROFILE_OPEN_ROOM5 === '1' && name === '__two' && room === 5) {
+                // Safe observation workload: short genuine body motion, then
+                // sustained pointer-locked camera input without walking off cover.
+                for (let elapsed=0;elapsed<keyMs*4;elapsed+=500) {
+                    if (flightRecorder) await page.keyboard.press('Shift+KeyH');
+                    await page.mouse.move(width/2+(elapsed%1000 ? 35 : -35),height/2,{steps:4});
+                    if (elapsed===0 || elapsed===500) {
+                        const key=elapsed===0 ? 'd' : 'a';
+                        await page.keyboard.down(key); await page.waitForTimeout(150); await page.keyboard.up(key);
+                        await page.waitForTimeout(350);
+                    } else await page.waitForTimeout(500);
+                }
+            } else {
+            for (let elapsed = 0; elapsed < keyMs; elapsed += 100) {
+                const stepMs = Math.min(100, keyMs-elapsed);
                 if (flightRecorder) await page.keyboard.press("Shift+KeyH");
                 await page.mouse.move(width/2 + (elapsed % 1000 ? 5 : -5), height/2, {steps:4});
-                if (elapsed === 0) await page.keyboard.press("Space", {delay:150});
+                if (elapsed === 0 && process.env.PROFILE_OPEN_ROOM5 !== "1") await page.keyboard.press("Space", {delay:150});
                 for (const key of ["w", "s", "d", "a"]) {
                     await page.keyboard.down(key);
                     await page.waitForTimeout(stepMs);
                     await page.keyboard.up(key);
                 }
             }
+            }
+
 			if (flightRecorder) {
                 await page.keyboard.press("Shift+KeyH");
 				await page.keyboard.press("Shift+KeyP");
@@ -499,8 +579,8 @@ try {
                 captureValidation = {active,states,cutscenes,rawFrames:frames.length,totalFrames:recording.summary.totalFrames,
                     bodyRange:["X","Y","Z"].map(axis=>range(body+axis)),cameraRange:["X","Y","Z"].map(axis=>range("camera"+axis))};
                 const expectedState = name === "__three" ? "three-slime" : "playing";
-                if (active.length!==1 || !["bob","goop"].includes(active[0]) || states.some(state=>state!==expectedState) || cutscenes.some(state=>state!=="none") ||
-                    frames.length!==recording.summary.totalFrames || Math.max(...captureValidation.bodyRange)<.05 || Math.max(...captureValidation.cameraRange)<.05) {
+                if (active.length!==1 || !["bob","goop","volt"].includes(active[0]) || states.some(state=>state!==expectedState) || cutscenes.some(state=>state!=="none") ||
+                    frames.length!==recording.summary.totalFrames || (active[0] !== "volt" && Math.max(...captureValidation.bodyRange)<.05) || Math.max(...captureValidation.cameraRange)<.05) {
                     throw new Error("Invalid interactive capture: "+JSON.stringify(captureValidation));
                 }
             }
@@ -531,12 +611,22 @@ try {
 			await page.locator("canvas").screenshot({ path: path.join(out, `${captureId}.png`) });
 			await writeFile(path.join(out, "raw.json"), JSON.stringify(report));
 		};
-		if (process.env.PROFILE_MODE !== "startup") for (const room of betaScope ? [1] : [
-			1,
-			3,
-			5
-		]) await sample("__one", room);
-		data.oneWarmup = await page.evaluate(() => __one.lightingPrewarmProfile);
+        const sample = async (name,room,variant='') => {
+            try { return await sampleOnce(name,room,variant); }
+            catch(error) {
+                report.rejectedCaptures ??= [];
+                report.rejectedCaptures.push({run,name,room,variant,error:error.stack});
+                console.error('REJECTED',name,room,variant,error.message);
+                await writeFile(path.join(out,'raw.json'),JSON.stringify(report));
+                await page.screenshot({path:path.join(out,`rejected-${run}-${name}-${room}-${variant}.png`)});
+                await page.evaluate(name=>{const r=globalThis[name];r.stop();r.restartLevel();r.start();},name);
+                await page.waitForFunction(name=>globalThis[name].input.enabled,name);
+            }
+        };
+
+		if (process.env.PROFILE_MODE !== "startup") for (const room of (process.env.PROFILE_SCOPE === 'two' || process.env.PROFILE_SKIP_ONE_SAMPLES === '1') ? [] : process.env.PROFILE_ROOM_SET === 'hotspots' ? [1] : betaScope ? [1] : [1,5]) await sample("__one", room);
+		await restartCheck("__one");
+        data.oneWarmup = await page.evaluate(() => __one.lightingPrewarmProfile);
 		data.resources = await page.evaluate(() => performance.getEntriesByType("resource").filter((e) => /\.(?:js|glb|bin)(?:$|\?)/.test(e.name)).map((e) => ({
 			name: e.name,
 			start: e.startTime,
@@ -564,18 +654,14 @@ try {
 		}
 		await page.locator("[data-action=\"enter-level\"]").click();
 		await page.waitForFunction(() => globalThis.__two?.state === "running");
-		data.twoTransitionMs = performance.now() - transition;
+		data.twoRunningMs = performance.now() - transition;
+        await page.waitForFunction(()=>__two.input.enabled);
+        data.twoTransitionMs = performance.now() - transition;
 		console.log("two transition", data.twoTransitionMs);
 		data.twoConfigurations = await page.evaluate(() => __two.preparationQueue?.configurations);
 		await writeFile(path.join(out, "raw.json"), JSON.stringify(report));
-		if (process.env.PROFILE_MODE !== "startup") for (const room of betaScope ? [5] : [
-			1,
-			2,
-			3,
-			4,
-			5
-		]) await sample("__two", room);
-		if (betaScope && process.env.PROFILE_MODE !== "startup") {
+		if (process.env.PROFILE_MODE !== "startup") for (const room of process.env.PROFILE_SCOPE === 'two' ? [1] : process.env.PROFILE_ROOM_SET === 'long' ? [1,5] : process.env.PROFILE_ROOM_SET === 'hotspots' ? [3,4,5] : betaScope ? [5] : [1,2,3,4,5]) await sample("__two", room);
+		if ((betaScope || ["hotspots","long"].includes(process.env.PROFILE_ROOM_SET)) && process.env.PROFILE_MODE !== "startup") {
 			await page.keyboard.press("Tab", {delay:150});
 			await page.waitForFunction(() => __two.resources.manager.activeSlimeId === "goop");
 			await sample("__two", 5, "goop");
@@ -583,7 +669,18 @@ try {
 		if (betaScope && process.env.PROFILE_EXTRA_ROOM_ONE === "1" && process.env.PROFILE_MODE !== "startup") {
 			await sample("__two", 1, "background-preparation");
 		}
-		await page.evaluate(() => {
+		if (process.env.PROFILE_SCOPE === 'two') {
+            data.profiles = await page.evaluate(()=>__profiles);
+            await writeFile(path.join(out,'raw.json'),JSON.stringify(report));
+            await context.close();
+            continue;
+        }
+        await restartCheck("__two");
+        if (process.env.PROFILE_ROOM_SET === 'long') {
+            if (await page.evaluate(()=>__two.resources.manager.activeSlimeId) !== 'bob') await page.keyboard.press('Tab',{delay:150});
+            await sample('__two',1,'warmed-bob');
+        }
+        await page.evaluate(() => {
 			__two.resources.manager.unlock("volt");
 			__two.events.emit("completed", {
 				levelId: "level-2",
@@ -593,9 +690,14 @@ try {
 		const three = performance.now();
 		await page.locator("[data-action=\"enter-level\"]").click();
 		await page.waitForFunction(() => globalThis.__three?.state === "running");
-		data.threeTransitionMs = performance.now() - three;
+		data.threeRunningMs = performance.now() - three;
+        await page.waitForFunction(()=>__three.input.enabled);
+        data.threeTransitionMs = performance.now() - three;
+        console.log("three transition", data.threeTransitionMs);
 		if (process.env.PROFILE_MODE !== "startup") for (const room of betaScope ? [1] : [1, 2]) await sample("__three", room);
-		data.profiles = await page.evaluate(() => __profiles);
+		if (process.env.PROFILE_ROOM_SET === "long") await sample("__three",1,"volt");
+        await restartCheck("__three");
+        data.profiles = await page.evaluate(() => __profiles);
 		await writeFile(path.join(out, "raw.json"), JSON.stringify(report));
 		await context.close();
 	}
@@ -616,5 +718,5 @@ try {
 } finally {
 	await writeFile(path.join(out, "raw.json"), JSON.stringify(report));
 	await browser?.close();
-	server.kill();
+	server?.kill();
 }

@@ -134,7 +134,7 @@ test('Blackout companions walk the safe bay corridor, rising duct and transit ex
         companion.beginStep(); body.update(DT, companion.steer(trial.id, body, walk, p.world), companion.jump[trial.id]);
         assert.equal(bay.acidAt(body.position) || (trial.id !== 'goop' && transit.acidAt(body.position)), false);
       }
-      assert.ok(body.position.z >= trial.end, `${trial.id} stalled at ${body.position.toArray()}`);
+      assert.ok(body.position.z >= trial.end, `${trial.id} stalled at ${(body.position as THREE.Vector3).toArray()}`);
       assert.ok(body.grounded);
     }
   } finally { p.dispose(); staging.dispose(); transit.dispose(); bay.dispose(); }

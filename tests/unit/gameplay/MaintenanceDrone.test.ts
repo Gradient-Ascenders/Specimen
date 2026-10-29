@@ -12,6 +12,8 @@ import { MaintenanceDroneFlightBody } from '../../../src/vehicles/MaintenanceDro
 import { WorldAudio } from '../../../src/audio/WorldAudio.ts';
 import type { SoundId } from '../../../src/audio/SoundCatalog.ts';
 
+const readState = (controller: MaintenanceDroneController) => controller.readModel.state;
+
 const DT = 1 / 60;
 const STILL = new THREE.Vector3();
 
@@ -200,7 +202,7 @@ test('only Volt can mount and first startup/tutorial fire exactly once', () => {
         controllingVolt: true,
       });
       fixture.controller.applyFallingSupportToVolt(fixture.volt);
-      if (fixture.controller.readModel.state === 'grounded-idle') break;
+      if (readState(fixture.controller) === 'grounded-idle') break;
     }
     assert.equal(fixture.controller.readModel.state, 'grounded-idle');
 
@@ -410,7 +412,7 @@ test('mid-air dismount is allowed, drone loses power, and supported Volt follows
         controllingVolt: true,
       });
       const landed =
-        fixture.controller.readModel.state === 'grounded-idle';
+        readState(fixture.controller) === 'grounded-idle';
       fixture.controller.applyFallingSupportToVolt(fixture.volt);
       if (fixture.volt.position.y < voltBefore - 1e-5) carriedDown = true;
       if (landed && supportedBeforeDroneStep) {
@@ -539,8 +541,8 @@ test('checkpoint snapshot preserves stable mounted/parked learning state but nev
     const transientSnapshot = fixture.controller.capture();
     fixture.controller.restore(transientSnapshot);
     assert.equal(
-      fixture.controller.readModel.state === 'damaged-idle' ||
-      fixture.controller.readModel.state === 'grounded-idle',
+      readState(fixture.controller) === 'damaged-idle' ||
+      readState(fixture.controller) === 'grounded-idle',
       true,
     );
   } finally {
@@ -631,7 +633,7 @@ test('partial constructor failure unregisters an already-added drone support col
   const originalRegister = world.register.bind(world);
   world.register = ((mesh, layerMask, transformMode) => {
     originalRegister(mesh, layerMask, transformMode);
-    if ((layerMask & CollisionLayer.MaintenanceDroneSupport) !== 0) {
+    if (((layerMask ?? 0) & CollisionLayer.MaintenanceDroneSupport) !== 0) {
       throw new Error('injected drone collider registration failure');
     }
   }) as typeof world.register;

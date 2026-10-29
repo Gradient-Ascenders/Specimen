@@ -63,25 +63,9 @@ neutral geometry, winding, eye seating, material values, embedded ramp
 pixels/UVs, and all five exported morphs. Editable Blender byte identity can
 change on save; geometry and GLB identity are checked separately.
 
-## Interactive review
+## Review
 
-```bash
-npx vite build --config vite.volt-preview.config.ts
-npx vite preview --config vite.volt-preview.config.ts --host 127.0.0.1 --port 4189 --strictPort
-```
-
-Open <http://127.0.0.1:4189/tools/volt-preview.html>. This separate review build
-leaves the production game entry unchanged. It offers reset, all morph
-controls, a restrained motion demo, front/side/back/three-quarter views,
-and studio/unpowered/powered Blackout lighting. It uses the authored Blackout
-environment, current game FOV (48°), exposure and 3.5–7 m follow distances.
-To recapture checks while the server is running:
-
-```bash
-node scripts/diagnostics/capture-volt-polish.mjs
-```
-
-Browser evidence uses software-rendered Chromium: it verifies exported
-appearance and controls in the lighting fixture, not hardware performance
-or production gameplay acceptance. Production lifecycle, animation driving,
-collision and ability wiring remain separate from this asset-polish delivery.
+The historical standalone preview and its capture script have been retired.
+Use the production [Volt presentation regression](../../../tests/browser/rendering/VoltPresentation.spec.ts)
+for the current model, lighting and lifecycle checks. Captures belong under
+ignored `artifacts/`; software-rendered checks do not establish hardware performance.

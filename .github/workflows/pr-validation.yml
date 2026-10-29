@@ -13,77 +13,63 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Select checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      checks: ${{ steps.select.outputs.checks }}
+      browser: ${{ steps.select.outputs.browser }}
+      generated: ${{ steps.select.outputs.generated }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The proposed merge and both parents suffice; avoid fetching asset history.
+          fetch-depth: 2
+          sparse-checkout: scripts/build
+      - id: select
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/build/classify-pr-changes.mjs "$BASE_SHA"
+
   unit-tests:
     name: Unit tests
+    needs: changes
+    if: needs.changes.outputs.checks == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Check out proposed merge
-        uses: actions/checkout@v7
-
-      - name: Use pinned Node.js version and cache npm downloads
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - name: Use pinned npm version
-        run: npm install --global npm@11.18.0
-
-      - name: Install locked dependencies
-        run: npm ci
-
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - name: Check game, tests and tooling types
+        run: npm run type-check
       - name: Verify baked asset reproducibility
+        if: needs.changes.outputs.generated == 'true'
         run: npm run check:generated-assets
-
       - name: Run tests
         run: npm test
 
   production-build:
     name: Production smoke (${{ matrix.shard }}/2)
+    needs: changes
+    if: needs.changes.outputs.browser == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     strategy:
       matrix:
         shard: [1, 2]
     steps:
-      - name: Check out proposed merge
-        uses: actions/checkout@v7
-
-      - name: Use pinned Node.js version and cache npm downloads
-        uses: actions/setup-node@v7
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - name: Use pinned npm version
-        run: npm install --global npm@11.18.0
-
-      - name: Install locked dependencies
-        run: npm ci
-
-      # build already runs tsc. Do not type-check or build a second time.
-      - name: Build for production
-        run: npm run build
-
-      - name: Validate production layout and references
-        run: npm run validate:production
-
-      - name: Cache Chromium
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package-lock.json') }}
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Smoke-test production at a nested path
-        timeout-minutes: 8
-        # Preserve production and isolated menu coverage. Each runner has one
-        # software-WebGL worker, avoiding CPU contention on one machine.
-        run: npm run test:smoke -- --fully-parallel --shard=${{ matrix.shard }}/2
-
+          browser: chromium
+      # build already checks game types; do not compile the artifact twice.
+      - run: npm run build
+      - run: npm run validate:production
+      - name: Check production startup, restart and menus
+        timeout-minutes: 5
+        # Long profile and multi-level journeys run nightly; keep one WebGL worker.
+        run: npm run test:smoke -- --grep-invert @extended --fully-parallel --shard=${{ matrix.shard }}/2
       - name: Upload browser diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v7
@@ -96,14 +82,23 @@ jobs:
           retention-days: 7
 
   production-smoke:
-    # Preserve the existing required-check name for branch protection.
+    # Preserve the required-check name even when browser work is unnecessary.
     name: Production smoke
-    needs: production-build
+    needs: [changes, production-build]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
-      - name: Require both smoke shards to pass
+      - name: Require every selected browser shard to pass
         env:
+          SELECTION_RESULT: ${{ needs.changes.result }}
+          BROWSER_REQUIRED: ${{ needs.changes.outputs.browser }}
           SHARD_RESULT: ${{ needs.production-build.result }}
-        run: test "$SHARD_RESULT" = success
+        run: |
+          test "$SELECTION_RESULT" = success
+          if [ "$BROWSER_REQUIRED" = true ]; then
+            test "$SHARD_RESULT" = success
+          else
+            test "$BROWSER_REQUIRED" = false
+            test "$SHARD_RESULT" = skipped
+          fi

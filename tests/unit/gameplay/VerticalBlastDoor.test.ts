@@ -90,8 +90,8 @@ test('closing detects either slime, exposes blocked/reopening, and resumes only 
   fixture.door.update(0.1, [bob, goop]);
   assert.equal(fixture.door.state, 'reopening');
   assert.equal(fixture.door.progress, 1);
-  bob.position.set(10, 2, 0);
-  goop.position.set(10, 2, 0);
+  (bob.position as THREE.Vector3).set(10, 2, 0);
+  (goop.position as THREE.Vector3).set(10, 2, 0);
   fixture.door.update(0.1, [bob, goop]);
   assert.equal(cleared, 1);
   assert.equal(fixture.door.state, 'closing');

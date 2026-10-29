@@ -54,7 +54,7 @@ test('acid speed belongs to Goop contact, resets on dry ground/recovery and does
     assert.equal(goop.lastJumpSpeedMetresPerSecond, DEFAULT_KINEMATIC_BODY_CONFIG.minimumJumpSpeedMetresPerSecond);
     goop.recoverAt(new THREE.Vector3(10, .46, -10));
     assert.equal(goop.maximumLocomotionSpeedMetresPerSecond, NORMAL_SPEED);
-    assert.equal(goop.velocity.lengthSq(), 0);
+    assert.equal((goop.velocity as THREE.Vector3).lengthSq(), 0);
   } finally {p.dispose(); for (const mesh of [acid, dry, platform]) {mesh.geometry.dispose(); (mesh.material as THREE.Material).dispose();}}
 });
 

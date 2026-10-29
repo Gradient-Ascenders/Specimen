@@ -157,7 +157,7 @@ test(`${preset} graphics retains Volt release, controls and warmed lifecycle thr
   await page.mouse.down({ button: 'right' });
   await page.waitForFunction(() => (window as any).__voltBlackout.resources.electricalSystem.readModel.aimActive);
   await frames(12); const aim = await sample('__voltBlackout', 'electrical-aim');
-  expect(aim.volt.visible).toBe(false); expect(aim.light.visible).toBe(true); await capture('electrical-aim');
+  expect(aim.volt.visible).toBe(false); expect(aim.light!.visible).toBe(true); await capture('electrical-aim');
   await page.mouse.up({ button: 'right' });
   // Aim exit restores opacity when the existing camera-proximity fade allows
   // it; open-space staging avoids the drone/entry-wall obstruction.
@@ -234,7 +234,7 @@ test(`${preset} graphics retains Volt release, controls and warmed lifecycle thr
     await page.evaluate(() => (window as any).__voltBlackout.requestFailure());
     await frames(2);
     const dying = await sample('__voltBlackout', `dying-${pass}`);
-    expect(dying.light.intensity).toBe(0);
+    expect(dying.light!.intensity).toBe(0);
     expect(dying.programs).toBe(warm.programs);
     await expect(page.locator('.death-retry')).toBeVisible({ timeout: 120_000 });
     await page.locator('.death-retry').click(); await frames();
@@ -256,14 +256,14 @@ test(`${preset} graphics retains Volt release, controls and warmed lifecycle thr
     for (let i = 0; i < 360; i++) rt.fixedUpdate(1 / 60);
   });
   await frames(); const merged = await sample('__voltBlackout', 'merged');
-  expect(merged.volt.visible).toBe(false); expect(merged.light.visible).toBe(false);
+  expect(merged.volt.visible).toBe(false); expect(merged.light!.visible).toBe(false);
   await page.evaluate(() => {
     const rt = (window as any).__voltBlackout;
     rt.resources.phase.restore('boss-defeated'); rt.resources.specimenForm.restore('specimen');
     if (!rt.beginSplit() || !rt.completeSplit()) throw new Error('split rejected');
   });
   await frames(); const split = await sample('__voltBlackout', 'split');
-  expect(split.volt.visible).toBe(true); expect(split.light.visible).toBe(true); expect(split.volt.opacity).toBe(1);
+  expect(split.volt.visible).toBe(true); expect(split.light!.visible).toBe(true); expect(split.volt.opacity).toBe(1);
   await page.evaluate(() => (window as any).__voltBlackout.restartLevel()); await frames();
   expect((await sample('__voltBlackout', 'restart')).active).toBe('volt');
   // Diagnostic original-light-removal controls run only after gameplay/cache

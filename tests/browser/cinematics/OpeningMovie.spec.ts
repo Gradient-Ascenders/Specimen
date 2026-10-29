@@ -91,7 +91,7 @@ test('opt-in production MP4 backup plays the whole intro while Level 1 finishes 
   console.log('Native opening playback/preparation:', JSON.stringify(probe));
   expect(probe.readyAt).toBeGreaterThan(0);
   expect(probe.readyAt).toBeLessThan(probe.readyDuration - 1);
-  expect(probe.canvasClearsDuringVideo).toBe(0, 'The visible cinematic must not use WebGL/video textures.');
+  expect(probe.canvasClearsDuringVideo, 'The visible cinematic must not use WebGL/video textures.').toBe(0);
   expect(probe.totalFrames).toBeGreaterThan(1500);
   expect(probe.stages).toEqual(expect.arrayContaining(['experiments', 'bob-door', 'entering', 'cracking', 'falling', 'breaking', 'forming']));
   expect(goopRequests).toBe(1);

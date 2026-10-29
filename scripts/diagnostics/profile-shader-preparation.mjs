@@ -1,18 +1,18 @@
+import { DIAGNOSTIC_OPTIONS, diagnosticOptions, launchDiagnosticBrowser } from '../lib/diagnostics.mjs';
 /** #191 production diagnostic; bundle edits expose owners only. No renderer patch.
  * node scripts/diagnostics/profile-shader-preparation.mjs --label before --runs 2 --channel msedge
  * Warm means a second navigation in the SAME context; driver cache is uncontrolled.
  * Timer/inspection instrumentation is identical before/after; not Wits qualification.
  */
-import { chromium } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import path from 'node:path';
 const { values } = parseArgs({ options: {
+  ...DIAGNOSTIC_OPTIONS,
   label: { type:'string', default:'candidate' }, runs: { type:'string', default:'2' },
-  channel: { type:'string', default:'msedge' }, profile:{type:'string',default:'minimum'},
-  headed:{type:'boolean',default:false}, url:{type:'string',default:'http://127.0.0.1:4191/'},
+  profile:{type:'string',default:'minimum'},
   trace:{type:'boolean',default:false},
   opening:{type:'string',default:'natural'},
   suppressSpeculation:{type:'boolean',default:false},
@@ -20,24 +20,28 @@ const { values } = parseArgs({ options: {
   sweep:{type:'boolean',default:false},
   dist:{type:'string',default:'dist'},
 } });
+const suppliedUrl = values.url;
+const diagnostic = diagnosticOptions(values, { url: 'http://127.0.0.1:4191/', output: `artifacts/shader-preparation/${values.label}` });
+Object.assign(values, diagnostic);
 if (!/^[\w-]+$/.test(values.label) || !['minimum','standard'].includes(values.profile)) throw Error('Invalid label/profile');
 if(!['natural','skip'].includes(values.opening))throw Error('Invalid opening route');
 const startupRoute=`opening-${values.opening}-v1`;
 const runs = Number(values.runs); if (!Number.isInteger(runs) || runs < 1) throw Error('Invalid runs');
 const backgroundBatch=values.backgroundBatch==='unchanged'?undefined:Number(values.backgroundBatch);
 if(backgroundBatch!==undefined&&(!Number.isInteger(backgroundBatch)||backgroundBatch<1||backgroundBatch>8))throw Error('Invalid diagnostic batch size');
-const output = path.resolve('artifacts/shader-preparation', values.label); await mkdir(output,{recursive:true});
+const output = diagnostic.output; await mkdir(output,{recursive:true});
 const hashes = {};
 for (const file of await readdir(path.join(values.dist,'assets'))) if (file.endsWith('.js')) hashes[file] = createHash('sha256').update(await readFile(path.join(values.dist,'assets',file))).digest('hex');
 const report = { schema:2, recordedAt:new Date().toISOString(), protocol:{...values, requestedStartupRoute:startupRoute, viewport:[960,600],dpr:1,
   route:'ordinary production; controller-staged completion/room entries; bounded real input; not full puzzle playthrough',
   cache:'fresh browser per pair; warm navigation in same context; HTTP routing disables HTTP cache; OS/driver cache uncontrolled'}, hashes, runs:[] };
-const server = spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--outDir',values.dist,'--host','127.0.0.1','--port','4191','--strictPort'],{stdio:'ignore',windowsHide:true});
+const ownServer = !suppliedUrl && !process.env.SPECIMEN_DIAGNOSTIC_URL && !process.env.SPECIMEN_PRODUCTION_URL;
+const server = ownServer ? spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--outDir',values.dist,'--host','127.0.0.1','--port','4191','--strictPort'],{stdio:'ignore',windowsHide:true}) : undefined;
 let browser;
 try {
   for (let n=0;n<100;n++) { try { if ((await fetch(values.url)).ok) break; } catch {} await new Promise(r=>setTimeout(r,100)); }
   for (let pair=0;pair<runs;pair++) {
-    browser = await chromium.launch({channel:values.channel,headless:!values.headed,args:['--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding']});
+    browser = await launchDiagnosticBrowser(diagnostic, {args:['--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding']});
     const context = await browser.newContext({viewport:{width:960,height:600},deviceScaleFactor:1});
     const page = await context.newPage(); page.setDefaultTimeout(300_000);
     await page.addInitScript(diagnosticGL => {
@@ -291,4 +295,4 @@ try {
     }
     await browser.close();browser=undefined;
   }
-} finally {await writeFile(path.join(output,'raw.json'),JSON.stringify(report,null,2));await browser?.close();server.kill();}
+} finally {await writeFile(path.join(output,'raw.json'),JSON.stringify(report,null,2));await browser?.close();server?.kill();}

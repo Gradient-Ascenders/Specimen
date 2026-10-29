@@ -18,7 +18,7 @@ function fixture() {
   const renderer = { clippingPlanes: [], renderBufferDirect: function (_c: THREE.Camera, _s: THREE.Scene,
     _g: THREE.BufferGeometry, _m: THREE.Material, o: THREE.Object3D) { assert.equal(this, renderer); calls.push(o); } } as unknown as THREE.WebGLRenderer;
   const helper = new CameraOcclusion(renderer, [{mesh: door, frame: new THREE.Matrix4(), halfWidth: 3.8, halfHeight: 2.8, depthMargin: .3}], [hidden]);
-  const submit = (c: THREE.Camera = camera) => renderer.renderBufferDirect(c, scene, hidden.geometry, hidden.material, hidden, null);
+  const submit = (c: THREE.Camera = camera) => renderer.renderBufferDirect(c, scene, hidden.geometry, hidden.material, hidden, null as never);
   const draw = () => { scene.updateMatrixWorld(true); helper.render(camera, () => submit()); };
   return { scene, frame, door, hidden, camera, calls, renderer, helper, submit, draw };
 }
@@ -75,7 +75,7 @@ test('every instance must fit behind the opaque rectangle, including updated ban
   const transform = new THREE.Matrix4(); bank.setMatrixAt(0, transform.makeTranslation(0, 0, -20));
   bank.setMatrixAt(1, transform.makeTranslation(0, 0, -25)); f.frame.add(bank);
   const helper = new CameraOcclusion(f.renderer, [{mesh:f.door,frame:new THREE.Matrix4(),halfWidth:3.8,halfHeight:2.8,depthMargin:.3}], [bank]);
-  const draw = () => { f.scene.updateMatrixWorld(true); helper.render(f.camera, () => f.renderer.renderBufferDirect(f.camera,f.scene,bank.geometry,bank.material,bank,null)); };
+  const draw = () => { f.scene.updateMatrixWorld(true); helper.render(f.camera, () => f.renderer.renderBufferDirect(f.camera,f.scene,bank.geometry,bank.material,bank,null as never)); };
   draw(); assert.equal(f.calls.length, 0);
   bank.setMatrixAt(1, transform.makeTranslation(15, 0, -20)); bank.instanceMatrix.needsUpdate = true;
   draw(); assert.equal(f.calls.length, 1);
@@ -138,5 +138,5 @@ test('combat detail respects world scale, close views and hysteresis without new
   root.scale.setScalar(5); detail.update(camera,.9,true); assert.equal(detail.diagnostics.level,'full');
   root.scale.setScalar(1); camera.position.z=10;detail.update(camera,.9,true);assert.equal(detail.diagnostics.level,'distant');
   detail.update(camera);assert.equal(detail.diagnostics.level,'full');assert.equal(mesh.geometry.index,index);
-  detail.dispose();mesh.geometry.dispose();mesh.material.dispose();
+  detail.dispose();mesh.geometry.dispose();for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) material.dispose();
 });

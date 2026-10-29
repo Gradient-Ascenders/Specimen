@@ -16,7 +16,9 @@ npx playwright install chromium
 npm run test:smoke
 ```
 
-`build` includes TypeScript checking. Generated-asset checks compare checked-in
+`type-check` checks the game plus all TypeScript tests, helpers, offline scripts
+and Playwright configs through `tsconfig.tooling.json`. Shared JavaScript CI and
+diagnostic utilities opt into checking with `@ts-check`. `build` checks game types. Generated-asset checks compare checked-in
 banks, geometry and provenance against their sources. Keep the curated unit
 suite focused and replace overlapping coverage when adding regressions.
 
@@ -26,7 +28,9 @@ Playwright projects select the matching `tests/browser/<suite>/` directories.
 
 | Suite | Command after building | Execution policy |
 | --- | --- | --- |
-| Production and menus | `npm run test:smoke` | PR and submission gates; two one-worker PR shards. |
+| PR startup and menus | `npm run test:smoke -- --grep-invert @extended` | Three cases across two one-worker shards when browser inputs change. |
+| Extended smoke | `npm run test:smoke -- --grep @extended` | Five default/profile/multi-level journeys, nightly/manual in two shards. |
+| All production and menus | `npm run test:smoke` | Submission gate and local full smoke. |
 | Scheduled integration | `npm run test:integration -- --grep @nightly` | Nightly/manual Chromium regression coverage. |
 | All gameplay integration | `npm run test:integration` | On demand, including the scheduled cases. |
 | Rendering | `npx playwright test --project=rendering` | On demand: shader, resource, art and quality regressions. |
@@ -47,9 +51,15 @@ The main production journeys retain unmodified shipped code. Music assertions
 read the production catalog through `MusicFixtures.ts`, rather than numbered
 filename fragments.
 
-PR CI runs generated assets, units and the required `Production smoke`
-aggregate. Production integration retains its tagged nightly journeys and Firefox
-startup. Submission CI tests the extracted ZIP; its optional extended checks
+PR CI selects work from changed paths. Documentation-only changes skip game
+jobs; tooling/unit-only changes skip browsers. Game changes run units/types,
+relevant generated-asset checks and the three-case browser gate (Minimum-graphics startup/restart plus isolated menus).
+Unknown paths
+retain game checks. The required `Production smoke` aggregate rejects failed
+selection or browser shards. Setup reads the pinned versions from the repo and
+caches browser binaries by Playwright version. The longer `@extended` journeys
+run nightly instead of blocking every PR. Production integration retains its
+tagged nightly journeys and Firefox startup. Submission CI tests the extracted ZIP; its optional extended checks
 run the scheduled integration group. The manual **Browser regressions** workflow
 runs any extended project, or all ordinary projects, across four one-worker
 shards. Browser reports, captures and logs remain ignored and are retained as CI
@@ -90,11 +100,22 @@ are separate from a complete human playthrough and hardware acceptance.
 | `scripts/diagnostics/` | Capture views and profile loading, rendering and gameplay. |
 | `scripts/lib/` | Shared offline helpers. |
 
-`node scripts/diagnostics/benchmark-level-one-loading.mjs` accepts CLI options such as `--url` and `--passes`.
-`node scripts/diagnostics/benchmark-level-two-performance.mjs` uses `SPECIMEN_CDP_URL` to connect to a hardware
-Chrome debug endpoint. Compare matched builds, settings, viewport and hardware
+Reusable loading, performance, shader/light and shadow tools share
+`--url`, `--output`, `--channel`, `--executable`, `--cdp`, `--headed`,
+`--software` and `--help`. CLI values override `SPECIMEN_DIAGNOSTIC_URL`,
+`SPECIMEN_DIAGNOSTIC_OUTPUT` and `SPECIMEN_BROWSER_*`/`SPECIMEN_CDP_URL`, then
+per-tool defaults. Outputs default to ignored `artifacts/`. Legacy per-tool
+settings still work. Hardware-only benchmarks retain their hardware requirements;
+`--software` cannot configure a connected external browser. CPU audits and
+asset validators keep their own inputs.
+
+`node scripts/diagnostics/benchmark-level-one-loading.mjs` also accepts `--passes`.
+`node scripts/diagnostics/benchmark-level-two-performance.mjs` uses `--cdp` or
+`SPECIMEN_CDP_URL` to connect to a hardware Chrome debug endpoint. Compare matched builds, settings, viewport and hardware
 without concurrent GPU workloads.
-`node scripts/diagnostics/benchmark-first-loading.mjs` captures initial loading;
+`node scripts/diagnostics/benchmark-first-loading.mjs` captures initial loading.
+`profile-performance.mjs` is the single general profiler (including the former
+lab options); it requires a clean matching build for provenance.
 `node scripts/assets/generate-delivery-assets.mjs` reproduces lossless GLB banks.
 `scripts/diagnostics/performance-budgets.proposed.json` contains planning targets,
 not approved requirements. Performance qualification consumes explicit evidence

@@ -3,7 +3,7 @@ import {expect, test} from '@playwright/test';
 
 for (const preset of ['normal', 'performance'] as const) {
   const entry = preset === 'performance' ? './?opening=mp4' : './';
-  test(`standard ${preset} opening preparation keeps a complete transmission framebuffer${preset === 'performance' ? ' when the MP4 backup is omitted' : ''}`, async ({page}) => {
+  test(`standard ${preset} opening preparation keeps a complete transmission framebuffer${preset === 'performance' ? ' when the MP4 backup is omitted' : ''}`, { tag: '@extended' }, async ({page}) => {
     const errors: string[] = [];
     const movieRequests: string[] = [];
     page.on('request', request => { if (/\.mp4(?:\?|$)/.test(request.url())) movieRequests.push(request.url()); });

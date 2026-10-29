@@ -134,7 +134,7 @@ test('powered platform transports active and inactive riders, pauses on power lo
 
     platform.restoreState(checkpoint);
     assert.ok(platform.platform.root.position.equals(checkpointPosition));
-    assert.ok(platform.platform.previousPosition.equals(checkpointPosition));
+    assert.ok((platform.platform.previousPosition as THREE.Vector3).equals(checkpointPosition));
     assert.equal(platform.platform.displacement.lengthSq(), 0);
   } finally {
     platform.dispose();
@@ -396,7 +396,7 @@ test('device collection checkpoint restore returns moving devices to the exact c
       );
       assert.ok(rig.platform.platform.root.position.equals(capturedPosition));
       assert.ok(
-        rig.platform.platform.previousPosition.equals(capturedPosition),
+        (rig.platform.platform.previousPosition as THREE.Vector3).equals(capturedPosition),
       );
       assert.equal(rig.platform.platform.displacement.lengthSq(), 0);
       assert.equal(rig.generator.core.readModel.connected, false);
@@ -487,10 +487,10 @@ test('full device-rig reset restores authored platform, lift, bridge, and door t
     rig.reset();
 
     assert.ok(rig.platform.platform.root.position.equals(platformStart));
-    assert.ok(rig.platform.platform.previousPosition.equals(platformStart));
+    assert.ok((rig.platform.platform.previousPosition as THREE.Vector3).equals(platformStart));
     assert.equal(rig.platform.platform.displacement.lengthSq(), 0);
     assert.ok(rig.lift.platform.root.position.equals(liftStart));
-    assert.ok(rig.lift.platform.previousPosition.equals(liftStart));
+    assert.ok((rig.lift.platform.previousPosition as THREE.Vector3).equals(liftStart));
     assert.equal(rig.lift.platform.displacement.lengthSq(), 0);
     assert.equal(rig.bridge.progress, 0);
     assert.equal(rig.bridge.root.rotation.y, bridgeStartRotation);

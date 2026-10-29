@@ -207,7 +207,7 @@ test('Room 5 remains at its authored start until its first active fixed step', (
   });
   const initialPlatformPosition =
     scene.roomFive.movingPlatformOne.root.position.clone();
-  const initialLaserStart = scene.roomFive.lasers.hazards[0].start.clone();
+  const initialLaserStart = (scene.roomFive.lasers.hazards[0].start as THREE.Vector3).clone();
 
   // Arbitrary time spent in the earlier rooms cannot phase-shift Room 5.
   controller.update(137.25);
@@ -216,7 +216,7 @@ test('Room 5 remains at its authored start until its first active fixed step', (
       initialPlatformPosition,
     ),
   );
-  assert.ok(scene.roomFive.lasers.hazards[0].start.equals(initialLaserStart));
+  assert.ok((scene.roomFive.lasers.hazards[0].start as THREE.Vector3).equals(initialLaserStart));
 
   // The entry step establishes room/checkpoint ownership without consuming
   // any Room 5 simulation time.
@@ -235,7 +235,7 @@ test('Room 5 remains at its authored start until its first active fixed step', (
       initialPlatformPosition,
     ),
   );
-  assert.ok(scene.roomFive.lasers.hazards[0].start.equals(initialLaserStart));
+  assert.ok((scene.roomFive.lasers.hazards[0].start as THREE.Vector3).equals(initialLaserStart));
 
   controller.update(0.5);
   assert.ok(
@@ -243,7 +243,7 @@ test('Room 5 remains at its authored start until its first active fixed step', (
       initialPlatformPosition,
     ),
   );
-  assert.ok(!scene.roomFive.lasers.hazards[0].start.equals(initialLaserStart));
+  assert.ok(!(scene.roomFive.lasers.hazards[0].start as THREE.Vector3).equals(initialLaserStart));
 
   controller.dispose();
   collisionWorld.clear();

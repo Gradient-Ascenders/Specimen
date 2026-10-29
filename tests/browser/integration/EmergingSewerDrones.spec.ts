@@ -321,7 +321,7 @@ test('Level 3 local drone interlocks, real Goop retaliation and traversal', asyn
         return results;
       }, index);
       for (const result of attempts) { expect(result.reached).toBe(false); expect(result.available).toBe(false); expect(result.progress).toBe(0); }
-      expect(attempts.find((a: any) => a.mode === 'wall-charge').attached).toBe(true);
+      expect(attempts.find((a: any) => a.mode === 'wall-charge')!.attached).toBe(true);
       routes.push({ index, attempts });
       await capture(page, `local-bob-lift-${index + 1}-locked`, [16, index === 0 ? 6 : 9, index === 0 ? 106 : 130], [10, index === 0 ? 2.4 : 5.5, index === 0 ? 111 : 135]);
     } else {

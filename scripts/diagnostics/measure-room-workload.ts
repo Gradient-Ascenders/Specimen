@@ -21,7 +21,7 @@ try {
     ['room-5', [64, 6, 275], 280, [64, 15, 300]],
   ] as const) {
     const camera = new THREE.PerspectiveCamera(60, 16 / 9, .1, 200);
-    camera.position.set(...cameraPosition); camera.lookAt(new THREE.Vector3(...target)); camera.updateMatrixWorld();
+    camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]); camera.lookAt(new THREE.Vector3(...target)); camera.updateMatrixWorld();
     scene.updatePresentationVisibility(camera.position, { z: bodyZ });
     const update = () => scene.update(1 / 60, scene.resolveRoomId({ x: 64, y: 2, z: bodyZ }), []);
     const measure = (action: () => void) => {

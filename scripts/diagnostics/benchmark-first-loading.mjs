@@ -1,17 +1,19 @@
+import { DIAGNOSTIC_OPTIONS, diagnosticOptions, launchDiagnosticBrowser } from '../lib/diagnostics.mjs';
+import { parseArgs } from 'node:util';
 /** Native hardware first-load comparison. One fresh browser per level; Medium
  * 1920x1080. OS/driver caches remain uncontrolled. PERF_PROFILE=1 exposes runtime
  * owners for diagnosis; use the default unmodified bundle for final timings. */
 import assert from 'node:assert/strict';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {chromium} from '@playwright/test';
 import {GRAPHICS_PROFILES} from '../../src/render/GraphicsProfiles.ts';
 
-const base = process.env.PERF_BASE ?? 'http://localhost:4173/';
-const output = resolve(process.env.PERF_OUTPUT ?? 'artifacts/first-loading');
+const { values } = parseArgs({ options: DIAGNOSTIC_OPTIONS });
+const diagnostic = diagnosticOptions(values, { url: process.env.PERF_BASE, output: process.env.PERF_OUTPUT ?? 'artifacts/first-loading', channel: 'chrome', headed: true });
+const base = diagnostic.url, output = diagnostic.output;
 const profile = process.env.PERF_PROFILE === '1';
 await mkdir(output, {recursive:true});
-const cdp = process.env.SPECIMEN_CDP_URL;
+const cdp = diagnostic.cdp;
 let browser;
 const report = {at:new Date().toISOString(), profile, externalBrowser:!!cdp,
   protocol:'Fresh browser/profile per level unless an external CDP endpoint is supplied; Medium, 1920x1080 DPR1; native GPU. Shader disk cache disabled for owned browsers. Immediate opening skip for Containment. Request-to-ready excludes arrival cinematics and user wait at Enter. OS/driver caches uncontrolled.',
@@ -19,7 +21,7 @@ const report = {at:new Date().toISOString(), profile, externalBrowser:!!cdp,
 const save = () => writeFile(resolve(output, 'results.json'), JSON.stringify(report, null, 2));
 try {
   for (const level of (process.env.PERF_LEVELS ?? '1,2,3').split(',').map(Number)) {
-    browser = cdp ? await chromium.connectOverCDP(cdp) : await chromium.launch({channel:'chrome',headless:false,
+    browser = await launchDiagnosticBrowser(diagnostic, {
       args:['--disable-gpu-shader-disk-cache','--disable-background-timer-throttling','--disable-renderer-backgrounding']});
     report.browser = browser.version();
     const context = await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1});

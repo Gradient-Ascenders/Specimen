@@ -49,7 +49,7 @@ function fixture(invincible=true,random=()=>0) {
     for(let i=0;i<3;i++){boss.controller.applyImpact(hit());tick(82);killSquad();tick(73);}
     boss.controller.applyImpact(hit());tick();assert.equal(boss.controller.readModel.state,'transition');boss.controller.skipCinematic(body.position);tick();
   };
-  const aimCore=()=>aim.subVectors(presentation.coreWorld,body.position.clone().add(new THREE.Vector3(0,.75,0))).normalize();
+  const aimCore=()=>aim.subVectors(presentation.coreWorld,(body.position as THREE.Vector3).clone().add(new THREE.Vector3(0,.75,0))).normalize();
   return {arena,world,targets,body,weapon,presentation,boss,tick,killSquad,phaseTwo,aimCore,dispose:()=>{boss.dispose();weapon.dispose();targets.dispose();arena.dispose();world.clear();surfaces.clear();}};
 }
 
@@ -347,7 +347,7 @@ test('each dodge makes exactly one early roll in either direction, with no extra
   const world=new CollisionWorld(),eye=new THREE.Mesh(new THREE.SphereGeometry(4)),machine=new THREE.Group();machine.position.z=FINAL_ARENA.centreZ;
   eye.position.copy(machine.position);world.register(eye,CollisionLayer.Projectile);
   const dodge=new ExterminatorEvasion({world,eye,machine}),core=eye.position;
-  const shot={id:1,active:true,position:core.clone().add(new THREE.Vector3(0,0,-12)),previousPosition:core.clone(),direction:new THREE.Vector3(0,0,1),chargeAmount:1,fullyCharged:true,radiusMetres:.7};
+  const shot={id:1,active:true,position:core.clone().add(new THREE.Vector3(0,0,-12)),previousPosition:core.clone(),direction:new THREE.Vector3(0,0,1),chargeAmount:1,fullyCharged:true,overcharged:false,radiusMetres:.7};
   for(const id of [1,2]) {
     shot.id=id;let previous=0,travel=0,signed=0,reachedPeak=false,returnSamples=0;
     for(let i=0;i<240;i++) {
@@ -367,7 +367,7 @@ test('each dodge makes exactly one early roll in either direction, with no extra
 test('rolls wait for an imminent unblocked eye impact and ignore partial charges, armour, cover and near misses',()=>{
   const world=new CollisionWorld(),eye=new THREE.Mesh(new THREE.SphereGeometry(4)),machine=new THREE.Group();machine.position.z=FINAL_ARENA.centreZ;
   eye.position.copy(machine.position);world.register(eye,CollisionLayer.Projectile);const dodge=new ExterminatorEvasion({world,eye,machine});
-  const shot={id:1,active:true,position:eye.position.clone().add(new THREE.Vector3(0,0,-32)),previousPosition:eye.position.clone(),direction:new THREE.Vector3(0,0,1),chargeAmount:1,fullyCharged:true,radiusMetres:.7};
+  const shot={id:1,active:true,position:eye.position.clone().add(new THREE.Vector3(0,0,-32)),previousPosition:eye.position.clone(),direction:new THREE.Vector3(0,0,1),chargeAmount:1,fullyCharged:true,overcharged:false,radiusMetres:.7};
   const blocker=new THREE.Mesh(new THREE.BoxGeometry(20,20,.5));blocker.position.copy(eye.position).add(new THREE.Vector3(0,0,-6));
   try {
     dodge.update(1/60,true,eye.position,[shot]);assert.equal(dodge.active,false,'32m away is too early');

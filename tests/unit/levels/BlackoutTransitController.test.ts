@@ -128,10 +128,10 @@ test('Bob must hold the wall switch to deploy the bridge; Volt can latch the far
   const cues: string[] = [], off = gameplayAudioEvents.on('cue',e=>cues.push(e.sound));
   try {
     for (const enemy of f.controller.emergingDrones) enemy.state.destroy();
-    f.bodies.bob.position.copy(f.room.switchBodyPosition);
+    (f.bodies.bob.position as THREE.Vector3).copy(f.room.switchBodyPosition);
     (f.bodies.bob as unknown as { attached: boolean; attachmentSurfaceName: string }).attached = true;
     (f.bodies.bob as unknown as { attachmentSurfaceName: string }).attachmentSurfaceName = 'bob-bridge-switch-sticky-wall';
-    f.bodies.volt.position.set(0, 0.86, 145);
+    (f.bodies.volt.position as THREE.Vector3).set(0, 0.86, 145);
     for (let i = 0; i < 90; i++) f.controller.update(DT, f.bodies);
     assert.equal(f.controller.bridgeDeployed, true);
     assert.equal(f.controller.lockReceiver.target.isAvailable(), true);
@@ -191,13 +191,13 @@ test('checkpoint capture restores lights, sewer damage, lift position, and bridg
 test('drone acquisition provides a warning window; Goop remains acid-safe while Bob and Volt fail in acid', () => {
   const f = fixture();
   try {
-    f.bodies.bob.position.set(-4, 2.3, 100.5);
+    (f.bodies.bob.position as THREE.Vector3).set(-4, 2.3, 100.5);
     assert.equal(f.controller.update(0.1, f.bodies), undefined, 'acquisition alone is not an instant fail');
-    f.bodies.bob.position.set(-4, -0.5, 100);
-    f.bodies.goop.position.set(4, -0.5, 100);
+    (f.bodies.bob.position as THREE.Vector3).set(-4, -0.5, 100);
+    (f.bodies.goop.position as THREE.Vector3).set(4, -0.5, 100);
     assert.equal(f.controller.update(DT, f.bodies), 'bob');
-    f.bodies.bob.position.set(15, 1, 90);
-    f.bodies.volt.position.set(-4, -0.5, 100);
+    (f.bodies.bob.position as THREE.Vector3).set(15, 1, 90);
+    (f.bodies.volt.position as THREE.Vector3).set(-4, -0.5, 100);
     assert.equal(f.controller.update(DT, f.bodies), 'volt');
   } finally { f.dispose(); }
 });
@@ -228,18 +228,18 @@ test('Bob-side drones emerge sequentially while the third waits beside Volt’s 
     assert.deepEqual(f.controller.emergingDrones.map(d => d.state.state), ['dormant', 'dormant', 'dormant']);
     for (const [index, z] of [85, 109, 131].entries()) {
       // Only Goop approaches; persistent inactive bodies remain at the entry.
-      f.bodies.goop.position.set(18, -.52, z);
+      (f.bodies.goop.position as THREE.Vector3).set(18, -.52, z);
       for (let i = 0; i < 120; i++) f.controller.update(DT, f.bodies);
       assert.deepEqual(f.controller.emergingDrones.map(d => d.state.state),
         [0, 1, 2].map(i => i < 2 && i <= index ? 'active' : 'dormant'));
       assert.equal(f.controller.emergingDrones[index]!.shell.body.visible, true);
       if (index < 2) assert.ok(f.controller.emergingDrones[index]!.shell.body.position.y > -.98);
     }
-    f.bodies.bob.position.set(10, 8.06, 142.5);
-    f.bodies.goop.position.set(10, -.52, 139);
+    (f.bodies.bob.position as THREE.Vector3).set(10, 8.06, 142.5);
+    (f.bodies.goop.position as THREE.Vector3).set(10, -.52, 139);
     f.controller.update(DT, f.bodies);
     assert.equal(f.controller.emergingDrones[2]!.state.state, 'dormant', 'separate Bob/Goop routes do not wake Volt’s drone');
-    f.bodies.volt.position.set(-16, 2.96, 117.5);
+    (f.bodies.volt.position as THREE.Vector3).set(-16, 2.96, 117.5);
     for (let i = 0; i < 120; i++) f.controller.update(DT, f.bodies);
     assert.equal(f.controller.emergingDrones[2]!.state.state, 'active');
     const third = f.controller.emergingDrones[2]!.shell.body;
@@ -267,7 +267,7 @@ test('obsolete covers, supports and beam blockers are absent from collision quer
     }
     // Checkpoints now follow Goop's enemy clear and Bob's original landing.
     const pad = f.room.bobRoutePlatforms[1]!;
-    f.bodies.bob.position.copy(pad.position); f.bodies.bob.position.y += .7;
+    (f.bodies.bob.position as THREE.Vector3).copy(pad.position); (f.bodies.bob.position as THREE.Vector3).y += .7;
     f.bodies.bob.isSupportedBy = mesh => mesh === pad;
     f.controller.update(DT, f.bodies); assert.equal(f.controller.checkpointStage, 0);
     f.controller.emergingDrones[0]!.state.destroy();

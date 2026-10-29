@@ -1,15 +1,17 @@
+import { DIAGNOSTIC_OPTIONS, diagnosticOptions, launchDiagnosticBrowser } from '../lib/diagnostics.mjs';
+import { observeGameSource } from '../lib/game-observers.ts';
+import { parseArgs } from 'node:util';
 /** #171 production evidence. Staged route poses are labelled separately from live input. */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from '@playwright/test';
 
 const root = path.resolve(import.meta.dirname, '../..');
-const output = path.resolve(process.env.CONTAINMENT_SHADOW_OUTPUT ?? path.join(root, 'artifacts/evidence/shadows/containment'));
-const url = process.env.CONTAINMENT_SHADOW_URL ?? 'http://127.0.0.1:4181/';
-const cdp = process.env.CONTAINMENT_SHADOW_CDP_URL;
-const server = process.env.CONTAINMENT_SHADOW_URL ? undefined : spawn('npm',
+const { values } = parseArgs({ options: DIAGNOSTIC_OPTIONS });
+const diagnostic = diagnosticOptions(values, { url: process.env.CONTAINMENT_SHADOW_URL ?? 'http://127.0.0.1:4181/', output: process.env.CONTAINMENT_SHADOW_OUTPUT ?? 'artifacts/evidence/shadows/containment', cdp: process.env.CONTAINMENT_SHADOW_CDP_URL });
+const { url, output: output } = diagnostic;
+const server = (values.url || process.env.SPECIMEN_DIAGNOSTIC_URL || process.env.SPECIMEN_PRODUCTION_URL || process.env.CONTAINMENT_SHADOW_URL) ? undefined : spawn('npm',
   ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4181', '--strictPort'],
   { cwd: root, stdio: 'ignore' });
 const errors = [], failures = [], captures = [], timings = [], lifecycle = [];
@@ -21,7 +23,7 @@ try {
     if (attempt === 99) throw new Error('Preview did not start');
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  browser = cdp ? await chromium.connectOverCDP(cdp) : await chromium.launch({ args: [
+  browser = await launchDiagnosticBrowser(diagnostic, { args: [
     '--disable-dev-shm-usage', '--disable-background-timer-throttling',
     '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
   ] });
@@ -36,11 +38,9 @@ try {
   await page.route('**/assets/index-*.js', async route => {
     const response = await route.fetch();
     const body = await response.text();
-    const pattern = /([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/;
-    const match = body.match(pattern);
-    if (match) exposures++;
-    await route.fulfill({ response, body: match ? body.replace(pattern,
-      `(globalThis.__containmentShadows=${match[1]},${match[1]}.prepareLightingPrograms()).then(`) : body });
+    const observed = observeGameSource(body, { runtime: '__containmentShadows' });
+    exposures++;
+    await route.fulfill({ response, body: observed });
   });
   const frames = (count = 3) => page.evaluate(async n => {
     for (let i = 0; i < n; i++) await new Promise(requestAnimationFrame);

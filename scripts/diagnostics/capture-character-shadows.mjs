@@ -1,14 +1,17 @@
+import { DIAGNOSTIC_OPTIONS, diagnosticOptions, launchDiagnosticBrowser } from '../lib/diagnostics.mjs';
+import { observeGameSource } from '../lib/game-observers.ts';
+import { parseArgs } from 'node:util';
 /** #170: production character/shadow evidence; expose only the served bundle. */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from '@playwright/test';
 
 const root = path.resolve(import.meta.dirname, '../..');
-const output = path.resolve(process.env.CHARACTER_SHADOW_OUTPUT ?? 'artifacts/evidence/shadows/characters');
-const url = process.env.CHARACTER_SHADOW_URL ?? 'http://127.0.0.1:4180/';
-const server = process.env.CHARACTER_SHADOW_URL ? undefined : spawn('npm',
+const { values } = parseArgs({ options: DIAGNOSTIC_OPTIONS });
+const diagnostic = diagnosticOptions(values, { url: process.env.CHARACTER_SHADOW_URL ?? 'http://127.0.0.1:4180/', output: process.env.CHARACTER_SHADOW_OUTPUT ?? 'artifacts/evidence/shadows/characters', cdp: process.env.CHARACTER_SHADOW_CDP_URL });
+const { url, output: output } = diagnostic;
+const server = (values.url || process.env.SPECIMEN_DIAGNOSTIC_URL || process.env.SPECIMEN_PRODUCTION_URL || process.env.CHARACTER_SHADOW_URL) ? undefined : spawn('npm',
   ['run', 'preview', '--', '--host', '0.0.0.0', '--port', '4180', '--strictPort'],
   { cwd: root, stdio: 'ignore' });
 let browser, context;
@@ -20,9 +23,7 @@ try {
     if (attempt === 99) throw new Error('Preview did not start');
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  browser = process.env.CHARACTER_SHADOW_CDP_URL
-    ? await chromium.connectOverCDP(process.env.CHARACTER_SHADOW_CDP_URL)
-    : await chromium.launch({ args: ['--disable-dev-shm-usage', '--disable-background-timer-throttling',
+  browser = await launchDiagnosticBrowser(diagnostic, { args: ['--disable-dev-shm-usage', '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'] });
   context = await browser.newContext({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1 });
   const page = await context.newPage();
@@ -33,9 +34,9 @@ try {
   page.on('response', response => { if (response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
   await page.route('**/assets/*.js', async route => {
     const response = await route.fetch();
-    const body = (await response.text())
-      .replace(/([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/,
-        '(globalThis.__characterRoomOne=$1,$1.prepareLightingPrograms()).then(')
+    const source = await response.text();
+    const body = (/\/index-[^/]+\.js$/.test(route.request().url())
+      ? observeGameSource(source, { runtime: '__characterRoomOne' }) : source)
       .replace(/return new ([A-Za-z_$][\w$]*)\.CultivationLevelRuntime\(/,
         'return globalThis.__characterCultivation=new $1.CultivationLevelRuntime(');
     await route.fulfill({ response, body });

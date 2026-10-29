@@ -72,7 +72,7 @@ test('moving platform snapshot restore commits current/previous transforms toget
 
   platform.restoreState(snapshot);
   assert.ok(platform.root.position.equals(checkpointPosition));
-  assert.ok(platform.previousPosition.equals(checkpointPosition));
+  assert.ok((platform.previousPosition as THREE.Vector3).equals(checkpointPosition));
   assert.equal(platform.displacement.lengthSq(), 0);
   assert.equal(platform.target, 'end');
 

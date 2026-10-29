@@ -120,7 +120,7 @@ test('all three turn toward the lab as ascent starts, then hold that direction t
     const headings = new Map<object, THREE.Vector3>();
     for (const p of Object.values(s.presentations)) {
       const aim = p.setAimDirection.bind(p);
-      p.setAimDirection = direction => { if (direction) headings.set(p, new THREE.Vector3(direction.x, direction.y, direction.z)); aim(direction); };
+      p.setAimDirection = (direction: Parameters<typeof p.setAimDirection>[0]) => { if (direction) headings.set(p, new THREE.Vector3(direction.x, direction.y, direction.z)); aim(direction!); };
     }
     s.movie.begin(s.camera);
     while (s.movie.seconds < s.movie.boardingSeconds + T.lift - .01) s.movie.update(1 / 60);
@@ -163,7 +163,7 @@ test('the ascent borrows real slimes once, keeps rendering non-authoritative, sp
     assert.equal(s.ambient.intensity, .025); assert.equal(s.camera.fov, 48);
     Object.values(s.presentations).forEach((p, i) => assert.equal(p.root.parent, parents[i]));
     for (const id of ['bob', 'goop', 'volt'] as const) {
-      assert.ok(s.bodies[id].position.distanceTo(V.landing[id]) < 1e-8); assert.equal(s.bodies[id].grounded, true);
+      assert.ok((s.bodies[id].position as THREE.Vector3).distanceTo(V.landing[id]) < 1e-8); assert.equal(s.bodies[id].grounded, true);
     }
     assert.equal(cues.filter(c => c.sound === 'volt-shoot-01').length, 3);
     assert.equal(cues.filter(c => c.sound === 'blackout-lift-start-01').length, 1);

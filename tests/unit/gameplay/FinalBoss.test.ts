@@ -247,11 +247,11 @@ test('a real charged jump boards a moving lift; its rider is carried through the
     }
     assert.ok(boarded,JSON.stringify({body:f.body.position,platform:platform.current}));
     for(let i=0;i<12;i++){f.body.update(1/60,zero);f.arena.advancePlatforms(1/60,f.body);}
-    const offset=f.body.position.clone().sub(platform.current);
+    const offset=(f.body.position as THREE.Vector3).clone().sub(platform.current);
     for(let i=0;i<900;i++) {
       f.body.update(1/60,zero);f.arena.advancePlatforms(1/60,f.body);
       assert.ok(f.body.isSupportedBy(platform.collider),'rider lost support during orbit');
-      assert.ok(f.body.position.clone().sub(platform.current).distanceTo(offset)<.08,'carrier drift');
+      assert.ok((f.body.position as THREE.Vector3).clone().sub(platform.current).distanceTo(offset)<.08,'carrier drift');
     }
     assert.ok(f.body.position.y>24,'the lift must carry the specimen to its high position');
   }finally{f.dispose();}

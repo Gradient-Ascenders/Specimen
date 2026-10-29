@@ -158,7 +158,7 @@ const readCreatedProgramCount = async (page: Page): Promise<number> =>
   page.evaluate(
     () =>
       (
-        window as Window & {
+        window as unknown as Window & {
           __specimenCreatedWebGlProgramCount?: number;
         }
       ).__specimenCreatedWebGlProgramCount ?? 0,
@@ -216,7 +216,7 @@ const visitRoom = async (page: Page, room: number): Promise<void> => {
   } else {
     await page.evaluate((roomId) => {
       const runtime = (
-        window as Window & {
+        window as unknown as Window & {
           __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
         }
       ).__specimenProductionTraversalRuntime;
@@ -266,7 +266,7 @@ const readAcidPresentationSample = async (
   if ((await page.locator(RUNTIME_DIAGNOSTICS_SELECTOR).count()) === 0) {
     return page.evaluate(() => {
       const runtime = (
-        window as Window & {
+        window as unknown as Window & {
           __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
         }
       ).__specimenProductionTraversalRuntime;
@@ -582,14 +582,14 @@ test('Room 1 sticky-wall approach and climb reuse prepared GPU bindings', async 
     prototype.createProgram = function () { counts.programs++; return program.call(this); };
     prototype.createVertexArray = function () {
       counts.bindings++;
-      const owner = (window as Window & { __roomOneGpuOwner?: string }).__roomOneGpuOwner;
+      const owner = (window as unknown as Window & { __roomOneGpuOwner?: string }).__roomOneGpuOwner;
       if (owner) counts.owners.push(owner);
       return binding.call(this);
     };
-    prototype.bufferData = function (...args: Parameters<typeof upload>) {
+    prototype.bufferData = (function (this: WebGL2RenderingContext, ...args: Parameters<typeof upload>) {
       counts.uploads++;
       return upload.apply(this, args);
-    };
+    }) as typeof upload;
     Object.assign(window, { __roomOneGpuCounts: counts });
   });
   await page.goto('./', { waitUntil: 'domcontentloaded' });
@@ -599,7 +599,7 @@ test('Room 1 sticky-wall approach and climb reuse prepared GPU bindings', async 
   await finishOpening(page);
   await waitForRenderedFrames(page, 2);
   await page.evaluate(() => {
-    const host = window as Window & {
+    const host = window as unknown as Window & {
       __specimenProductionTraversalRuntime: { renderLayer: { scene: THREE.Scene } };
       __roomOneGpuOwner?: string;
     };
@@ -618,13 +618,13 @@ test('Room 1 sticky-wall approach and climb reuse prepared GPU bindings', async 
     });
   });
   const readCounts = () => page.evaluate(() => ({
-    ...(window as Window & { __roomOneGpuCounts: {
+    ...(window as unknown as Window & { __roomOneGpuCounts: {
       programs: number; bindings: number; uploads: number; owners: string[];
     } }).__roomOneGpuCounts,
   }));
   const prepared = await readCounts();
   const samples = await page.evaluate(() => {
-    const host = window as Window & {
+    const host = window as unknown as Window & {
       __roomOneGpuCounts: { programs: number; bindings: number; uploads: number; owners: string[] };
       __specimenProductionTraversalRuntime: ProductionTraversalRuntime & {
         input: { isDown(action: string): boolean };
@@ -741,7 +741,7 @@ test('Room 3 final sticky-wall climb reuses GPU programs and bindings without ch
     const program = prototype.createProgram, binding = prototype.createVertexArray, upload = prototype.bufferData;
     prototype.createProgram = function () { counts.programs++; return program.call(this); };
     prototype.createVertexArray = function () { counts.bindings++; return binding.call(this); };
-    prototype.bufferData = function (...args: Parameters<typeof upload>) { counts.uploads++; return upload.apply(this, args); };
+    prototype.bufferData = (function (this: WebGL2RenderingContext, ...args: Parameters<typeof upload>) { counts.uploads++; return upload.apply(this, args); }) as typeof upload;
     Object.assign(window, { __finalWallGpuCounts: counts });
   });
   await page.goto('./', { waitUntil: 'domcontentloaded' });
@@ -751,7 +751,7 @@ test('Room 3 final sticky-wall climb reuses GPU programs and bindings without ch
   await finishOpening(page);
   await waitForRenderedFrames(page, 2);
   const result = await page.evaluate(() => {
-    const host = window as Window & {
+    const host = window as unknown as Window & {
       __finalWallGpuCounts: { programs: number; bindings: number; uploads: number };
       __specimenProductionTraversalRuntime: ProductionTraversalRuntime & {
         input: { isDown(action: string): boolean };
@@ -843,7 +843,7 @@ test('Bob reflections snap across restart and recreate across level reload', asy
 
   const readReflectionState = async () => page.evaluate(() => {
     const runtime = (
-      window as Window & {
+      window as unknown as Window & {
         __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
       }
     ).__specimenProductionTraversalRuntime;
@@ -877,7 +877,7 @@ test('Bob reflections snap across restart and recreate across level reload', asy
 
   await page.evaluate(() => {
     const runtime = (
-      window as Window & {
+      window as unknown as Window & {
         __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
       }
     ).__specimenProductionTraversalRuntime;
@@ -896,7 +896,7 @@ test('Bob reflections snap across restart and recreate across level reload', asy
 
   const recoveredGoop = await page.evaluate(() => {
     const runtime = (
-      window as Window & {
+      window as unknown as Window & {
         __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
       }
     ).__specimenProductionTraversalRuntime;
@@ -929,7 +929,7 @@ test('Bob reflections snap across restart and recreate across level reload', asy
 
   const restarted = await page.evaluate(() => {
     const runtime = (
-      window as Window & {
+      window as unknown as Window & {
         __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
       }
     ).__specimenProductionTraversalRuntime;
@@ -950,7 +950,7 @@ test('Bob reflections snap across restart and recreate across level reload', asy
 
   const reloaded = await page.evaluate(async () => {
     const runtime = (
-      window as Window & {
+      window as unknown as Window & {
         __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
       }
     ).__specimenProductionTraversalRuntime;
@@ -1018,7 +1018,7 @@ test('real Level 1 controls drive Bob ground locomotion, stopping, and reversal'
 
   const readBob = async () => page.evaluate(() => {
     const runtime = (
-      window as Window & {
+      window as unknown as Window & {
         __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
       }
     ).__specimenProductionTraversalRuntime;
@@ -1118,7 +1118,7 @@ test('Level 1 damage holds the burst at frame zero through Stress anticipation',
 
   const observation = await page.evaluate(() => {
     const runtime = (
-      window as Window & {
+      window as unknown as Window & {
         __specimenProductionTraversalRuntime?: ProductionTraversalRuntime;
       }
     ).__specimenProductionTraversalRuntime;

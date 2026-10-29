@@ -1,0 +1,41 @@
+name: Set up Specimen
+description: Install the pinned toolchain, locked dependencies and optional browser.
+inputs:
+  browser:
+    description: Browser to install (none, chromium or firefox).
+    default: none
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+    - name: Use the repository's npm version
+      shell: bash
+      run: npm install --global "$(node -p "require('./package.json').packageManager")"
+    - name: Install locked dependencies
+      shell: bash
+      run: npm ci
+    - name: Read browser version
+      id: playwright
+      if: inputs.browser != 'none'
+      shell: bash
+      run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+    - name: Cache browser binaries
+      if: inputs.browser != 'none'
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ inputs.browser }}-${{ steps.playwright.outputs.version }}
+    - name: Install browser and system dependencies
+      if: inputs.browser != 'none'
+      shell: bash
+      env:
+        BROWSER: ${{ inputs.browser }}
+      run: |
+        case "$BROWSER" in
+          chromium) npx playwright install --with-deps --only-shell chromium ;;
+          firefox) npx playwright install --with-deps firefox ;;
+          *) echo "Unsupported browser: $BROWSER" >&2; exit 1 ;;
+        esac

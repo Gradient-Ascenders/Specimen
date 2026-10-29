@@ -16,7 +16,7 @@ export function visitCultivationRoomTwoSurfaceStates(scene:LevelTwoPreviewScene,
   room.update(.5,[]);visit('room-two-landed');
   const bob=room.root.localToWorld(new THREE.Vector3(-18,14.2,28.5));
   const goop=room.root.localToWorld(new THREE.Vector3(0,.66,45.5));
-  const held=[{id:'bob',position:bob,radiusMetres:.45,attached:true,supportCollider:room.wallButton}];
+  const held=[{id:'bob' as const,position:bob,radiusMetres:.45,attached:true,supportCollider:room.wallButton}];
   room.update(.3,held);door.update(.24,[{id:'goop',position:goop,radiusMetres:.45}]);
   visit('room-two-button-pressing');
   room.update(.3,held);door.update(2,[{id:'goop',position:goop,radiusMetres:.45}]);

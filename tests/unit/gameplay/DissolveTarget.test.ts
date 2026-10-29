@@ -80,7 +80,7 @@ function compileShadowHook(material: THREE.Material): {
     fragmentShader:
       '#include <common>\nvoid main() {\n#include <clipping_planes_fragment>\n}',
   };
-  material.onBeforeCompile(shader, null as never);
+  material.onBeforeCompile(shader as THREE.WebGLProgramParametersWithUniforms, null as never);
   return shader;
 }
 
@@ -99,7 +99,7 @@ void main() {
   #include <emissivemap_fragment>
 }`,
   };
-  material.onBeforeCompile(shader, null as never);
+  material.onBeforeCompile(shader as THREE.WebGLProgramParametersWithUniforms, null as never);
   return shader;
 }
 

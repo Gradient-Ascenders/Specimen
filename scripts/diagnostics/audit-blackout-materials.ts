@@ -1,9 +1,22 @@
 import { readBlackoutMaintenanceMapData } from '../../src/render/environment/blackout/BlackoutMaintenanceMapData.ts';
 /** Node-side authored-surface audit; run before and after the texture pass. */
 import { createHash } from 'node:crypto';
+import { parseArgs } from 'node:util';
+import { resolve } from 'node:path';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { BlackoutMaintenanceBay } from '../../src/levels/BlackoutMaintenanceBay.ts';
+
+const { values, positionals } = parseArgs({ options: {
+  output: { type: 'string' }, label: { type: 'string' }, help: { type: 'boolean' },
+}, allowPositionals: true });
+if (values.help) {
+  console.log('Usage: node scripts/diagnostics/audit-blackout-materials.ts [LABEL] [--label NAME] [--output PATH]');
+  process.exit(0);
+}
+const label = values.label ?? positionals[0] ?? 'after';
+if (!/^[\w-]+$/.test(label)) throw new Error('Use a simple capture label.');
+const directory = resolve(values.output ?? `artifacts/blackout-materials/${label}`);
 
 const compressed = readFileSync(new URL('../../src/assets/blackout/maintenance-maps.bin', import.meta.url));
 const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
@@ -22,7 +35,6 @@ bay.root.traverse(object => {
     indexHash: createHash('sha256').update(Buffer.from(object.geometry.index!.array.buffer)).digest('hex'),
     userData: object.userData, castShadow: object.castShadow, receiveShadow: object.receiveShadow });
 });
-const directory = `artifacts/issue-162/checkpoint-1/${process.argv[2] ?? 'after'}`;
 mkdirSync(directory, { recursive: true });
 writeFileSync(`${directory}/authored-surfaces.json`, JSON.stringify({ surfaces }, null, 2) + '\n');
 console.log(`${surfaces.length} authored meshes, ${bay.collisionMeshes.length} colliders, ${materials.size} material identities including hidden proxies`);

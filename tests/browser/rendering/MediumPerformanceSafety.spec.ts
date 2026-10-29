@@ -10,7 +10,7 @@ test('Medium 1080p Blackout prepares and switches Specimen detail without new GP
   await page.setViewportSize({width:1920,height:1080});
   await page.addInitScript(settings=>localStorage.setItem('specimen.graphics-preferences.v1',JSON.stringify({mode:'manual',settings})),GRAPHICS_PROFILES.standard.settings);
   await page.addInitScript(()=>{
-    const probe=(window as any).__mediumPreparation={rehearsals:[],retainedTargets:[],liveStorage:[],liveInspections:0};
+    const probe: { rehearsals: { viewport: unknown; pixelRatio: number }[]; retainedTargets: unknown[][]; liveStorage: string[]; liveInspections: number } = (window as any).__mediumPreparation={rehearsals:[],retainedTargets:[],liveStorage:[],liveInspections:0};
     let runtime:any,renderCamera:any;
     for(const name of ['bufferData','texImage2D','texImage3D','texStorage2D','texStorage3D','renderbufferStorage','renderbufferStorageMultisample','getProgramInfoLog']){
       const original=(WebGL2RenderingContext.prototype as any)[name];

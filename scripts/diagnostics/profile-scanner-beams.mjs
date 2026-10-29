@@ -1,3 +1,4 @@
+import { DIAGNOSTIC_OPTIONS, diagnosticOptions, launchDiagnosticBrowser } from '../lib/diagnostics.mjs';
 /** #193 matched production-frame CPU attribution. Exposes the shipped session
  * for staging/measurement only. No diagnostic URL/content flags or fake renderer.
  * Use --cdp for the assessment browser; software rendering is correctness only. */
@@ -7,21 +8,18 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { cpus, platform, release } from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { chromium } from '@playwright/test';
 
 const { values } = parseArgs({ options: {
-  url: { type: 'string', default: 'http://127.0.0.1:4186/' },
+  ...DIAGNOSTIC_OPTIONS,
   label: { type: 'string', default: 'candidate' }, samples: { type: 'string', default: '60' },
   probe: { type: 'boolean', default: false },
-  cdp: { type: 'string' }, executable: { type: 'string' }, software: { type: 'boolean', default: false },
 } });
+const diagnostic = diagnosticOptions(values, { output: `artifacts/scanner-beams/${values.label}` });
+Object.assign(values, diagnostic);
 assert.match(values.label, /^[\w-]+$/);
 const samples = Number(values.samples); assert.ok(Number.isInteger(samples) && samples >= 12);
-const output = path.resolve('artifacts/scanner-beams', values.label); await mkdir(output, { recursive: true });
-const browser = values.cdp ? await chromium.connectOverCDP(values.cdp) : await chromium.launch({
-  executablePath: values.executable,
-  args: values.software ? ['--use-gl=angle', '--use-angle=swiftshader'] : [],
-});
+const output = diagnostic.output; await mkdir(output, { recursive: true });
+const browser = await launchDiagnosticBrowser(diagnostic);
 const context = await browser.newContext({ viewport: { width: 960, height: 600 }, deviceScaleFactor: 1 });
 const report = { label: values.label, recordedAt: new Date().toISOString(), url: values.url,
   host: { cpu: cpus()[0].model, platform: platform(), kernel: release(), node: process.version }, assets: {}, errors: [],

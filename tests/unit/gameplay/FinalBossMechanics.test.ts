@@ -82,8 +82,8 @@ test('ordinary damage grace does not award a perfect dodge',()=>{
     assert.equal(f.boss.controller.damagePlayer(5,-1),true);
     const forward=new THREE.Vector3(0,0,-1);
     f.dash.update(1/60,{enabled:true,pressed:true,cancelled:false,movement:forward,forward,up:new THREE.Vector3(0,1,0)});
-    const origin=f.body.position.clone().add(new THREE.Vector3(0,4,0));
-    f.boss.projectiles.fireOrb(origin,f.body.position);f.boss.projectiles.update(.04,f.body);
+    const origin=(f.body.position as THREE.Vector3).clone().add(new THREE.Vector3(0,4,0));
+    f.boss.projectiles.fireOrb(origin,new THREE.Vector3().copy(f.body.position));f.boss.projectiles.update(.04,f.body);
     assert.equal(f.dodges,0);assert.equal(f.boss.controller.readModel.playerHealth,95);
   }finally{f.dispose();}
 });
@@ -149,7 +149,7 @@ test('RAM marks its full forward lane and laser direction warnings follow live r
   try {
     f.boss.reset();assert.equal(f.boss.controller.startPhaseTwo(f.body.position),true);f.tick();const p=f.presentation;
     assert.equal(f.boss.controller.readModel.attack,'ram');assert.equal(p.ramWarning.visible,true);
-    const toPlayer=f.body.position.clone().sub(p.machine.position).setY(0).length();
+    const toPlayer=(f.body.position as THREE.Vector3).clone().sub(p.machine.position).setY(0).length();
     assert.ok(p.ramWarning.scale.z>toPlayer,'the warning extends beyond the player to the charge destination');
     assert.ok(p.ramWarning.scale.x>=p.ramHull.widthMetres);
     f.boss.suspend();assert.equal(p.ramWarning.visible,false);assert.equal(p.beamWarning.visible,false);

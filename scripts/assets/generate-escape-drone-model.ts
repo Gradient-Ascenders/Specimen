@@ -14,8 +14,8 @@ const parts:Record<string,{attributes:Record<string,{itemSize:number;type:string
 scene.traverse(o=>{if(o instanceof THREE.Mesh){
  if(!/^ED_(Head_(armour|armourShadow|mechanism|barrel)|Airframe_(armour|armourShadow|mechanism)|Rotor_barrel)$/.test(o.name))
   throw Error('Unexpected escape drone mesh: '+o.name);
- const geometry=o.geometry.clone().applyMatrix4(o.matrixWorld),attributes={};
- for(const [name,attribute] of Object.entries(geometry.attributes)){
+ const geometry=o.geometry.clone().applyMatrix4(o.matrixWorld),attributes:typeof parts[string]['attributes']={};
+ for(const [name,attribute] of Object.entries(geometry.attributes as THREE.NormalBufferAttributes)){
   if(attribute instanceof THREE.InterleavedBufferAttribute)throw Error('Unexpected interleaved model attribute.');
   attributes[name]={itemSize:attribute.itemSize,type:attribute.array.constructor.name,
    normalized:attribute.normalized,values:Array.from(attribute.array)};

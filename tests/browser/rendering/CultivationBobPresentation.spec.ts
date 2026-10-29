@@ -834,7 +834,7 @@ test('dark-room graphics preparation awaits the pending configuration when brigh
     // This prevents legitimate subset reuse from masking the selection bug.
     for(const config of queue.configurations)if(config.ready)config.lightingKey='review-earlier-light-layout';
     bright.ready=true;dark.ready=false;
-    const evidence=rt.__darkPreparation={arguments:[],resourceRenders:0,timerTurns:0,live:[],gates:[],queueRetained:false};
+    const evidence: { arguments: boolean[]; resourceRenders: number; timerTurns: number; live: { at: number; calls: string[]; newPrograms: number; error: number }[]; gates: unknown[]; queueRetained: boolean; darkReady?: boolean; brightReady?: boolean; pending?: number } = rt.__darkPreparation={arguments:[],resourceRenders:0,timerTurns:0,live:[],gates:[],queueRetained:false};
     const prototype=Object.getPrototypeOf(queue),prepareCurrent=prototype.prepareCurrent;
     prototype.prepareCurrent=function(dark:boolean){evidence.arguments.push(dark);return prepareCurrent.call(this,dark);};
     const compile=renderer.compileAsync;

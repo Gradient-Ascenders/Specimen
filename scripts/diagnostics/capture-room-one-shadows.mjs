@@ -1,15 +1,17 @@
+import { DIAGNOSTIC_OPTIONS, diagnosticOptions, launchDiagnosticBrowser } from '../lib/diagnostics.mjs';
+import { observeGameSource } from '../lib/game-observers.ts';
+import { parseArgs } from 'node:util';
 /** Reproducible, matched Room 1 proof. Instrument only the served bundle. */
 import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from '@playwright/test';
 
 const root = path.resolve(import.meta.dirname, '../..');
-const evidence = path.resolve(process.env.SHADOW_PROOF_OUTPUT ?? path.join(root, 'artifacts/evidence/shadows/room-one'));
-const url = process.env.SHADOW_PROOF_URL ?? 'http://127.0.0.1:4179/';
+const { values } = parseArgs({ options: DIAGNOSTIC_OPTIONS });
+const diagnostic = diagnosticOptions(values, { url: process.env.SHADOW_PROOF_URL ?? 'http://127.0.0.1:4179/', output: process.env.SHADOW_PROOF_OUTPUT ?? 'artifacts/evidence/shadows/room-one', cdp: process.env.SHADOW_PROOF_CDP_URL });
+const { url, output: evidence } = diagnostic;
 // A CDP connection allows the same capture on representative physical hardware.
-const cdp = process.env.SHADOW_PROOF_CDP_URL;
-const server = process.env.SHADOW_PROOF_URL ? undefined : spawn('npm',
+const server = (values.url || process.env.SPECIMEN_DIAGNOSTIC_URL || process.env.SPECIMEN_PRODUCTION_URL || process.env.SHADOW_PROOF_URL) ? undefined : spawn('npm',
   ['run', 'preview', '--', '--host', '0.0.0.0', '--port', '4179', '--strictPort'],
   { cwd: root, stdio: 'ignore' });
 const errors = [], failures = [], poses = [], lifecycle = [];
@@ -24,7 +26,7 @@ try {
     if (i === 99) throw new Error('Preview did not start');
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  browser = cdp ? await chromium.connectOverCDP(cdp) : await chromium.launch({
+  browser = await launchDiagnosticBrowser(diagnostic, {
     args: ['--disable-dev-shm-usage', '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'],
   });
@@ -39,11 +41,9 @@ try {
   await page.route('**/assets/index-*.js', async route => {
     const response = await route.fetch();
     const body = await response.text();
-    const pattern = /([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/;
-    const match = body.match(pattern);
-    if (match) exposures++;
-    await route.fulfill({ response, body: match ? body.replace(pattern,
-      `(globalThis.__shadowRuntime=${match[1]},${match[1]}.prepareLightingPrograms()).then(`) : body });
+    const observed = observeGameSource(body, { runtime: '__shadowRuntime' });
+    exposures++;
+    await route.fulfill({ response, body: observed });
   });
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-action="start"]').click();
@@ -251,7 +251,7 @@ try {
   });
   await inspectLifecycle('reload-after-failure');
   const baseline = await snapshot();
-  const report = { capturedAtUtc: new Date().toISOString(), browserVersion: browser.version(), environment, cdp: Boolean(cdp), physicalGpuDetected: !/swiftshader|llvmpipe|software/i.test(environment.gpuRenderer), representativeHardwareVerified: process.env.SHADOW_PROOF_REPRESENTATIVE === '1' && !/swiftshader|llvmpipe|software/i.test(environment.gpuRenderer),
+  const report = { capturedAtUtc: new Date().toISOString(), browserVersion: browser.version(), environment, cdp: Boolean(diagnostic.cdp), physicalGpuDetected: !/swiftshader|llvmpipe|software/i.test(environment.gpuRenderer), representativeHardwareVerified: process.env.SHADOW_PROOF_REPRESENTATIVE === '1' && !/swiftshader|llvmpipe|software/i.test(environment.gpuRenderer),
     limitations: ['Human visual acceptance is separate.', 'Bob secondary deformation and fade shadow correctness remain #170.',
       'Hatch evidence stages the existing lighting/art API; no native hatch cutscene exists in this checkout.',
       'Timings measure warmed Room 1 at a fixed standing pose; traversal profiling remains #173.'],
@@ -265,6 +265,6 @@ try {
   throw error;
 } finally {
   await context?.close();
-  if (!cdp) await browser?.close();
+  await browser?.close();
   server?.kill();
 }

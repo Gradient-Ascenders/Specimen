@@ -1,17 +1,18 @@
+import { DIAGNOSTIC_OPTIONS, diagnosticOptions, launchDiagnosticBrowser } from '../lib/diagnostics.mjs';
 import assert from 'node:assert/strict';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {parseArgs} from 'node:util';
-import {chromium} from '@playwright/test';
 import {GRAPHICS_PROFILES} from '../../src/render/GraphicsProfiles.ts';
 
 const {values} = parseArgs({options: {
-  url: {type: 'string', default: process.env.SPECIMEN_PRODUCTION_URL ?? 'http://127.0.0.1:4173/'},
+  ...DIAGNOSTIC_OPTIONS,
   output: {type: 'string'}, passes: {type: 'string', default: '3'},
-  channel: {type: 'string', default: 'chrome'}, headless: {type: 'boolean', default: false},
+  headless: {type: 'boolean', default: false},
   viewport: {type: 'string'},
 }});
-const url = new URL(values.url), passes = Number(values.passes);
+const diagnostic = diagnosticOptions(values, { output: `artifacts/loading-benchmark/${new Date().toISOString().replaceAll(':', '-')}`, channel: 'chrome', headed: !values.headless });
+const url = new URL(diagnostic.url), passes = Number(values.passes);
 assert.ok(['http:', 'https:'].includes(url.protocol), 'Serve the production build over HTTP(S).');
 assert.ok(Number.isInteger(passes) && passes >= 1 && passes <= 10, '--passes must be between 1 and 10.');
 let viewport = null;
@@ -21,13 +22,13 @@ if (values.viewport) {
   viewport = {width: Number(match[1]), height: Number(match[2])};
   assert.ok(Object.values(viewport).every(n => n >= 320 && n <= 8192), 'Invalid viewport size.');
 }
-const output = resolve(values.output ?? `artifacts/loading-benchmark/${new Date().toISOString().replaceAll(':', '-')}`);
+const output = diagnostic.output;
 await mkdir(output, {recursive: true});
-const cdp = process.env.SPECIMEN_BROWSER_CDP_URL;
+const cdp = diagnostic.cdp;
 const report = {recordedAt: new Date().toISOString(), url: url.href,
   scope: 'Medium loading only; this is not a full assessment-PC qualification.',
   protocol: 'Unmodified production bundle, normal HTTP caching, no GPU/backend override or CPU throttling. First navigation then same-context reloads. OS/driver caches remain uncontrolled.',
-  freshBrowserProcess: !cdp, requestedHeadless: values.headless, runs: []};
+  freshBrowserProcess: !cdp, requestedHeadless: !diagnostic.headed, runs: []};
 let browser, context;
 const save = () => writeFile(resolve(output, 'results.json'), JSON.stringify(report, null, 2));
 const requireHardware = gpu => assert.ok(gpu && !/swiftshader|llvmpipe|lavapipe|softpipe|software|basic render driver|\bwarp\b/i.test(gpu),
@@ -37,9 +38,8 @@ try {
   const response = await fetch(manifestUrl, {signal: AbortSignal.timeout(15000)});
   assert.ok(response.ok, 'A production build-manifest.json is required. Build and serve dist first.');
   report.build = await response.json();
-  browser = cdp ? await chromium.connectOverCDP(cdp) : await chromium.launch({
-    channel: values.channel, headless: values.headless,
-    args: values.headless ? [] : ['--start-maximized'],
+  browser = await launchDiagnosticBrowser(diagnostic, {
+    args: diagnostic.headed ? ['--start-maximized'] : [],
   });
   report.browserVersion = browser.version();
   context = await browser.newContext({viewport});

@@ -29,7 +29,7 @@ const material = (material: THREE.Material) => {
   const maps: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(values)) {
     if (value instanceof THREE.DataTexture) maps[key] = {
-      pixels: pixelHash(value.image.data), width: value.image.width, height: value.image.height,
+      pixels: pixelHash(value.image.data!), width: value.image.width, height: value.image.height,
       colorSpace: value.colorSpace, repeat: value.repeat.toArray(), offset: value.offset.toArray(),
       wrap: [value.wrapS, value.wrapT], filter: [value.minFilter, value.magFilter], mipmaps: value.generateMipmaps,
     };

@@ -21,12 +21,9 @@ jobs:
         with:
           ref: ${{ inputs.baseline }}
           path: artifacts/baseline
-      - uses: actions/setup-node@v7
+      - uses: ./.github/actions/setup
         with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm install --global npm@11.18.0
-      - run: npm ci
+          browser: chromium
       - run: npm run check:generated-assets
       - name: Capture matched cold CPU profiles sequentially
         run: |
@@ -34,7 +31,6 @@ jobs:
           node --expose-gc scripts/diagnostics/profile-cultivation-construction.ts --output artifacts/perf-192/baked.json
       - name: Compare all authored gameplay poses
         run: node scripts/diagnostics/compare-cultivation-bake.ts artifacts/baseline > artifacts/perf-192/parity.log
-      - run: npx playwright install --with-deps chromium
       - name: Capture matched room and animation views
         run: |
           node scripts/diagnostics/capture-cultivation-bake.mjs --baseline-root artifacts/baseline

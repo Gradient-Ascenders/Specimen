@@ -1,3 +1,4 @@
+import { DIAGNOSTIC_OPTIONS, diagnosticOptions, launchDiagnosticBrowser } from '../lib/diagnostics.mjs';
 /** #189: matched production render attribution, NOT a gameplay/FPS qualification.
  * Serve baseline/candidate dist separately; use the same browser/GPU/settings.
  * --cdp can drive an isolated native browser from Windows Node under WSL.
@@ -8,25 +9,26 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import path from 'node:path';
-import { chromium } from '@playwright/test';
 
 const { values } = parseArgs({ options: {
-  url: { type: 'string', default: 'http://127.0.0.1:4184/' },
-  cdp: { type: 'string' }, label: { type: 'string', default: 'candidate' },
+  ...DIAGNOSTIC_OPTIONS,
+  label: { type: 'string', default: 'candidate' },
   samples: { type: 'string', default: '20' },
   pose: { type: 'string' }, probe: { type: 'boolean', default: false },
 } });
+const diagnostic = diagnosticOptions(values, { output: `artifacts/light-budget/${values.label}` });
+Object.assign(values, diagnostic);
 assert.match(values.label, /^[a-zA-Z0-9_-]+$/);
 const samples = Number(values.samples);
 assert.ok(Number.isInteger(samples) && samples >= 8);
-const output = path.resolve('artifacts/light-budget', values.label);
+const output = diagnostic.output;
 await mkdir(output, { recursive: true });
 const report = { label: values.label, url: values.url, recordedAt: new Date().toISOString(),
   protocol: { content: 'authored Cultivation, production ?debug=1 (#197 unresolved)', viewport: [960,600], dpr: 1,
     scope: 'frozen full WebGL render, including transmission; ABBA updating/cached/cached/updating shadows; no sustained gameplay claim',
     probe:values.probe, onlyPose:values.pose??null, samples },
   assets: {}, loading: {}, poses: [], lifecycle: [], errors: [] };
-const browser = values.cdp ? await chromium.connectOverCDP(values.cdp) : await chromium.launch();
+const browser = await launchDiagnosticBrowser(diagnostic);
 const context = await browser.newContext({ viewport: {width:960, height:600}, deviceScaleFactor:1 });
 try {
   const page = await context.newPage(); page.setDefaultTimeout(240_000);

@@ -19,7 +19,7 @@ test('same-shader profile changes prepare resized shadow targets before ordinary
     await expect(page.locator('.game-flow')).toHaveAttribute('data-state','playing',{timeout:240_000});
     await page.evaluate(()=>{
       const session=(window as any).__shadowSession,rt=session.runtime,layer=rt.renderLayer,renderer=layer.renderer,gl=renderer.getContext();
-      const probe=rt.__shadowProbe={draws:[],gates:[],fullPasses:0,disposals:[],oldMaps:[],originals:new Map(),armed:false};
+      const probe: { draws: { calls: string[]; growth: number; error: number; running: boolean }[]; gates: unknown[]; fullPasses: number; disposals: string[]; oldMaps: string[]; originals: Map<string, any>; armed: boolean; finish?: () => unknown } = rt.__shadowProbe={draws:[],gates:[],fullPasses:0,disposals:[],oldMaps:[],originals:new Map(),armed:false};
       layer.scene.traverse((object:any)=>{if(object.shadow)for(const map of [object.shadow.map,object.shadow.mapPass])if(map&&!probe.oldMaps.includes(map.uuid)){probe.oldMaps.push(map.uuid);map.addEventListener('dispose',()=>probe.disposals.push(map.uuid));}});
       let current:any;
       for(const name of ['texImage2D','texStorage2D','renderbufferStorage','renderbufferStorageMultisample','getProgramInfoLog','getShaderInfoLog']){

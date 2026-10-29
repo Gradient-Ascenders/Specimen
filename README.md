@@ -69,6 +69,7 @@ specimens and P to pause. Change bindings in Settings. Press **F1** to toggle th
 | Command | Purpose |
 | --- | --- |
 | `npm test` | Run unit tests. |
+| `npm run type-check` | Check game, test and tooling TypeScript. |
 | `npm run build` | Type-check and build the static site into `dist/`. |
 | `npm run preview` | Serve the production build locally. |
 | `npm run validate:production` | Check the built layout and asset references. |

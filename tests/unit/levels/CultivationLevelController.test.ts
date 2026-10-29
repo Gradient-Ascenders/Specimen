@@ -209,8 +209,8 @@ test('restart during partial Room 3 entry clears flags and restores the entrance
   assert.equal(fixture.controller.readModel.bobEnteredRoomThree, false);
   assert.equal(fixture.controller.readModel.goopEnteredRoomThree, false);
   assert.equal(fixture.pair.activeSlimeId, 'goop');
-  assert.ok(fixture.bob.position.equals(entrance.bobSpawnPosition));
-  assert.ok(fixture.goop.position.equals(entrance.goopSpawnPosition));
+  assert.ok((fixture.bob.position as THREE.Vector3).equals(entrance.bobSpawnPosition));
+  assert.ok((fixture.goop.position as THREE.Vector3).equals(entrance.goopSpawnPosition));
   fixture.controller.dispose();
 });
 

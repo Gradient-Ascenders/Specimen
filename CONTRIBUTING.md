@@ -1,8 +1,9 @@
 # Contributing to Specimen
 
 Use the Node version in `.nvmrc`, the npm version in `package.json` and `npm ci`.
-Keep the lockfile synchronized. Start a focused branch from current `main` and
-link its issue or agreed task in the pull request.
+Keep the lockfile synchronized. Follow `.editorconfig`; avoid unrelated formatting
+changes. Start a focused branch from current `main` and link its issue or agreed
+task in the pull request.
 
 ## Implementation
 

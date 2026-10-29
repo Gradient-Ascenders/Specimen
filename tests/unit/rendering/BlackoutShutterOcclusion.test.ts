@@ -25,7 +25,7 @@ function fixture() {
   scene.updateMatrixWorld(true);
   const helper = new BlackoutShutterOcclusion(renderer, gate, scene);
   const submit = (mesh: THREE.Mesh, c: THREE.Camera = camera) =>
-    renderer.renderBufferDirect(c, scene, mesh.geometry, mesh.material as THREE.Material, mesh, null);
+    renderer.renderBufferDirect(c, scene, mesh.geometry, mesh.material as THREE.Material, mesh, null as never);
   const draw = (meshes = [hidden, edge, overhead, front, crossing, actor]) => {
     scene.updateMatrixWorld(true); helper.render(camera, () => meshes.forEach(mesh => submit(mesh)));
   };

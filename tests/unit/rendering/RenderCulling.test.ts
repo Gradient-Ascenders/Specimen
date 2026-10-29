@@ -58,7 +58,7 @@ test('authored shadow boxes reject empty cube faces and restore shared draw rang
   const frustum=new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
   assert.equal(frustum.intersectsObject(mesh),true,'the default sphere admits this empty shadow submission');
   const before=mesh.onBeforeShadow,after=mesh.onAfterShadow,scope=new AuthoredShadowCulling(root);
-  const args=[{} as THREE.WebGLRenderer,mesh,camera,camera,geometry,material,null] as const;
+  const args=[{} as THREE.WebGLRenderer,mesh as unknown as THREE.Scene,camera,camera,geometry,material,null as never] as const;
   geometry.setDrawRange(3,9);
   try{
     scope.render(()=>{mesh.onBeforeShadow(...args);assert.equal(geometry.drawRange.count,0);mesh.onAfterShadow(...args);assert.equal(geometry.drawRange.count,9);});

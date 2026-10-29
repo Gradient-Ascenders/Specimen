@@ -1,3 +1,6 @@
+import { DIAGNOSTIC_OPTIONS, diagnosticOptions, launchDiagnosticBrowser } from '../lib/diagnostics.mjs';
+import { observeGameSource } from '../lib/game-observers.ts';
+import { parseArgs } from 'node:util';
 /** #173: production loading, matched render-only ABBA, continuous frames and lifecycle.
  * Menu handoffs below use existing debug completion APIs; they are not full traversal. */
 import assert from 'node:assert/strict';
@@ -5,12 +8,12 @@ import {spawn, execFileSync} from 'node:child_process';
 import {mkdir, readFile, readdir, writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import path from 'node:path';
-import {chromium} from '@playwright/test';
 
-const output = path.resolve(process.env.GAME_SHADOW_OUTPUT ?? 'artifacts/evidence/shadows/full-game');
-const url = process.env.GAME_SHADOW_URL ?? 'http://127.0.0.1:4183/';
+const { values } = parseArgs({ options: DIAGNOSTIC_OPTIONS });
+const diagnostic = diagnosticOptions(values, { url: process.env.GAME_SHADOW_URL ?? 'http://127.0.0.1:4183/', output: process.env.GAME_SHADOW_OUTPUT ?? 'artifacts/evidence/shadows/full-game', cdp: process.env.GAME_SHADOW_CDP_URL });
+const { url, output: output } = diagnostic;
 const dpr = Number(process.env.GAME_SHADOW_DPR ?? 1);
-const server = process.env.GAME_SHADOW_URL ? undefined : spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4183', '--strictPort'], {stdio: 'ignore'});
+const server = (values.url || process.env.SPECIMEN_DIAGNOSTIC_URL || process.env.SPECIMEN_PRODUCTION_URL || process.env.GAME_SHADOW_URL) ? undefined : spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4183', '--strictPort'], {stdio: 'ignore'});
 const provenance = process.env.GAME_SHADOW_PROVENANCE ? JSON.parse(await readFile(process.env.GAME_SHADOW_PROVENANCE, 'utf8')) : {
   revision: execFileSync('git', ['rev-parse', 'HEAD'], {encoding:'utf8'}).trim(),
   dirtyPaths: execFileSync('git', ['status', '--short'], {encoding:'utf8'}).trim().split('\n'),
@@ -21,8 +24,7 @@ try {
   await mkdir(output, {recursive:true});
   for (const name of await readdir('dist/assets')) if (name.endsWith('.js')) report.assets[name] = createHash('sha256').update(await readFile(path.join('dist/assets',name))).digest('hex');
   for (let i=0;i<100;i++) {try {if((await fetch(url)).ok) break;} catch {} await new Promise(resolve=>setTimeout(resolve,100));}
-  browser = process.env.GAME_SHADOW_CDP_URL ? await chromium.connectOverCDP(process.env.GAME_SHADOW_CDP_URL)
-    : await chromium.launch({args:['--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding']});
+  browser = await launchDiagnosticBrowser(diagnostic, {args:['--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding']});
   context = await browser.newContext({viewport:{width:960,height:600},deviceScaleFactor:dpr});
   const page = await context.newPage(); page.setDefaultTimeout(240_000);
   page.on('pageerror', error=>report.errors.push(error.message));
@@ -31,8 +33,9 @@ try {
   page.on('response',response=>{if(response.status()>=400) report.failures.push({url:response.url(),status:response.status()});});
   await page.route('**/assets/*.js', async route=>{
     const response = await route.fetch();
-    const body = (await response.text())
-      .replace(/([A-Za-z_$][\w$]*)\.prepareLightingPrograms\(\)\.then\(/, '(globalThis.__containment=$1,$1.prepareLightingPrograms()).then(')
+    const source = await response.text();
+    const body = (/\/index-[^/]+\.js$/.test(route.request().url())
+      ? observeGameSource(source, { runtime: '__containment' }) : source)
       .replace(/return new ([A-Za-z_$][\w$]*)\.CultivationLevelRuntime\(/, 'return globalThis.__cultivation=new $1.CultivationLevelRuntime(')
       .replace(/export\{([A-Za-z_$][\w$]*) as BlackoutLevelRuntime\};/, 'class __ExposedBlackout extends $1{constructor(...args){super(...args);globalThis.__blackout=this}}export{__ExposedBlackout as BlackoutLevelRuntime};');
     await route.fulfill({response,body});
