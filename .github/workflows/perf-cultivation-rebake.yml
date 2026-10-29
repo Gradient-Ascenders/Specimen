@@ -1,0 +1,55 @@
+# Temporary one-shot workflow for PR #248.
+# Remove this file after the generated bake lands on perf/optimisations.
+name: Temporary Cultivation radiance rebake
+on:
+  push:
+    branches:
+      - perf/optimisations
+
+permissions:
+  contents: write
+
+jobs:
+  bake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout optimisation branch
+        uses: actions/checkout@v7
+        with:
+          ref: perf/optimisations
+
+      - name: Use pinned Node and npm
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm install --global npm@11.18.0
+          npm ci
+
+      - name: Install Blender for the offline BVH bake
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y blender
+
+      - name: Export current authored geometry and lighting
+        run: node scripts/generate-cultivation-radiance.ts
+
+      - name: Rebuild real Cultivation irradiance and reflection bank
+        run: blender --background --factory-startup --threads 2 --python assets/environments/cultivation-lighting/bake-radiance.py
+
+      - name: Commit regenerated asset inputs and payload to the PR branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/environments/cultivation-lighting/bake-input.json assets/environments/cultivation-lighting/radiance.bin
+          if ! git diff --cached --quiet; then
+            git commit -m "build(assets): rebake Cultivation radiance for updated level geometry"
+            git push origin HEAD:refs/heads/perf/optimisations
+          fi
+
+      - name: Check every generated asset against its sources
+        run: npm run check:generated-assets
