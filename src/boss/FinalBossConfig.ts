@@ -23,7 +23,7 @@ export const FINAL_ARENA_ORBIT = Object.freeze({
 export function finalArenaSupportY(feetY:number):number {
   return feetY>=FINAL_ARENA_ORBIT.lowY-.15 ? THREE.MathUtils.clamp(feetY,FINAL_ARENA_ORBIT.lowY,FINAL_ARENA_ORBIT.highY) : FINAL_ARENA.floorY;
 }
-const FINAL_BOSS_HEALTH = 750;
+const FINAL_BOSS_HEALTH = 500;
 export const FINAL_BOSS_TUNING = Object.freeze({
   playerHealth:100,coverHealthMultiplier:5,
   health:FINAL_BOSS_HEALTH,phaseTwoHealth:FINAL_BOSS_HEALTH*.5,scale:3,hoverY:18,defenseHoverY:26,
