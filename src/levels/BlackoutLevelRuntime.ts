@@ -546,7 +546,16 @@ export class BlackoutLevelRuntime {
             // Each shot can select previously unused lamps. Allocate their
             // depth samplers before the receiver draw freezes shadow updates.
             if (shadows) prepareShadowSamplerMaps(renderer, layer.scene, camera);
-            renderer.setViewport(viewport); renderer.setScissorTest(false); renderer.transmissionResolutionScale = transmissionScale;
+            // These temporary cinematic cameras only rehearse programs/uploads.
+            // The retained gameplay camera's full-size transmission target was
+            // already primed by BlackoutPresentationPreparation. Keep that
+            // storage and the full-size shadow maps; bound only the hidden
+            // rehearsal raster work, drawing every shot and fencing below.
+            const ratio = renderer.getPixelRatio();
+            const scale = Math.min(1, 320 / (viewport.z * ratio), 180 / (viewport.w * ratio));
+            const minimumSpan = Math.ceil(1 / transmissionScale) / ratio;
+            renderer.setViewport(0, 0, Math.max(minimumSpan, viewport.z * scale), Math.max(minimumSpan, viewport.w * scale));
+            renderer.setScissorTest(false); renderer.transmissionResolutionScale = transmissionScale;
             layer.withShadowPreparation(shadows, () => this.hiddenMaterialCulling!.render(() => renderer.render(layer.scene, camera)));
           }));
           await waitForGpuPreparation(renderer.getContext(), yieldFrame, current);
