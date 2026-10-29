@@ -53,7 +53,7 @@ export class CultivationBlenderArt {
         const source=scene.contaminationArt.glass,material=source.clone();
         material.name='cultivation-hall-stained-observation-glass';material.vertexColors=true;
         material.opacity=.50;material.onBeforeCompile=source.onBeforeCompile;
-        material.customProgramCacheKey=()=>source.customProgramCacheKey()+':hall';
+        material.customProgramCacheKey=()=>source.customProgramCacheKey();
         this.materials.set(key,material);return material;
       }
       if(name.startsWith('Hall'))return finish(name.slice(4),false,true);
@@ -96,7 +96,7 @@ export class CultivationBlenderArt {
       }
       if(nursery&&['Ceramic','Cool','Resin','Deck','Paint'].includes(name)){
         material.onBeforeCompile=spec[0].onBeforeCompile;
-        material.customProgramCacheKey=()=>spec[0].customProgramCacheKey()+':nursery';
+        material.customProgramCacheKey=()=>spec[0].customProgramCacheKey();
       }
       material.name='cultivation-blender-'+name.toLowerCase();
       if(!nursery||['Foliage','Loam','Lamp','Ink','Graphite','Seal'].includes(name)){

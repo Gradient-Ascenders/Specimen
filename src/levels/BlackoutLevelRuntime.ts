@@ -563,16 +563,19 @@ export class BlackoutLevelRuntime {
             // storage and the full-size shadow maps; bound only the hidden
             // rehearsal raster work, drawing every shot and fencing below.
             const ratio = renderer.getPixelRatio();
-            const scale = Math.min(1, 320 / (viewport.z * ratio), 180 / (viewport.w * ratio));
+            const scale = Math.min(1, 16 / (viewport.z * ratio), 9 / (viewport.w * ratio));
             const minimumSpan = Math.ceil(1 / transmissionScale) / ratio;
             renderer.setViewport(0, 0, Math.max(minimumSpan, viewport.z * scale), Math.max(minimumSpan, viewport.w * scale));
             renderer.setScissorTest(false); renderer.transmissionResolutionScale = transmissionScale;
             layer.withShadowPreparation(shadows, () => this.hiddenMaterialCulling!.render(() => renderer.render(layer.scene, camera)));
           }));
-          await waitForGpuPreparation(renderer.getContext(), yieldFrame, current);
         };
           await resources.researchFinale?.primePresentationFrames(layer.scene, warmFrame, current);
           await resources.defeatFinale?.primePresentationFrames(warmFrame, current);
+          // Every rehearsal submits to the same context. One fence drains all
+          // preceding shots, allowing their uploads and CPU preparation to
+          // overlap instead of stopping the pipeline at each camera pose.
+          await waitForGpuPreparation(renderer.getContext(), yieldFrame, current);
         } finally {
           const clearColor = renderer.getClearColor(new THREE.Color()), clearAlpha = renderer.getClearAlpha();
           withIsolatedPrewarmState(renderer, () => {

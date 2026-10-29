@@ -367,6 +367,7 @@ export class CultivationLevelRuntime {
     // gameplay must not resize it on the first controllable frame.
     this.releaseReducedTransmissionCap??=this.renderLayer.gelRendering.requestReducedTransmissionCap(.25);
     return this.presentationPreparation ??= Promise.all([
+      resources.bobReflectionEnvironment.preload(this.renderLayer.renderer),
       resources.bobPresentation.prepare(),
       resources.goopPresentation.prepare(),
       resources.voltPresentation.prepare(),

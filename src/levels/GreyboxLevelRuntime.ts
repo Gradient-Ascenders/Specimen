@@ -2853,6 +2853,8 @@ function compileObjectSignature(
     morphAttributes,
     object.receiveShadow ? 'receiver' : 'non-receiver',
     object.castShadow ? 'caster' : 'non-caster',
+    object.customDepthMaterial?.uuid ?? '',
+    object.customDistanceMaterial?.uuid ?? '',
   ].join('|');
 }
 
@@ -2874,9 +2876,16 @@ function cloneCompileObject(
     clone.castShadow = object.castShadow;
     clone.receiveShadow = object.receiveShadow;
     clone.layers.mask = object.layers.mask;
+    clone.customDepthMaterial = object.customDepthMaterial;
+    clone.customDistanceMaterial = object.customDistanceMaterial;
     return clone;
   }
-  return object.clone(false);
+  const clone = object.clone(false);
+  // Object3D.copy does not carry custom shadow materials. Keep the live
+  // deformation/dissolve programs in the compiler pass, before real primers.
+  clone.customDepthMaterial = object.customDepthMaterial;
+  clone.customDistanceMaterial = object.customDistanceMaterial;
+  return clone;
 }
 
 function disposeCompileInstances(root: THREE.Object3D): void {

@@ -28,6 +28,7 @@ export class CultivationPreparationQueue {
   private readonly uploaded = new Set<THREE.BufferGeometry>();
   private readonly uploadedInstanceAttributes = new Set<THREE.InstancedBufferAttribute>();
   private readonly proxySources = new WeakMap<Drawable, Drawable>();
+  private readonly primedScreenObjects = new WeakSet<Drawable>();
   private readonly retained: THREE.Material[] = [];
   private readonly materialCopies = new Map<string, THREE.Material>();
   private readonly preparedVisibleFeatures = new Set<string>();
@@ -472,30 +473,61 @@ export class CultivationPreparationQueue {
     const transmissionPrograms = transmissionRequired ? opaquePrograms : [];
     if (!transmissionRequired) this.diagnostics.skippedTransmissionObjects += opaquePrograms.length;
     const passes = [[programs, false, scene], [transmissionPrograms, true, scene], [shadows, true, shadowScene]] as const;
-    for (const [objects, shadowTarget, targetScene] of passes) {
-      const label = targetScene === shadowScene ? 'shadow' : shadowTarget ? 'linear' : 'screen';
-      if (config === this.startupConfiguration && this.backgroundSupported && objects.length > FOREGROUND_COMPILE_BATCH_SIZE) {
-        // Startup owns the loading screen. Feed several independent compiler
-        // batches, yielding to paint between submissions, then await the whole
-        // pass before any linear/screen material copy can be reused.
-        yield {label:'startup-'+label+'-compile', run: () => this.compileStartupPass(objects, shadowTarget, targetScene, label, config)};
-        continue;
-      }
-      for (let i = 0; i < objects.length;) {
-        // A requested room can submit a larger compiler batch while the loading
-        // screen is already up. Introduce one background object at a time:
-        // parallel driver compilation still competes with live draws AFTER a
-        // submission returns, beyond the synchronous slice budget. Keep the
-        // remaining work resumable and promote it on demand at the doorway.
-        const batch = objects.slice(i, i + (this.priority === config ? FOREGROUND_COMPILE_BATCH_SIZE : 1));
-        i += batch.length;
-        const group = new THREE.Group(); group.add(...batch);
-        yield {label: targetScene === shadowScene ? 'shadow-compile' : shadowTarget ? 'transmission-compile' : 'compile', run: () => {
-          return this.compileBatch(group, shadowTarget, targetScene, label, true);
-        }};
+    const physicalFirst = (a: Drawable, b: Drawable) =>
+      Number([b.material].flat().some(m => m instanceof THREE.MeshPhysicalMaterial)) -
+      Number([a.material].flat().some(m => m instanceof THREE.MeshPhysicalMaterial));
+    programs.sort(physicalFirst); transmissionPrograms.sort(physicalFirst);
+    if (config === this.startupConfiguration && this.backgroundSupported) {
+      // Screen and linear variants must own different currentProgram slots
+      // while compileAsync polls them. Their geometry and uniforms stay shared.
+      const linearMaterials = new Map<THREE.Material, THREE.Material>();
+      const linearPrograms = transmissionPrograms.map(object => {
+        const proxy = clonePrewarmDrawable(object, this.instanceDisposers) as Drawable;
+        const copy = (material: THREE.Material) => {
+          let result = linearMaterials.get(material);
+          if (!result) { result = copyPrewarmMaterial(material); linearMaterials.set(material, result); this.retained.push(result); }
+          return result;
+        };
+        proxy.material = Array.isArray(object.material) ? object.material.map(copy) : copy(object.material);
+        return proxy;
+      });
+      yield {label:'startup-compile-all', run: async () => {
+        const started = performance.now(), beforeSubmission = this.diagnostics.compileSubmissionMs;
+        try {
+          const results = await Promise.allSettled([
+            this.compileStartupPass(programs, false, scene, 'screen', config),
+            this.compileStartupPass(linearPrograms, true, scene, 'linear', config),
+            this.compileStartupPass(shadows, true, shadowScene, 'shadow', config),
+          ]);
+          const failure = results.find(result => result.status === 'rejected');
+          if (failure?.status === 'rejected') throw failure.reason;
+        } finally {
+          // The three passes overlap. Record their combined wall time once.
+          const elapsed = performance.now() - started;
+          this.diagnostics.compileWaitMs += elapsed;
+          this.diagnostics.compileAsyncWaitMs += Math.max(0, elapsed - (this.diagnostics.compileSubmissionMs - beforeSubmission));
+        }
+      }};
+    } else {
+      for (const [objects, shadowTarget, targetScene] of passes) {
+        const label = targetScene === shadowScene ? 'shadow' : shadowTarget ? 'linear' : 'screen';
+        for (let i = 0; i < objects.length;) {
+          // A requested room can submit a larger compiler batch while the loading
+          // screen is already up. Introduce one background object at a time:
+          // parallel driver compilation still competes with live draws AFTER a
+          // submission returns, beyond the synchronous slice budget. Keep the
+          // remaining work resumable and promote it on demand at the doorway.
+          const batch = objects.slice(i, i + (this.priority === config ? FOREGROUND_COMPILE_BATCH_SIZE : 1));
+          i += batch.length;
+          const group = new THREE.Group(); group.add(...batch);
+          yield {label: targetScene === shadowScene ? 'shadow-compile' : shadowTarget ? 'transmission-compile' : 'compile', run: () => {
+            return this.compileBatch(group, shadowTarget, targetScene, label, true);
+          }};
+        }
       }
     }
-    for (const [objects, shadowTarget, targetScene] of [[primes, false, scene], [transmissionPrograms, true, scene], [shadows, true, shadowScene]] as const) for (let i = 0; i < objects.length;) {
+    const remainingPrimes = primes.filter(object => !this.primedScreenObjects.has(object));
+    for (const [objects, shadowTarget, targetScene] of [[remainingPrimes, false, scene], [transmissionPrograms, true, scene], [shadows, true, shadowScene]] as const) for (let i = 0; i < objects.length;) {
       const batch = objects.slice(i, i + (this.priority === config ? 16 : 1));
       i += batch.length;
       yield {label:(shadowTarget ? 'shadow-prime:' : 'prime:') + batch[0].name, run: () => {
@@ -565,7 +597,6 @@ export class CultivationPreparationQueue {
   }
 
   private async compileStartupPass(objects: readonly Drawable[], shadowTarget: boolean, scene: THREE.Scene, label: string, config: Configuration): Promise<void> {
-    const started = performance.now(), beforeSubmission = this.diagnostics.compileSubmissionMs;
     const pending = new Set<Promise<void>>();
     let failed = false, failure: unknown;
     try {
@@ -574,9 +605,15 @@ export class CultivationPreparationQueue {
         // and records each actual synchronous submission separately below.
         await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
         if (this.disposed || failed) break;
-        const group = new THREE.Group(); group.add(...objects.slice(i, i+FOREGROUND_COMPILE_BATCH_SIZE));
+        const batch = objects.slice(i, i+FOREGROUND_COMPILE_BATCH_SIZE);
+        const group = new THREE.Group(); group.add(...batch);
         const start = performance.now();
-        const job = this.compileBatch(group, shadowTarget, scene, label, false).catch(error => {
+        const job = this.compileBatch(group, shadowTarget, scene, label, false).then(() => {
+          // Start exact first-use bindings for completed screen batches while
+          // later lighting variants are still compiling. Transmissive objects
+          // retain their full-size, live-scene primer below.
+          if (label === 'screen') return this.primeCompiledScreenBatch(batch, scene);
+        }).catch(error => {
           if (!failed) { failed = true; failure = error; }
         }).finally(() => { pending.delete(job); this.diagnostics.compilerJobs--; });
         pending.add(job); this.diagnostics.compilerJobs++;
@@ -594,12 +631,34 @@ export class CultivationPreparationQueue {
       // Polls retain material.currentProgram, even after cancellation/failure.
       // Finish submitted work before the queue may release its material copies.
       await Promise.all(pending);
-      const elapsed = performance.now()-started;
-      // Count wall time once, rather than adding overlapping batch durations.
-      this.diagnostics.compileWaitMs += elapsed;
-      this.diagnostics.compileAsyncWaitMs += Math.max(0, elapsed-(this.diagnostics.compileSubmissionMs-beforeSubmission));
     }
     if (failed) throw failure;
+  }
+
+  private async primeCompiledScreenBatch(objects: readonly Drawable[], scene: THREE.Scene): Promise<void> {
+    const opaque = objects.filter(object => ![object.material].flat().some(material =>
+      (material instanceof THREE.MeshPhysicalMaterial && material.transmission > 0) ||
+      (material.transparent && material.side === THREE.DoubleSide && !material.forceSinglePass)));
+    for (let i = 0; i < opaque.length; i += 16) {
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      if (this.disposed) return;
+      const batch = opaque.slice(i, i + 16), start = performance.now();
+      scene.add(...batch);
+      try {
+        this.renderStateRevision++;
+        this.withState(true, false, () => this.layer.renderer.render(scene, this.camera));
+        for (const object of batch) {
+          this.primedScreenObjects.add(object);
+          const source = this.proxySources.get(object) ?? object;
+          this.uploaded.add(source.geometry);
+          if (source instanceof THREE.InstancedMesh) {
+            this.uploadedInstanceAttributes.add(source.instanceMatrix);
+            if (source.instanceColor) this.uploadedInstanceAttributes.add(source.instanceColor);
+          }
+        }
+      } finally { for (const object of batch) object.removeFromParent(); }
+      this.diagnostics.primeMs += performance.now() - start;
+    }
   }
 
   /** State is restored synchronously, before compileAsync yields to gameplay. */

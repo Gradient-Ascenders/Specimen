@@ -62,9 +62,15 @@ export class CultivationRadiance {
 
   constructor(origin: THREE.Vector3) { this.uniforms.cvOrigin.value.copy(origin); }
 
+  /** Fetch and filter lighting while the character and authored models load.
+   * Material binding still waits until their complete hierarchy is available. */
+  preload(renderer: THREE.WebGLRenderer): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    return this.preparation ??= this.load(renderer).catch(error => { this.preparation = undefined; if (!this.disposed) throw error; });
+  }
+
   async prepare(renderer: THREE.WebGLRenderer, root: THREE.Object3D): Promise<void> {
-    if (this.disposed) return;
-    await (this.preparation ??= this.load(renderer).catch(error => { this.preparation = undefined; if (!this.disposed) throw error; }));
+    await this.preload(renderer);
     if (this.disposed || !this.reflections) return;
     root.traverse(object => {
       if (!(object instanceof THREE.Mesh) || object.userData.lightingOnly) return;

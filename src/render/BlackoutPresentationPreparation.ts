@@ -90,15 +90,19 @@ export class BlackoutPresentationPreparation {
     const yieldFrame = () => typeof requestAnimationFrame === 'function'
       ? new Promise<void>(resolve => requestAnimationFrame(() => resolve())) : Promise.resolve();
     const compile = async (objects: readonly THREE.Object3D[], scene: THREE.Scene, target?: THREE.WebGLRenderTarget) => {
-      for (let i = 0; i < objects.length && !this.disposed; i += 128) {
+      const jobs: Promise<void>[] = [];
+      let failed = false, failure: unknown;
+      try { for (let i = 0; i < objects.length && !this.disposed && !failed; i += 128) {
         const batch = new THREE.Group(); batch.add(...objects.slice(i, i + 128));
         this.diagnostics.compileBatches++;
         this.diagnostics.maxCompileObjects = Math.max(this.diagnostics.maxCompileObjects, batch.children.length);
-        try { await withLights(() => withIsolatedPrewarmState(layer.renderer, () => layer.withShadowPreparation(true,
-          () => layer.renderer.compileAsync(batch, camera, scene)), target)); }
-        finally { batch.clear(); }
+        const job = withLights(() => withIsolatedPrewarmState(layer.renderer, () => layer.withShadowPreparation(true,
+          () => layer.renderer.compileAsync(batch, camera, scene)), target));
+        jobs.push(job.then(() => {}).catch(error => {failed = true; failure = error;}).finally(() => batch.clear()));
         await yieldFrame();
-      }
+      } } catch (error) { failed = true; failure = error; }
+      finally { await Promise.all(jobs); }
+      if (failed) throw failure;
     };
     const prime = async (objects: readonly THREE.Object3D[], scene: THREE.Scene, target?: THREE.WebGLRenderTarget) => {
       for (let i = 0; i < objects.length && !this.disposed; i += 16) {
@@ -131,11 +135,32 @@ export class BlackoutPresentationPreparation {
     });
     this.busy = true;
     try {
-      for (const [group, scene, target] of [[visible, layer.scene, undefined], [shadows, shadowScene, this.target]] as const) {
-        if (this.disposed) return;
-        const objects = [...group.children], programs = variants(group);
-        group.clear();
-        await compile(programs, scene, target);
+      const visibleObjects = [...visible.children], shadowObjects = [...shadows.children];
+      const visiblePrograms = variants(visible), shadowPrograms = variants(shadows);
+      const linearPrograms = transmission ? visiblePrograms
+        .filter(object => !(object as THREE.Mesh<THREE.BufferGeometry, THREE.Material>).material.transparent)
+        .map(object => {
+          const material = copyPrewarmMaterial((object as THREE.Mesh).material as THREE.Material);
+          this.materials.push(material);
+          this.diagnostics.materialCopies++;
+          return clone(object as THREE.Mesh, material);
+        }) : [];
+      // Each output pass owns its material polling slots; submit independent
+      // passes together before the first upload can force a driver wait.
+      visible.clear(); shadows.clear();
+      const submissions = [compile(visiblePrograms, layer.scene)];
+      await yieldFrame();
+      if (!this.disposed) submissions.push(
+        compile(linearPrograms, layer.scene, this.target),
+        compile(shadowPrograms, shadowScene, this.target),
+      );
+      const compiled = await Promise.allSettled(submissions);
+      const failure = compiled.find(result => result.status === 'rejected');
+      if (failure?.status === 'rejected') throw failure.reason;
+      for (const [group, scene, target, objects, programs] of [
+        [visible, layer.scene, undefined, visibleObjects, visiblePrograms],
+        [shadows, shadowScene, this.target, shadowObjects, shadowPrograms],
+      ] as const) {
         if (this.disposed) return;
         // Resolve selected samplers before exposing receiver proxies, including
         // linear primers. The empty draw avoids uploading the whole room.
@@ -143,7 +168,6 @@ export class BlackoutPresentationPreparation {
         // Compile the transmission target's linear-output variants separately.
         if (group === visible && transmission) {
           const opaque = programs.filter(object => !(object as THREE.Mesh<THREE.BufferGeometry, THREE.Material>).material.transparent);
-          await compile(opaque, scene, this.target);
           await prime(opaque, scene, this.target);
           if (this.disposed) return;
         }

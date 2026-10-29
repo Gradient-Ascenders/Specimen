@@ -34,6 +34,7 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "benchmark:loading": "node scripts/benchmark-level-one-loading.mjs",
+    "benchmark:first-loading": "node scripts/benchmark-first-loading.mjs",
     "benchmark:level-two": "node scripts/benchmark-level-two-performance.mjs",
     "generate:delivery-assets": "node scripts/generate-delivery-assets.mjs"
   },
