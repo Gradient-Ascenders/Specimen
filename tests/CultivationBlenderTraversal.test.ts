@@ -13,6 +13,39 @@ import {ROOM_FIVE_JUMPS} from '../src/levels/RoomFiveParkour.ts';
 import {ROOM_FIVE_SAFE_STATIONS,ROOM_FIVE_ROUTE_NETWORKS} from '../src/levels/LevelTwoRoomFiveGreybox.ts';
 import {cultivationAssets} from './helpers/CultivationBakedAssets.ts';
 
+test('Room 2 final brace accepts centre and near-centre shots from the Goop floor route',()=>{
+  const scene=new LevelTwoPreviewScene(()=>{},cultivationAssets),room=scene.roomTwo;
+  const world=new CollisionWorld(),surfaces=new SurfaceRegistry();
+  scene.root.updateWorldMatrix(true,true);
+  world.registerAll(scene.collisionMeshes,undefined,ColliderTransformMode.Static);
+  for(const mesh of scene.dynamicCollisionMeshes)world.setTransformMode(mesh,ColliderTransformMode.Dynamic);
+  surfaces.registerAll(scene.collisionMeshes);
+  const targets=scene.solubleTargetMeshes.map(mesh=>createAuthoredDissolveTarget(mesh,world,surfaces));
+  const burns=new DissolveSystem(targets);scene.bindDissolveTargets(targets);
+  const drop=room.blockDrops[2]!,target=targets.find(t=>t.id===drop.solubleTargetId)!;
+  const body={position:new THREE.Vector3(),radiusMetres:.45},point=new THREE.Vector3();
+  const acid=new AcidProjectileSystem({slimeManager:{activeSlimeId:'goop',activeBody:body,canActiveUseAbility:()=>true},
+    collisionWorld:world,dissolveSystem:burns,aimRayProvider:{copyAimRay(origin,ray){origin.copy(body.position);ray.copy(point).sub(origin).normalize();}}});
+  try{
+    for(const z of [18,25])for(const xOffset of [-.4,0,.4]){
+      acid.reset();burns.reset();for(const t of targets)t.reset();room.reset();
+      body.position.copy(room.root.localToWorld(new THREE.Vector3(3,.66,z)));
+      target.mesh.getWorldPosition(point);point.x+=xOffset;
+      acid.update(1/60,{gameplayInputEnabled:true,pointerLocked:true,aimHeld:true,firePressed:false});
+      assert.equal(acid.aimReadModel.targetedSolubleId,target.id,`brace must be exposed from z=${z}, offset=${xOffset}`);
+      for(let i=0;i<300;i++){
+        acid.update(1/60,{gameplayInputEnabled:true,pointerLocked:true,aimHeld:true,firePressed:i===0});
+        burns.update(1/60);room.update(1/60,[]);
+        if(drop.state==='landed')break;
+      }
+      assert.equal(drop.state,'landed',`one shot must release the platform from z=${z}, offset=${xOffset}`);
+      assert.ok(room.blockDrops.slice(0,2).every(d=>d.state==='suspended'));
+    }
+    room.reset();target.reset();
+    assert.equal(drop.state,'suspended');assert.equal(target.completed,false);
+  }finally{acid.dispose();burns.dispose();for(const t of targets)t.dispose();scene.dispose();world.clear();surfaces.clear();}
+});
+
 test('Goop releases all three nursery cradles and Bob crosses them through the real doorway, with the inactive partner retained',()=>{
   const failures:unknown[]=[],scene=new LevelTwoPreviewScene(f=>failures.push(f),cultivationAssets),room=scene.roomOne;
   const world=new CollisionWorld(),surfaces=new SurfaceRegistry();scene.root.updateWorldMatrix(true,true);
