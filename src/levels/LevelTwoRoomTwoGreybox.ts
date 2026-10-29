@@ -529,11 +529,8 @@ export class LevelTwoRoomTwoGreybox {
       brace.userData.assemblyId = definition.id;
       brace.userData.releaseMode = 'rope-limited-elevated-drop';
       if (definition.id === 'cultivation-room-2-block-3') {
-        // The final deck is wider and closer to the ceiling than the others.
-        // Extend its brace toward the entrance so floor-level shots can reach
-        // it without threading the narrow gap above the suspended platform.
-        // The authored skin is parented here, so it follows the same bounds.
-        brace.scale.set(1.5, 2, 5);
+        // Keep the standard-sized brace toward the entrance so floor-level
+        // shots clear the final deck's leading edge.
         brace.position.z -= 2;
       }
       this.solubleTargetMeshes.push(brace);
