@@ -55,6 +55,7 @@ export class FinalBossEncounter {
   private readonly hit=new CollisionHit();
   private readonly hud:FinalBossHud;
   private oldState:FinalBossState='idle';
+  private phaseTwoCoverRestored=false;
   private readonly sound:FinalBossAudio;
   private summonSerial=-1;
   private weaponSerial=-1;
@@ -175,7 +176,14 @@ export class FinalBossEncounter {
     });
   }
   private sync():void {
-    const m=this.controller.readModel,{arena,body}=this.options,p=this.presentation;p.update(m,this.controller.time,body);
+    const m=this.controller.readModel,{arena,body}=this.options,p=this.presentation;
+    if(m.phase===2&&!this.phaseTwoCoverRestored) {
+      // A player can stand inside destroyed cover when the phase changes.
+      const occupied=arena.cover.some(mesh=>!mesh.visible&&mesh.geometry.boundingBox!.distanceToPoint(mesh.worldToLocal(this.closest.copy(body.position)))<body.radiusMetres);
+      arena.restoreCover();this.phaseTwoCoverRestored=true;
+      if(occupied)body.recoverAt(FINAL_MERGE_ANCHOR);
+    }
+    p.update(m,this.controller.time,body);
     arena.setPowered(m.state!=='idle'&&m.state!=='suspended',m.phase===2||m.state==='transition',this.controller.time);arena.setDoors(m.state!=='idle',m.state==='escape'||m.state==='complete');arena.deployment(m.state==='intro'?m.progress:1);arena.setDamaged(m.phase===2||['defeated','escape','complete'].includes(m.state));
     this.hud.update(m,this.reinforcements.activeCount,this.controller.devInvincible);
     if(m.state!=='idle'&&m.state!=='suspended')this.options.host.dataset.bossEncounter='true';else delete this.options.host.dataset.bossEncounter;
@@ -313,6 +321,6 @@ export class FinalBossEncounter {
   }
   clearAttacks():void {this.squad.clear();this.droneFlight.reset();this.projectiles.clear();this.reinforcements.reset();this.presentation.evasionOffset.set(0,0,0);this.presentation.evasionRoll=0;this.shake=0;this.hostileShots.count=0;this.presentation.clearRamImpact();this.presentation.beam.visible=false;this.presentation.beamCore.visible=false;this.presentation.beamImpact.visible=false;this.presentation.shield.visible=false;this.presentation.eyeCharge.visible=false;this.presentation.clearAttackWarnings();for(let i=0;i<6;i++)this.options.arena.setSector(i,'inactive');this.sound.stopAttack();}
   suspend():void {this.music.stop();this.controller.suspend();this.clearAttacks();this.healthPacks.reset();this.sound.reset();this.hud.hide();}
-  reset():void {this.music.stop();this.music=new BossMusic();this.clearAttacks();this.debris.reset();for(const d of this.drones)d.reset();this.healthPacks.reset();this.controller.reset();this.presentation.reset();this.options.arena.reset();this.hud.hide();this.summonSerial=-1;this.weaponSerial=-1;this.reinforcementIndex=0;this.fired=0;this.oldState='idle';this.skipRequested=false;this.sound.reset();delete this.options.host.dataset.bossEncounter;}
+  reset():void {this.music.stop();this.music=new BossMusic();this.clearAttacks();this.debris.reset();for(const d of this.drones)d.reset();this.healthPacks.reset();this.controller.reset();this.presentation.reset();this.options.arena.reset();this.hud.hide();this.summonSerial=-1;this.weaponSerial=-1;this.reinforcementIndex=0;this.fired=0;this.oldState='idle';this.phaseTwoCoverRestored=false;this.skipRequested=false;this.sound.reset();delete this.options.host.dataset.bossEncounter;}
   dispose():void {if(this.disposed)return;this.reset();this.disposed=true;this.modelAbort.abort();for(const off of this.unregister)off();for(const drone of this.drones)drone.dispose();this.squad.dispose();this.reinforcements.dispose();this.healthPacks.dispose();this.projectiles.dispose();this.hostileShots.removeFromParent();this.hostileShots.dispose();this.shotGeometry.dispose();this.shotMaterial.dispose();this.presentation.dispose();this.debris.dispose();this.modelAsset?.dispose();this.controller.dispose();this.hud.dispose();}
 }
