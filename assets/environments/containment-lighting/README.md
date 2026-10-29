@@ -41,9 +41,9 @@ bounds and restrained indirect intensity limit coarse-grid light leakage.
 From the repository root:
 
 ```sh
-node scripts/generate-containment-radiance.ts
+node scripts/assets/generate-containment-radiance.ts
 /home/kevin/bin/blender --background --factory-startup --python assets/environments/containment-lighting/bake-radiance.py
-node scripts/generate-containment-radiance.ts --check
+node scripts/assets/generate-containment-radiance.ts --check
 ```
 
 The export records GLB hashes, fixture state, probe layout and the Python

@@ -20,7 +20,7 @@ Reduced coat strength and broader highlights keep the green surface readable.
 - `goop.validation.json`: measured topology, bounds and artifact/source hashes.
 - `verify-goop.py`: independent source/GLB geometry, material and eye-seating checks.
 - `goop.roundtrip.json`: results from the clean GLB import and comparison.
-- `evidence/`: front, side, back and three-quarter studio renders.
+- `evidence/`: ignored front, side, back and three-quarter renders generated with `--render`.
 
 The loose puddle dressing has been removed. The GLB excludes the studio. It contains 33,716
 triangles across three meshes. Each mesh is closed and has one connected
@@ -62,7 +62,7 @@ clean GLB import. Exported vertex positions must agree within 0.000002 m.
 
 The polish pass was inspected in the Windows Blender GUI from front, side,
 rear three-quarter and underside views, under studio and forest lighting,
-and at a reduced viewing size. Studio renders are in `evidence/`. These are
+and at a reduced viewing size. Generate local studio renders in `evidence/`. These are
 static asset checks, not evidence of in-game lighting or animation acceptance.
 
 Live MCP viewport captures were reviewed in the session. The separate saved

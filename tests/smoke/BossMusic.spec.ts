@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { isExpectedMusicCancellation } from '../helpers/ExpectedMusicCancellation.ts';
 
-const file = '07-blackout-boss-a-flawless-getaway.ogg';
+const file = 'blackout-boss-a-flawless-getaway.ogg';
 const snapshot = (page: Page) => page.evaluate(() => ((window as any).__bossMusicPlayers as HTMLAudioElement[])
   .map(p => ({ src: p.src, current: p === (window as any).__bossMusicCurrent, time: p.currentTime, duration: p.duration, paused: p.paused,
     loop: p.loop, rate: p.playbackRate, volume: p.volume, error: p.error?.message,

@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { ENDING_TIMING as T, endingGoopHitTime } from '../../src/cinematics/BossDefeatTimeline.ts';
 
 const endingMusic = (page: Page) => page.evaluate(() => ((window as any).__endingMusicPlayers as HTMLAudioElement[])
-  .filter(p => p.src.includes('10-blackout-first-sunlight-ending.ogg'))
+  .filter(p => p.src.includes('blackout-first-sunlight-ending.ogg'))
   .map(p => ({ time: p.currentTime, paused: p.paused, loop: p.loop, rate: p.playbackRate, volume: p.volume, error: p.error?.message })));
 
 const endingEffects = (page: Page) => page.evaluate(() => {

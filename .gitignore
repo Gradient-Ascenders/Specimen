@@ -27,11 +27,11 @@ test-results/
 .DS_Store
 Thumbs.db
 
-# Character generator caches
-assets/characters/**/__pycache__/
-
-# Legacy local Volt studio/review captures; new captures use artifacts/.
-assets/characters/volt/evidence/
+# Authoring caches, backups and local review captures
+__pycache__/
+*.blend[0-9]
+assets/**/evidence/
+docs/evidence/
 
 # Windows download metadata
 *:Zone.Identifier*

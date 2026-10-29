@@ -83,22 +83,3 @@ its floor's front edge, outside the lift shaft.
 Preparation warms the actual authored buffers and the lift/atrium doorway view.
 Restart reuses the asset; unload detaches borrowed optics, releases owned
 geometry and material clones once, and leaves shared finishes with their owners.
-
-## Verification
-
-`tests/RoomFiveShell.test.ts` checks the actual GLB, collision fingerprint, light
-and thruster budgets, entrance-wall coverage, sliding-door seams, moving-platform
-interpolation, roof height, release/reset behaviour and disposal. Opaque-triangle
-audits use 0.1 mm and 2 mm tolerances, including same-batch geometry, the existing
-wooden cover, moving platforms and partially opened hatch states. Repairs use
-surface ownership and physical clearances, without polygon offsets or broad
-conflict exclusions.
-
-`tests/RoomFiveProps.test.ts` verifies blocked movement, a real charged jump onto
-the desk, chair/cabinet support and clear button/escape approaches.
-
-`tests/browser/RoomFiveShell.spec.ts` exercises real production preparation,
-entry, the cell, platform movement, observation, release and restart. Captures
-and before/after surface reports live under ignored
-`artifacts/evidence/room-five-atrium/`. Software WebGL checks validate integration
-and resource preparation; they do not establish hardware frame rates.

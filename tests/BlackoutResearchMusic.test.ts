@@ -22,6 +22,6 @@ function readOggDuration(fileName: string): number {
 }
 
 test('supplied cinematic OGG streams cover the ascent and the complete 277-second research film', () => {
-  assert.ok(Math.abs(readOggDuration('08-blackout-elevator-quiet-ascent.ogg') - 85.068) < .01);
-  assert.equal(readOggDuration('09-blackout-research-the-specimen.ogg'), T.duration);
+  assert.ok(Math.abs(readOggDuration('blackout-elevator-quiet-ascent.ogg') - 85.068) < .01);
+  assert.equal(readOggDuration('blackout-research-the-specimen.ogg'), T.duration);
 });

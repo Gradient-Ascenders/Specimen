@@ -72,9 +72,3 @@ monitor, thrusters and moving laser heads. Entry, disabled, both sweep ends,
 reverse and reset states report zero conflicts at 0.1 mm and 2 mm tolerances.
 A separate check covers the Room 2 and Room 4 seams. Transparent acid, exhausts
 and beam glows remain separate from the opaque structural audit.
-
-Focused checks live in `tests/RoomThreeShell.test.ts` and
-`tests/browser/RoomThreeShell.spec.ts`; production captures and before/after
-surface reports are under ignored `artifacts/evidence/room-three-shell/`.
-Software WebGL verifies integration and resource behaviour; it does not measure
-hardware frame rates.

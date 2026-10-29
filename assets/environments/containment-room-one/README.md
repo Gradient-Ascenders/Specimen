@@ -11,13 +11,6 @@ and a ceiling service crown. It replaces the old rectangular wall dressing.
 The GLB uses the game's X/Y-up/Z coordinates after Blender's normal glTF export.
 Its `R1_Architecture` node carries version `containment-room-one-v1`.
 
-Rear wall panels stop outside the complete metal-return footprint, including
-bevel faces. The small backed reveals seal the joins without duplicate coverage.
-The centre instrument cover is split around the diagnostic housing for the
-same reason. Keep these footprints separate when changing their dimensions;
-`RoomOneShell.test.ts` and `OpeningLaboratory.test.ts` audit the exported rear
-wall at 0.1 mm and 2 mm tolerances, including entry, hatch, lid lift and reset.
-
 The west maintenance panels also stop before the complete corner-spine footprint,
 with a backed 20 mm reveal. The flush perimeter floor extends 80 mm under the
 wall bases and includes the rectangle's exact corners, sealing the rear plinth's
@@ -76,11 +69,6 @@ The complete collision fingerprint, pod motion, spawn, physical floor height,
 climbable wall and vent openings stay with the existing gameplay owners.
 Control-room scenery is beyond a glass wall and is not an accessible new area.
 
-Focused checks are `tests/RoomOneShell.test.ts`, the Containment art/collider/
-lighting tests and `tests/browser/RoomOneShell.spec.ts`. Production captures live
-under ignored `artifacts/evidence/room-one-shell/`. Software WebGL captures prove
-routing, rendering and resource reuse; they are not hardware FPS measurements.
-
 ## Desktop texture compression
 
 `room-one-maps-bc7.bin` contains the same six maps as native BC7 blocks with
@@ -94,7 +82,7 @@ overhead. Its gzip download is about 1.10 MB versus 0.97 MB for the original.
 There is no runtime transcoder, WebAssembly module or texture worker.
 
 To regenerate, use KTX-Software 4.4.2 and set `SPECIMEN_KTX_BIN` to its `bin`
-directory, then run `npm run generate:room-one-compressed-maps`. The script
+directory, then run `node scripts/assets/generate-room-one-compressed-maps.mjs`. The script
 encodes KTX2/UASTC and transcodes to BC7 offline, preserving RGB normal maps,
 linear data maps, sRGB colour maps and orientation. The JSON manifest records
 source/output hashes and tool settings. `--check`, also included in

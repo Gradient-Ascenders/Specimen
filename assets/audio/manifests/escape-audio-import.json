@@ -1,0 +1,106 @@
+{
+  "archive": "assets/audio/escape/escape-sounds.tar",
+  "archiveSha256": "ac4f153f37b631ae47af92a3acf510f7f16b5e7d1cea2abb8205a55eda3d27dd",
+  "processing": "Mono averaging, DC removal, gain with peak headroom, 2 ms one-shot fades, 80 ms circular strain-loop overlap. Scan-result silent tail trimmed. OGG Vorbis.",
+  "clips": [
+    {
+      "id": "escape-power-down-01",
+      "source": "power-down.wav",
+      "sourceSha256": "c82336c88ef6e9c606ccda93deedc2bc67c2f41427720f4ed5e70f7090556579",
+      "sourceDurationSeconds": 1.48,
+      "sourceChannels": 2,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0,
+      "gain": 0.615153,
+      "rms": 0.075002
+    },
+    {
+      "id": "escape-cell-hatch-open-01",
+      "source": "cell-hatch-open.wav",
+      "sourceSha256": "1fb101de9429774643d398d9651094b29234e93379072f8404fb4d986c33ba99",
+      "sourceDurationSeconds": 2.56,
+      "sourceChannels": 2,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0,
+      "gain": 1.072424,
+      "rms": 0.064577
+    },
+    {
+      "id": "escape-drone-scan-01",
+      "source": "drone-scan.wav",
+      "sourceSha256": "c208fd90ef1a69d5a9990ab59586cb08825b8bfe8c4141ab9705e0548965e816",
+      "sourceDurationSeconds": 1.48,
+      "sourceChannels": 2,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0,
+      "gain": 1.365008,
+      "rms": 0.054907
+    },
+    {
+      "id": "escape-scan-result-01",
+      "source": "scan-result.wav",
+      "sourceSha256": "ab338a731e3d772bab81dc60a31894a94fecead007efba83b8eda076b65f321a",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimEndSeconds": 0.7,
+      "circularOverlapSeconds": 0,
+      "gain": 0.205189,
+      "rms": 0.065169
+    },
+    {
+      "id": "escape-termination-warning-01",
+      "source": "termination-warning.wav",
+      "sourceSha256": "437882684d5ff906f23b7f6917351ae8c47f9de1bac60bc880e0be5eda2830ef",
+      "sourceDurationSeconds": 1.0,
+      "sourceChannels": 2,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0,
+      "gain": 0.394915,
+      "rms": 0.064139
+    },
+    {
+      "id": "escape-drone-strain-loop-01",
+      "source": "drone-strain.wav",
+      "sourceSha256": "43a76b9d73619ef4c77aa449f5329d2f2d64c71cf839e6b411093f038fd5a7f2",
+      "sourceDurationSeconds": 2.0,
+      "sourceChannels": 2,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0.08,
+      "gain": 0.540766,
+      "rms": 0.044951
+    },
+    {
+      "id": "escape-projectile-metal-impact-01",
+      "source": "projectile-impact.wav",
+      "sourceSha256": "b30c01772f954681ac8d7a300aff6a528eb702a4360bb3bd25c7eaa453077fa1",
+      "sourceDurationSeconds": 0.6065,
+      "sourceChannels": 2,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0,
+      "gain": 1.140974,
+      "rms": 0.063505
+    },
+    {
+      "id": "escape-drone-destruction-01",
+      "source": "drone-destruction.wav",
+      "sourceSha256": "67de4e5c3b6e0c65958dace31b747227a96fbeb7434c059244ba04b7d5b7c885",
+      "sourceDurationSeconds": 2.0,
+      "sourceChannels": 2,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0,
+      "gain": 1.047751,
+      "rms": 0.071941
+    },
+    {
+      "id": "escape-shaft-fall-01",
+      "source": "shaft-fall.wav",
+      "sourceSha256": "a6ad39ad1e53be8dacc844439dd2b4c40726fe07e2d310bdf89f4bc0fcda816b",
+      "sourceDurationSeconds": 1.48,
+      "sourceChannels": 2,
+      "trimEndSeconds": 0,
+      "circularOverlapSeconds": 0,
+      "gain": 0.859876,
+      "rms": 0.053901
+    }
+  ]
+}

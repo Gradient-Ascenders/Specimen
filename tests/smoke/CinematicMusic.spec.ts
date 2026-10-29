@@ -62,8 +62,8 @@ test('cinematic recordings decode at the nested URL and credits use the existing
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('./', { waitUntil: 'domcontentloaded' });
-  const files = ['04-opening-tension.ogg', '05-containment-escape-high-tech-lab.ogg', '06-cultivation-volt-rescue-digital-slash.ogg',
-    '08-blackout-elevator-quiet-ascent.ogg', '09-blackout-research-the-specimen.ogg', '10-blackout-first-sunlight-ending.ogg'];
+  const files = ['opening-tension.ogg', 'containment-escape-high-tech-lab.ogg', 'cultivation-volt-rescue-digital-slash.ogg',
+    'blackout-elevator-quiet-ascent.ogg', 'blackout-research-the-specimen.ogg', 'blackout-first-sunlight-ending.ogg'];
   const decoded = await page.evaluate(async files => {
     const context = new AudioContext();
     try {
@@ -216,8 +216,8 @@ test('real finales own streamed music across pause, skip and level handoffs; ven
   await expect.poll(async () => {
     state = await snapshot(page);
     return state.filter(p => !p.paused).map(p => p.src);
-  }, { timeout: 30_000 }).toEqual([expect.stringContaining('06-cultivation-volt-rescue-digital-slash.ogg')]);
-  expect(state.find(p => p.src.includes('06-cultivation'))!.src).toContain('06-cultivation-volt-rescue-digital-slash.ogg');
+  }, { timeout: 30_000 }).toEqual([expect.stringContaining('cultivation-volt-rescue-digital-slash.ogg')]);
+  expect(state.find(p => p.src.includes('06-cultivation'))!.src).toContain('cultivation-volt-rescue-digital-slash.ogg');
   expect(state.find(p => p.src.includes('06-cultivation'))!.time).toBeLessThan(10);
   expect(state.find(p => p.src.includes('06-cultivation'))!).toMatchObject({ loop: false, rate: 1, error: undefined });
   await expect.poll(async () => (await snapshot(page)).find(p => p.src.includes('06-cultivation'))!.volume).toBeCloseTo(.49, 4);

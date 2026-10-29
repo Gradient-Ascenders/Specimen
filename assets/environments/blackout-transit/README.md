@@ -45,7 +45,7 @@ From the repository root, using Blender 5.2:
 ```sh
 blender --background --factory-startup --python-exit-code 1 \
   --python assets/environments/blackout-transit/generate-transit.py
-node scripts/generate-blackout-maintenance-art.ts
+node scripts/assets/generate-blackout-maintenance-art.ts
 ```
 
 The gzip runtime bundle is `src/assets/blackout/transit-art.bin`. The packer also
@@ -89,35 +89,3 @@ default opaque material ordering can then reject obscured actor/effect pixels
 early, rather than drawing asynchronously created enclosure materials last.
 Geometry still loads in parallel before mandatory shader preparation and GPU
 warmup; gameplay does not defer those uploads or compilation.
-
-## Focused validation
-
-```sh
-node tests/BlackoutTransitArt.test.ts
-node scripts/audit-blackout-transit-art.ts /tmp/transit-surfaces.json
-SURFACE_TOLERANCE=.002 node scripts/audit-blackout-transit-art.ts /tmp/transit-clearance.json
-```
-
-The assembled fixture includes neighbouring Room 1 art and connections, the
-original exit hallway/staging, all transit hazards, live dormant drones in
-initial/reset states, and the actual lift/bridge owners. It checks partly
-deployed, fully deployed and retracting poses. Tests also cover wall coverage,
-both entry bores, exit clearance, exact landing heights, target identity,
-unchanged collision, shared map ownership, cancellation and disposal.
-
-Existing transit material, electrical-interaction and traversal tests supply
-the focused gameplay checks. Native Iris Xe captures, timing comparisons and
-surface reports are kept under ignored `artifacts/evidence/blackout-transit/`.
-Staged views and local GPU timings are not lab-hardware acceptance evidence.
-
-The native 1920 × 1080 Medium comparison on Iris Xe recorded 7.64 → 7.10 ms
-for the powered entry and 13.26 → 12.24 ms for the catwalk. Upper-route and exit
-views changed from 6.96 → 7.40 ms and 7.16 → 7.33 ms respectively. These are
-render-only GPU samples, not gameplay frame-rate guarantees. All reviewed views
-had zero WebGL errors and no new shader programs after preparation; restart
-prepared both rooms again and unload returned to the renderer's baseline.
-
-The new art has no reported opaque conflicts at 0.1 mm or 2 mm in the five
-assembled poses. Six retained Room 1 circuit-fixture conflicts remain outside
-this art pass. The audit reports those separately rather than treating them as
-new Room 2 findings.

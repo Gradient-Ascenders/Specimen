@@ -30,16 +30,16 @@ jobs:
       - run: npm run check:generated-assets
       - name: Capture matched cold CPU profiles sequentially
         run: |
-          node --expose-gc scripts/profile-cultivation-construction.ts --baseline-root artifacts/baseline --output artifacts/perf-192/baseline.json
-          node --expose-gc scripts/profile-cultivation-construction.ts --output artifacts/perf-192/baked.json
+          node --expose-gc scripts/diagnostics/profile-cultivation-construction.ts --baseline-root artifacts/baseline --output artifacts/perf-192/baseline.json
+          node --expose-gc scripts/diagnostics/profile-cultivation-construction.ts --output artifacts/perf-192/baked.json
       - name: Compare all authored gameplay poses
-        run: node scripts/compare-cultivation-bake.ts artifacts/baseline > artifacts/perf-192/parity.log
+        run: node scripts/diagnostics/compare-cultivation-bake.ts artifacts/baseline > artifacts/perf-192/parity.log
       - run: npx playwright install --with-deps chromium
       - name: Capture matched room and animation views
         run: |
-          node scripts/capture-cultivation-bake.mjs --baseline-root artifacts/baseline
-          node scripts/capture-cultivation-bake.mjs
-          node scripts/compare-cultivation-captures.mjs
+          node scripts/diagnostics/capture-cultivation-bake.mjs --baseline-root artifacts/baseline
+          node scripts/diagnostics/capture-cultivation-bake.mjs
+          node scripts/diagnostics/compare-cultivation-captures.mjs
       - name: Retain raw evidence
         if: always()
         uses: actions/upload-artifact@v7

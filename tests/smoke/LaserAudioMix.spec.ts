@@ -27,8 +27,8 @@ test('production laser mix retains audible telegraphs with lower beam levels and
       return { rms: Math.sqrt(sum / count), peak };
     };
     try {
-      const boss = measure(await decode('assets/audio/music/07-blackout-boss-a-flawless-getaway.ogg'));
-      const research = await decode('assets/audio/music/09-blackout-research-the-specimen.ogg');
+      const boss = measure(await decode('assets/audio/music/blackout-boss-a-flawless-getaway.ogg'));
+      const research = await decode('assets/audio/music/blackout-research-the-specimen.ogg');
       const effects = [];
       for (const clip of clips) {
         const buffer = await decode(clip.path), raw = measure(buffer);

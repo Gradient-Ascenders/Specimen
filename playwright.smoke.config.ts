@@ -51,7 +51,7 @@ export default defineConfig({
   },
   projects: [{ name: browserName, use: { browserName } }],
   webServer: {
-    command: 'node scripts/serve-production-smoke.mjs',
+    command: 'node scripts/build/serve-production-smoke.mjs',
     url: productionUrl,
     reuseExistingServer: false,
     timeout: 30_000,

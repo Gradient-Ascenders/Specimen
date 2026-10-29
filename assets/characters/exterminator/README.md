@@ -57,7 +57,6 @@ remains available for synchronous headless encounter fixtures.
 ## Verification
 
 ```sh
-node --test tests/ExterminatorModels.test.ts tests/FinalBoss.test.ts tests/FinalBossMechanics.test.ts tests/FinalBossPhaseTwo.test.ts
 npm run build
 npx playwright test tests/browser/ExterminatorModels.spec.ts
 ```

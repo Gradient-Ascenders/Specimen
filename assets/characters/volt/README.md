@@ -56,7 +56,6 @@ From the repository root, using this machine's native Windows Blender wrapper:
   --python assets/characters/volt/generate-volt.py -- --render
 /home/kevin/bin/blender --background --threads 8 assets/characters/volt/volt.blend \
   --python assets/characters/volt/verify-volt.py
-node --test tests/VoltModelAsset.test.ts
 ```
 
 Omit `-- --render` to regenerate without studio renders. Verification checks
@@ -79,7 +78,7 @@ environment, current game FOV (48°), exposure and 3.5–7 m follow distances.
 To recapture checks while the server is running:
 
 ```bash
-node scripts/capture-volt-polish.mjs
+node scripts/diagnostics/capture-volt-polish.mjs
 ```
 
 Browser evidence uses software-rendered Chromium: it verifies exported

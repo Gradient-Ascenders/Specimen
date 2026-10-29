@@ -40,7 +40,7 @@ as morphs; charging also pulses the gold emission.
 - `verify-specimen.py`: compare every imported GLB triangle with the source.
 - `specimen.validation.json`: measured topology, bounds and artifact hashes.
 - `specimen.roundtrip.json`: clean GLB import results and material checks.
-- `evidence/`: four full-body studio renders, `base-detail.png`,
+- `evidence/`: optional ignored local full-body studio renders, `base-detail.png`,
   `mohawk-detail.png` and `spike-detail.png` close-ups, and
   `living-gel-motion.mp4` showing all clips.
 - `reference/approved-lightning-mohawk.png`: the approved concept before the
@@ -72,7 +72,7 @@ input, collider changes, and runtime clip selection are outside this delivery.
 
 ## Viewing the interior
 
-Press **F12** for the studio render, or open `evidence/three-quarter.png`.
+Press **F12** for the studio render, or generate `evidence/three-quarter.png` with `--render`.
 Material Preview is useful for orbiting the shape but does not reliably show
 the nested transmissive gel and emitted light. The studio renders and motion
 preview show the actual Cycles materials. Frame 266 shows a bright charge pulse.

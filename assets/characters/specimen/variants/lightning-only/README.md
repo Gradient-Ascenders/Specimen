@@ -7,7 +7,7 @@ heart and swirls) are removed.
 
 - [Editable Blender model](specimen-lightning-only.blend), including the existing studio.
 - [Animated GLB](specimen-lightning-only.glb), character only.
-- [Front render](evidence/front.png) and [three-quarter render](evidence/three-quarter.png).
+- Optional front and three-quarter studio renders are generated locally in ignored `evidence/`.
 - Generation and export checks: `specimen-lightning-only.validation.json` and
   `specimen-lightning-only.roundtrip.json`.
 

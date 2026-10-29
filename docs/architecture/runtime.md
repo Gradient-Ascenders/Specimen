@@ -1,68 +1,49 @@
 # Runtime and lifecycle
 
-## Ownership
+`src/main.ts` owns the browser session: `RenderLayer`, `Input`, the application
+`Loop`, `AudioManager`, menus and `GameSessionCoordinator`. A level runtime owns
+its scene, collision and surface registries, bodies, puzzles, hazards,
+checkpoints, gameplay UI, audio subscriptions and transient effects.
 
-`src/main.ts` owns browser-session resources: `RenderLayer`, `Input`, the
-single `Loop`, `AudioManager`, UI, and `GameSessionCoordinator`. A concrete level runtime owns
-only its scene, collision and surface registries, playable bodies, level UI,
-hazards, puzzles, checkpoints, and subscriptions, including its `GameplayAudio`
-director. See [Gameplay audio](gameplay-audio.md) for sound ownership and mappings.
+The coordinator advances Containment → Cultivation → Blackout. It stops and
+disposes the current runtime before constructing the next. Only a serializable
+`LevelProgressionSnapshot` crosses that boundary; scene objects and callbacks
+stay with their owner.
 
-The coordinator runs the authored progression
-`Containment -> Cultivation -> Blackout`. It stops and disposes the current
-runtime before constructing the next one. Only a plain `LevelProgressionSnapshot`
-crosses that boundary; live Three.js objects, bodies, callbacks, and subsystem
-instances never do.
+## Updates and input
 
-## Frame and input contract
+Simulation runs at a fixed 60 Hz. A frame clamps elapsed time to 100 ms,
+performs at most six fixed updates, drops remaining whole-step backlog, and
+renders once. Blur or document hiding clears input and pauses timing.
 
-Gameplay advances at a fixed 60 Hz. Each browser frame clamps elapsed time to
-100 ms, performs at most six fixed updates, drops any remaining whole-step
-backlog, and renders once. Blur or document hiding pauses timing and clears
-input so returning to the tab cannot replay stale movement.
+Gameplay consumes named `InputAction` values. Held state persists until release;
+pressed/released state and mouse deltas last one fixed update. Menus disable
+input explicitly. Level start re-enables it. Presentation and audio consume
+state or events and never advance gameplay.
 
-Gameplay systems consume named `InputAction` values instead of browser key
-codes. Pressed/released state and relative mouse movement are transient for one
-fixed update; held state persists until release. Pointer movement belongs to
-the gameplay canvas while it owns pointer lock. Menus disable input explicitly,
-and level start is the only operation that re-enables it.
+## Restart and disposal
 
-The normal controls are WASD movement, Space jump, Tab slime switch, right mouse
-aim, left mouse fire while aiming, M maintenance-drone mount/dismount, and Shift
-drone descent. F2 toggles diagnostics when debug tools are enabled.
-F1 toggles [clean gameplay mode](clean-gameplay-mode.md), hiding non-aiming gameplay UI
-without pausing simulation, controls or audio.
+Each level implements `GameLevelRuntime`: load, start, stop, restart, unload and
+dispose. Duplicate safe operations are harmless; invalid transitions and
+reentrant restarts are rejected.
 
-## Lifecycle and reset
+Restart suspends updates, clears input and transient work, resets owned puzzle
+and hazard state, validates checkpoint anchors, recovers every persistent body,
+restores identity/camera/UI, and resumes only after recovery succeeds. Death's
+Retry uses the same authority. Ordinary restart reuses immutable geometry.
+Unload/dispose unregisters listeners and colliders, detaches camera targets,
+stops audio and releases owned CPU/GPU resources.
 
-Each level implements the `GameLevelRuntime` lifecycle. Load creates one
-resource set; start and stop control updates; restart restores authored state;
-unload detaches level resources; dispose is terminal. Duplicate safe operations
-are harmless, invalid transitions throw, and re-entrant restarts are rejected.
+`SlimeManager` owns availability and active identity. `PuzzleRegistry` owns
+reset order. Physics and checkpoints operate on stable body IDs, including
+inactive bodies. Debug shortcuts invoke production transitions.
 
-A player restart is coordinated by the active level runtime. It must:
+## Project boundaries
 
-1. suspend updates and clear transient input;
-2. reset puzzle, hazard, projectile, and room-owned transient state;
-3. recover all persistent bodies at validated checkpoint anchors;
-4. restore active identity, camera, HUD, and phase state;
-5. resume only after recovery succeeds.
+The game is single-player and statically hosted. Keep source grouped by
+responsibility. `KinematicBody` and authored collision primitives remain
+independent of deforming visual meshes. New presentation work must preserve
+that separation and dispose only resources it owns.
 
-Death uses the same recovery authority after the player chooses Retry. Ordinary
-restart does not reconstruct immutable geometry or application-owned rendering
-resources. Unload/dispose performs full teardown, unregisters listeners and
-colliders, detaches the camera target, and disposes owned GPU resources.
-
-## State boundaries
-
-- `SlimeManager` is the authority for roster availability and active identity.
-- Checkpoint snapshots contain serializable state only.
-- `PuzzleRegistry` owns deterministic reset order for authored components.
-- Presentation and audio read gameplay state/events; they do not decide damage,
-  progression, or completion.
-- Debug shortcuts must invoke production transitions rather than creating a
-  second state-change path.
-
-The runtime diagnostics panel reports lifecycle, fixed-step, renderer, body,
-collision, and checkpoint state. It is development-only unless production is
-opened deliberately with `?debug=1`.
+See [gameplay](../gameplay.md), [rendering](rendering.md) and
+[audio](gameplay-audio.md) for their contracts.

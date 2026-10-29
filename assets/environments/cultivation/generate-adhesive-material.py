@@ -1,6 +1,6 @@
 """Editable material studio for the shared Rooms 1/2 biofilm finish.
 
-Inputs are rebuilt by scripts/prepare-cultivation-adhesive-studio.ts. The room
+Inputs are rebuilt by scripts/blender/prepare-cultivation-adhesive-studio.ts. The room
 controller supplies the review geometry; this studio is never a runtime export.
 """
 import bpy

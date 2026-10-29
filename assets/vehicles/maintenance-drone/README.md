@@ -33,15 +33,10 @@ Regenerate from the repository root with Blender 5.2:
 ```sh
 blender --background --factory-startup --python-exit-code 1 \
   --python assets/vehicles/maintenance-drone/generate-maintenance-drone.py
-node scripts/generate-blackout-maintenance-art.ts
+node scripts/assets/generate-blackout-maintenance-art.ts
 ```
 
 The generator exposes separate hull, fan, cradle, light and export stages for
 native Blender MCP iteration. Re-running export preserves the editable parts.
-`node scripts/generate-blackout-maintenance-art.ts --check` checks both Blackout
+`node scripts/assets/generate-blackout-maintenance-art.ts --check` checks both Blackout
 geometry bundles and is included in the generated asset CI check.
-
-Focused validation is in `tests/MaintenanceDroneModel.test.ts`, alongside the
-existing controller and searchlight tests. It checks rotor/guard separation at
-multiple angles, collider footprint, saddle alignment, an unobstructed beam,
-shared buffers, borrowed texture ownership and cancellation/disposal.

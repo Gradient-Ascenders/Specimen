@@ -6,17 +6,17 @@ export type MusicLevel = 'containment' | 'cultivation' | 'blackout';
 export type MusicTrack = 'intro' | MusicLevel | CinematicTrack | 'boss';
 
 const MUSIC_PATHS: Record<MusicTrack, string> = {
-  intro: 'assets/audio/music/00-intro-osmotic-memory.ogg',
-  containment: 'assets/audio/music/01-containment-thought-loop.ogg',
-  cultivation: 'assets/audio/music/02-cultivation-unsolved-investigation.ogg',
-  blackout: 'assets/audio/music/03-blackout-searching.ogg',
-  awakening: 'assets/audio/music/04-opening-tension.ogg',
-  escape: 'assets/audio/music/05-containment-escape-high-tech-lab.ogg',
-  rescue: 'assets/audio/music/06-cultivation-volt-rescue-digital-slash.ogg',
-  boss: 'assets/audio/music/07-blackout-boss-a-flawless-getaway.ogg',
-  ascent: 'assets/audio/music/08-blackout-elevator-quiet-ascent.ogg',
-  research: 'assets/audio/music/09-blackout-research-the-specimen.ogg',
-  ending: 'assets/audio/music/10-blackout-first-sunlight-ending.ogg',
+  intro: 'assets/audio/music/intro-osmotic-memory.ogg',
+  containment: 'assets/audio/music/containment-thought-loop.ogg',
+  cultivation: 'assets/audio/music/cultivation-unsolved-investigation.ogg',
+  blackout: 'assets/audio/music/blackout-searching.ogg',
+  awakening: 'assets/audio/music/opening-tension.ogg',
+  escape: 'assets/audio/music/containment-escape-high-tech-lab.ogg',
+  rescue: 'assets/audio/music/cultivation-volt-rescue-digital-slash.ogg',
+  boss: 'assets/audio/music/blackout-boss-a-flawless-getaway.ogg',
+  ascent: 'assets/audio/music/blackout-elevator-quiet-ascent.ogg',
+  research: 'assets/audio/music/blackout-research-the-specimen.ogg',
+  ending: 'assets/audio/music/blackout-first-sunlight-ending.ogg',
 };
 
 // Retain Volt's prominent mix with the supplied, already-trimmed Digital Slash

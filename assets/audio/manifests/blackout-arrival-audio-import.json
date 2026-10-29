@@ -1,0 +1,16 @@
+{
+  "sourceFile": "assets/audio/blackout/vent-slide.wav",
+  "sourceFileSha256": "ef8a33614898b28ec0c4f9d0c7ae5b6865c4eda42f4af6618275efdd56aae1ab",
+  "processing": "Mono averaging, DC removal, gain with peak headroom, 2 ms fades, OGG Vorbis. No trimming or looping.",
+  "clips": [
+    {
+      "id": "blackout-vent-slime-slide-01",
+      "source": "vent-slide.wav",
+      "sourceSha256": "ef8a33614898b28ec0c4f9d0c7ae5b6865c4eda42f4af6618275efdd56aae1ab",
+      "sourceDurationSeconds": 4.0,
+      "sourceChannels": 2,
+      "gain": 14.618619,
+      "rms": 0.061309
+    }
+  ]
+}

@@ -19,7 +19,7 @@ The floor perimeter/corner-marker recipe follows the earlier Containment decks.
 ```sh
 blender --background --factory-startup --python-exit-code 1 \
   --python assets/environments/blackout-ascent/generate-ascent.py
-node scripts/generate-blackout-maintenance-art.ts
+node scripts/assets/generate-blackout-maintenance-art.ts
 ```
 
 Coordinates are metres, game Y-up. Root `B3_ASC_Architecture` identifies asset
@@ -51,30 +51,3 @@ The art owner restores retired material bindings and releases its unique
 buffers/material copies once. Shared texture maps and the original status/strip
 materials remain with their existing owners. Cancelled preparation discards
 late geometry. The Blender source stays editable alongside the runtime bundle.
-
-## Focused validation
-
-```sh
-node tests/BlackoutAscentArt.test.ts
-node tests/BlackoutElevator.test.ts
-node scripts/audit-blackout-ascent-art.ts /tmp/ascent-surfaces.json
-SURFACE_TOLERANCE=.002 node scripts/audit-blackout-ascent-art.ts /tmp/ascent-clearance.json
-node scripts/generate-blackout-maintenance-art.ts --check
-npm run type-check
-npm run build
-```
-
-The fixture composes the actual neighbouring rooms, controller-owned machinery
-and prepared arena art. Seven poses cover boarding, partly closed gates,
-scrolling, arrival, open gates, open lab door and reset. Both 0.0001 m and
-0.002 m audits report zero ascent-art conflicts. Two pre-existing Room 1 door
-receiver conflicts remain in the complete-scene reports, unchanged from the
-baseline; they are outside this pass. No broad name exclusions are applied.
-
-Three art tests verify unchanged collision/light/map budgets, shared shaft
-buffers, deck height, live owners, indicator reset, and cancellation/disposal.
-The nine existing elevator tests also pass. The final generated source was
-reopened and rendered in native Blender; evidence is under the ignored
-`artifacts/evidence/blackout-ascent/` directory. The viewport screenshot tool
-failed to create its file, so the Blender render supplies visual evidence.
-These checks establish geometry and behaviour, not a lab-hardware FPS result.

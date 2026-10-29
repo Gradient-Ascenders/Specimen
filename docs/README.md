@@ -1,57 +1,17 @@
-# Project documentation
+# Specimen documentation
 
-This directory contains durable guidance for the current game. Source code,
-tests, issue discussions, pull requests, and CI artifacts remain the authority
-for implementation details and historical evidence.
+Start with the root [README](../README.md) for setup and controls.
 
-## Architecture
+| Guide | Contents |
+| --- | --- |
+| [Development](development.md) | Checks, browser tests, packaging, deployment and capture tools. |
+| [Gameplay](gameplay.md) | Movement, abilities, switching, hazards and recovery. |
+| [Levels](levels.md) | Progression and the responsibilities of each level. |
+| [Runtime](architecture/runtime.md) | Ownership, fixed updates, transitions and disposal. |
+| [Rendering](architecture/rendering.md) | Scene resources, character presentation and preparation. |
+| [Audio](architecture/gameplay-audio.md) | Playback, event routing, music and reimporting sounds. |
+| [Asset sources](../assets/README.md) | Authoring files, generators and provenance. |
 
-- [Collision queries](architecture/collision-queries.md) — spatial candidates,
-  transform boundaries, diagnostics and reproducible CPU benchmarks.
-
-- [Runtime and lifecycle](architecture/runtime.md) — application ownership,
-  fixed-step updates, input, transitions, restart, and disposal.
-- [Rendering and assets](architecture/rendering.md) — renderer ownership,
-  lighting, shadows, preparation, and asset boundaries.
-- [Lab performance optimisation specification](architecture/lab-performance-optimisation.md) —
-  Level 2 preparation pacing, Level 1 startup and shader coverage, with hardware
-  acceptance targets and resource stability requirements.
-- [Cultivation room workload](architecture/room-workload.md) — room scope ownership,
-  static transforms, spatial batching, diagnostics and measurement limits.
-- [Goop model integration](architecture/goop-model-integration.md) — implementation
-  specification for the authored Goop model and shared gel presentation.
-- [Volt model integration](architecture/volt-model-integration.md) — implementation
-  specification for Volt's authored model, morphs, rescue and electrical lifecycle.
-- [Architecture decisions](decisions/README.md) — concise accepted decisions.
-
-## Gameplay
-
-- [Movement and camera](gameplay/movement-and-camera.md) — kinematic movement,
-  jumping, adhesion, and camera rules.
-- [Slimes and abilities](gameplay/slimes-and-abilities.md) — roster ownership,
-  switching, Goop, Volt, and the merged Specimen.
-- [Companion regrouping](gameplay/companion-regrouping.md) — safe idle-character
-  catch-up routes, puzzle eligibility and manual traversal boundaries.
-- [Puzzles, hazards, and combat](gameplay/puzzles-hazards-and-combat.md) — shared
-  component contracts, fixed-step ordering, resets, and damage authority.
-
-## Levels
-
-- [Containment](levels/containment.md)
-- [Cultivation](levels/cultivation.md)
-- [Blackout](levels/blackout.md)
-
-## Operations
-
-- [Continuous integration](operations/continuous-integration.md)
-- [Build and deployment](operations/deployment.md)
-- [Playtesting](operations/playtesting.md)
-- [Bob's trailer opening](operations/trailer-opening.md) — replayable in-engine
-  opening, recording controls, and capture-only startup.
-- [Goop's trailer introduction](operations/trailer-goop.md) — Goop intercepts a
-  drone attack on Bob and destroys the attacker with an acid shot.
-
-Generated screenshots, videos, browser logs, benchmark output, and one-off
-review notes do not belong in this directory. Attach review evidence to the
-relevant issue or pull request, keep CI evidence in workflow artifacts, and use
-an ignored `artifacts/` subdirectory for local output.
+Keep these guides about the current game. Store local captures, logs and
+benchmarks under ignored `artifacts/`; use CI artifacts or issue/PR attachments
+for review evidence. Historical reports and removed files remain in Git history.
