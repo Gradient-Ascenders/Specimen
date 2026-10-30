@@ -1,3 +1,4 @@
+import type { ShadowFiltering } from '../render/GraphicsProfiles.ts';
 import { KEY_BINDING_ACTIONS, keyLabel, type RebindableAction } from '../core/KeyBindings.ts';
 import { GameSettings, type GameSettingsSnapshot, type HUDVisibility, type FrameRateLimit, type CameraShake } from './GameSettings.ts';
 
@@ -21,6 +22,7 @@ export class AdditionalSettingsControls {
       const control = this.control(key);
       control.addEventListener(control.type === 'range' ? 'input' : 'change', () => apply(control), { signal });
     };
+    bind('shadow-filtering', c => settings.setShadowFiltering(c.value as ShadowFiltering));
     bind('music-volume', c => settings.setMusicVolume(Number(c.value) / 100));
     bind('brightness', c => settings.setBrightness(Number(c.value) / 100));
     bind('field-of-view', c => settings.setFieldOfViewDegrees(Number(c.value)));
@@ -68,7 +70,7 @@ export class AdditionalSettingsControls {
       this.output(key).value = `${value}${suffix}`;
     }
     for (const [key, value] of [
-      ['frame-rate-limit', settings.frameRateLimit], ['hud-visibility', settings.hudVisibility], ['camera-shake', settings.cameraShake],
+      ['shadow-filtering', settings.shadowFiltering], ['frame-rate-limit', settings.frameRateLimit], ['hud-visibility', settings.hudVisibility], ['camera-shake', settings.cameraShake],
     ] as const) {
       const control = this.control(key) as HTMLSelectElement;
       control.value = String(value);

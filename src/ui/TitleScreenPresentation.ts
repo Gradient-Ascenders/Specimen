@@ -1,4 +1,5 @@
 import type { RenderLayer } from '../render/RenderLayer.ts';
+import { PCFShadowMap } from 'three';
 import { TitleScreenScene } from './TitleScreenScene.ts';
 
 export const TITLE_PIXEL_BUDGET = 1280 * 720;
@@ -39,7 +40,7 @@ export class TitleScreenPresentation {
   async prepare(): Promise<void> {
     if (this.disposed) return;
     this.scene.update(0, this.host.clientWidth / Math.max(1, this.host.clientHeight), this.reducedMotion);
-    await this.renderLayer.withShadowPreparation(true, () => this.renderLayer.renderer.compileAsync(
+    await this.withTitleShadows(() => this.renderLayer.renderer.compileAsync(
       this.scene.scene, this.scene.camera));
     if (this.disposed) return;
     // Gameplay has its own preparation/readiness boundary after Start.
@@ -64,7 +65,7 @@ export class TitleScreenPresentation {
     if (resized) this.renderLayer.setPresentationResolution(TITLE_PIXEL_BUDGET);
     const wobbling = this.scene.update(this.seconds, width / height, this.reducedMotion);
     const refreshShadow = this.needsRender || wobbling || this.lastWobbling;
-    this.renderLayer.withShadowPreparation(true, () => {
+    this.withTitleShadows(() => {
       // Only the egg moves. Reuse the room's one 512px shadow map at rest;
       // update during a wobble and once more when the shell settles.
       this.renderLayer.renderer.shadowMap.needsUpdate = refreshShadow;
@@ -77,6 +78,15 @@ export class TitleScreenPresentation {
     this.needsRender = false;
     const motion = this.reducedMotion ? 'still' : 'orbiting';
     if (this.host.dataset.titleMotion !== motion) this.host.dataset.titleMotion = motion;
+  }
+
+  private withTitleShadows<T>(draw: () => T): T {
+    return this.renderLayer.withShadowPreparation(true, () => {
+      // Auto-detect may load a High gameplay rig behind this separate scene.
+      // The title retains its own comparison-depth map across preset checks.
+      this.renderLayer.renderer.shadowMap.type = PCFShadowMap;
+      return draw();
+    });
   }
 
   dispose(options: { keepScene?: boolean } = {}): void {

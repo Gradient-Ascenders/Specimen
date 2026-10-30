@@ -1,4 +1,5 @@
-import { calibrateGraphics, type GraphicsCalibrationResult } from './GraphicsCalibration.ts';
+import { calibrateGraphics, calibrateGraphicsProfiles, incompleteGraphicsMeasurement, type CalibrationProgress, type GraphicsCalibrationResult } from './GraphicsCalibration.ts';
+import { GraphicsPreparationYield } from './GraphicsPreparationYield.ts';
 import { DEFAULT_USER_KEY_BINDINGS, type UserKeyBindings } from '../core/KeyBindings.ts';
 import * as THREE from 'three';
 import { renderIsolatedPrewarmResources, withIsolatedPrewarmState } from './IsolatedResourcePrewarm.ts';
@@ -10,7 +11,7 @@ import type { PerformanceRenderSnapshot } from '../core/PerformanceSnapshot.ts';
 import { CameraRig } from './CameraRig.ts';
 import { resolveGraphicsQuality } from './GraphicsQuality.ts';
 import { GAMEPLAY_UI_LAYER, withGameplayUiVisibility } from './GameplayUiLayer.ts';
-import { DEFAULT_GRAPHICS_SETTINGS, GRAPHICS_LIGHTING_POLICY, GRAPHICS_PROFILES, graphicsProfileName,
+import { DEFAULT_GRAPHICS_SETTINGS, GRAPHICS_LIGHTING_POLICY, GRAPHICS_PROFILES, graphicsProfileName, graphicsPreparationKey, graphicsTransmissionResourceKey,
   type GraphicsSettings } from './GraphicsProfiles.ts';
 import { GraphicsResourcePolicy } from './GraphicsResourcePolicy.ts';
 import {
@@ -26,7 +27,7 @@ const BACKGROUND_COLOUR = 0x07110f;
 export interface RenderShadowConfiguration {
   readonly enabled: boolean;
   /** Raw depth is required for blocker search. Only opted-in levels use it,
-   * and only while the High shadow budget is selected. */
+   * and only while soft shadow filtering is selected. */
   readonly contactHardening?: boolean;
 }
 
@@ -39,7 +40,7 @@ export interface RenderShadowRequest {
 export class RenderShadowPolicy {
   private readonly shadowMap: THREE.WebGLRenderer['shadowMap'];
   private disposed = false;
-  private highQuality=false;
+  private softFiltering=false;
   private readonly onTypeChange:(()=>void)|undefined;
   private readonly requests: {
     owner: string;
@@ -102,13 +103,13 @@ export class RenderShadowPolicy {
     this.disposed = true;
   }
 
-  setHighQuality(enabled:boolean):void{
-    if(this.disposed||this.highQuality===enabled)return;
-    this.highQuality=enabled;this.apply();
+  setSoftFiltering(enabled:boolean):void{
+    if(this.disposed||this.softFiltering===enabled)return;
+    this.softFiltering=enabled;this.apply();
   }
 
   private get activeType():THREE.ShadowMapType{
-    return this.highQuality&&this.requests[this.requests.length-1]?.contactHardening?THREE.BasicShadowMap:THREE.PCFShadowMap;
+    return this.softFiltering&&this.requests[this.requests.length-1]?.contactHardening?THREE.BasicShadowMap:THREE.PCFShadowMap;
   }
 
   private apply(): void {
@@ -340,32 +341,46 @@ export class RenderLayer {
     this.renderer.setAnimationLoop(callback);
   }
 
-  /** Recheck an already-loaded later level using its real current camera view. */
-  async calibrateCurrentView(isCurrent: () => boolean): Promise<GraphicsCalibrationResult> {
+  /** Later levels use their real presentation path, including lighting/culling. */
+  async calibrateCurrentView(isCurrent: () => boolean, onProgress: CalibrationProgress,
+    onResourcesChanged: () => void, drawCurrentView: () => void): Promise<GraphicsCalibrationResult> {
     const previous = this.graphicsConfiguration, renderer = this.renderer, camera = this.cameraRig.camera;
     const target = new THREE.WebGLRenderTarget(1, 1);
+    const tasks = new GraphicsPreparationYield();
+    const now = () => this.hostWindow.performance.now();
     try {
-      this.setGraphicsSettings(GRAPHICS_PROFILES.standard.settings);
-      const viewport = this.getGameplayPrewarmViewport(new THREE.Vector4()), ratio = renderer.getPixelRatio();
-      target.setSize(Math.max(1, Math.round(viewport.z * ratio)), Math.max(1, Math.round(viewport.w * ratio)));
-      const draw = (): void => withIsolatedPrewarmState(renderer, () => {
-        renderer.setViewport(0, 0, target.width / ratio, target.height / ratio);
-        renderer.setScissorTest(false);
-        renderer.transmissionResolutionScale = 0.5;
-        // Quality changes can release shadow maps. Recreate them with normal
-        // updates before sampling receivers or timing the live workload.
-        this.render();
-      }, target);
-      let warmed = false;
-      const view = { warm: async () => {
-        if (warmed) return;
-        await withIsolatedPrewarmState(renderer, () => renderer.compileAsync(this.scene, camera), target);
-        draw(); warmed = true;
-      }, draw };
-      return await calibrateGraphics({ context: renderer.getContext() as WebGL2RenderingContext,
-        views: [view, view], now: () => this.hostWindow.performance.now(),
-        yieldTask: () => new Promise(resolve => this.hostWindow.setTimeout(resolve, 0)), isCurrent });
-    } finally { target.dispose(); this.setGraphicsSettings(previous); }
+      return await calibrateGraphicsProfiles({ isCurrent, now,
+        measure: async (profile, timing) => {
+          onProgress('preparing', profile);
+          await tasks.yield();
+          if (!isCurrent()) return incompleteGraphicsMeasurement('interrupted');
+          if (now() >= timing.measurementDeadline) return incompleteGraphicsMeasurement('timed-out');
+          const next = GRAPHICS_PROFILES[profile].settings;
+          if (graphicsPreparationKey(next) !== graphicsPreparationKey(previous) ||
+              graphicsTransmissionResourceKey(next) !== graphicsTransmissionResourceKey(previous)) onResourcesChanged();
+          this.setGraphicsSettings(next);
+          const viewport = this.getGameplayPrewarmViewport(new THREE.Vector4()), ratio = renderer.getPixelRatio();
+          const transmissionScale = renderer.transmissionResolutionScale;
+          target.setSize(Math.max(1, Math.round(viewport.z * ratio)), Math.max(1, Math.round(viewport.w * ratio)));
+          const draw = (): void => withIsolatedPrewarmState(renderer, () => {
+            renderer.setViewport(0, 0, target.width / ratio, target.height / ratio);
+            renderer.setScissorTest(false);
+            renderer.transmissionResolutionScale = transmissionScale;
+            const frame = renderer.info.render.frame;
+            drawCurrentView();
+            // A level can defer its draw while demand preparation is pending.
+            // Timing an empty frame would otherwise look like very fast hardware.
+            if (renderer.info.render.frame === frame) throw new Error('The current view is not ready to measure.');
+          }, target);
+          return calibrateGraphics({ context: renderer.getContext() as WebGL2RenderingContext,
+            views: [{ warm: async preparationDeadline => {
+              await withIsolatedPrewarmState(renderer, () => renderer.compileAsync(this.scene, camera), target);
+              if (!isCurrent() || now() >= preparationDeadline) return false;
+                draw();
+            }, draw }], now, timing, yieldTask: () => tasks.yield(), isCurrent,
+            onMeasuring: () => onProgress('measuring', profile) });
+        } });
+    } finally { tasks.dispose(); target.dispose(); this.setGraphicsSettings(previous); }
   }
 
   setBrightness(value: number): void {
@@ -384,7 +399,7 @@ export class RenderLayer {
     this.gelRendering.setTransmissionResolutionScaleCap(quality.transmissionResolutionScale);
     this.gelRendering.setMode(settings.gelRenderingMode);
     this.graphicsResources.setQuality(settings.shadowMapSizeCap, settings.effectsDensity);
-    this.shadowPolicy.setHighQuality(settings.shadowMapSizeCap===2048);
+    this.shadowPolicy.setSoftFiltering(settings.shadowFiltering==='soft');
     this.resize();
   }
 

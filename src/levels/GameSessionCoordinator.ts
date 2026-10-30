@@ -54,8 +54,12 @@ export class GameSessionCoordinator {
   private renderedInterpolationAlpha = 0;
   private resumeAfterGraphics = false;
   private initialPreparationPending = false;
+  private deferGraphicsPreparation = false;
+  private calibrationPending = false;
+  private restartAfterCalibration = false;
   private graphicsOwnerGeneration = 0;
   private queuedGraphics: {key: string; apply: () => void; resourceKey?: string} | undefined;
+  private latestGraphics: {key: string; apply: () => void; resourceKey?: string} | undefined;
   private readonly graphicsPreparation = new GraphicsPreparation((pending, error) => {
     if (pending && this.runtime.state === 'running') {
       this.resumeAfterGraphics = true; this.runtime.stop();
@@ -86,14 +90,15 @@ export class GameSessionCoordinator {
   stop(): void { this.resumeAfterGraphics = false; if (!this.transitionFailed) this.runtime.stop(); }
   applyGraphicsSettings(key: string, apply: () => void, resourceKey?: string): void {
     if (this.disposed) return;
+    this.latestGraphics = {key, apply, resourceKey};
     if (this.transitionPending || this.initialPreparationPending) { this.queuedGraphics = {key, apply, resourceKey}; return; }
     const runtime = this.runtime;
     // The title now precedes runtime construction. Apply its settings without
     // constructing a level; the opening's mandatory initial pass prepares them.
-    this.graphicsPreparation.update(key, apply, () => runtime.state === 'unloaded'
+    this.graphicsPreparation.update(key, apply, () => runtime.state === 'unloaded' || this.deferGraphicsPreparation
       ? Promise.resolve() : runtime.prepareGraphics?.() ?? Promise.resolve(),
       resourceKey === undefined ? undefined : {key:resourceKey, prepare:() => {
-        if (runtime.state === 'unloaded' || resourceKey === 'no-transmission') return Promise.resolve();
+        if (runtime.state === 'unloaded' || this.deferGraphicsPreparation || resourceKey === 'no-transmission') return Promise.resolve();
         return runtime.prepareRenderResources?.(this.renderedInterpolationAlpha, {
           fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:0,frameDeltaSeconds:0,stepsThisFrame:0,
           interpolationAlpha:this.renderedInterpolationAlpha,droppedSimulationTimeSeconds:0,renderFps:0,
@@ -101,6 +106,7 @@ export class GameSessionCoordinator {
       }});
   }
   async prepareInitialGraphics(selectGraphics?: () => Promise<void>): Promise<void> {
+    this.deferGraphicsPreparation = false;
     const runtime = this.runtime;
     const generation = this.graphicsOwnerGeneration;
     let prepared = false;
@@ -127,12 +133,54 @@ export class GameSessionCoordinator {
       }
     }
   }
+  /** Suspend normal draws and serialize settings while an optional probe owns
+   * renderer state. Rebuild only when it actually invalidated live resources. */
+  async withGraphicsCalibration<T>(run: (controls: {
+    isCurrent(): boolean; invalidateResources(): void; drawCurrentView(): void;
+  }) => Promise<T>, deferPreparation = false): Promise<T> {
+    await this.graphicsPreparation.settled;
+    if (this.disposed || this.transitionPending || this.transitionFailed || this.initialPreparationPending || this.graphicsPreparation.pending)
+      throw new Error('Graphics are already being prepared.');
+    const runtime = this.runtime, generation = this.graphicsOwnerGeneration;
+    const isCurrent = () => !this.disposed && this.runtime === runtime && generation === this.graphicsOwnerGeneration;
+    let invalidated = false;
+    this.initialPreparationPending = true;
+    this.deferGraphicsPreparation = deferPreparation;
+    this.calibrationPending = true;
+    try {
+      return await run({ isCurrent, invalidateResources: () => { invalidated = true; },
+        drawCurrentView: () => runtime.render(this.renderedInterpolationAlpha, {
+          fixedDeltaSeconds: 1 / 60, rawFrameDeltaSeconds: 0, frameDeltaSeconds: 0, stepsThisFrame: 0,
+          interpolationAlpha: this.renderedInterpolationAlpha, droppedSimulationTimeSeconds: 0, renderFps: 0,
+        }),
+      });
+    } finally {
+      if (isCurrent()) {
+        this.calibrationPending = false;
+        this.initialPreparationPending = false;
+        if (invalidated) {
+          this.graphicsPreparation.invalidatePrepared();
+          this.queuedGraphics ??= this.latestGraphics;
+        }
+        this.flushGraphicsSettings();
+        await this.graphicsPreparation.settled;
+        if (isCurrent()) {
+          if (this.graphicsPreparation.pending) throw new Error('Graphics preparation failed.');
+          if (this.restartAfterCalibration) { this.restartAfterCalibration = false; runtime.restartLevel(); }
+          if (this.resumeAfterGraphics && !this.transitionPending) {
+            this.resumeAfterGraphics = false; runtime.start();
+          }
+        }
+      }
+    }
+  }
   private flushGraphicsSettings(): void {
     const request = this.queuedGraphics; this.queuedGraphics = undefined;
     if (request) this.applyGraphicsSettings(request.key, request.apply, request.resourceKey);
   }
   restartLevel(): void {
     if (this.transitionFailed) throw new Error('Cannot restart after a failed level transition.');
+    if (this.calibrationPending) { this.restartAfterCalibration = true; return; }
     if (this.graphicsPreparation.pending) {
       const runtime = this.runtime, generation = this.graphicsOwnerGeneration;
       void this.graphicsPreparation.settled.then(() => {
@@ -144,6 +192,8 @@ export class GameSessionCoordinator {
   }
   unload(): void {
     ++this.graphicsOwnerGeneration; this.initialPreparationPending = false;
+    this.deferGraphicsPreparation = false;
+    this.calibrationPending = this.restartAfterCalibration = false;
     this.queuedGraphics = undefined;
     this.resumeAfterGraphics = false; this.graphicsPreparation.cancel();
     this.cancelPendingTransition();
@@ -207,6 +257,7 @@ export class GameSessionCoordinator {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.calibrationPending = this.restartAfterCalibration = false;
     ++this.graphicsOwnerGeneration;
     this.queuedGraphics = undefined;
     this.resumeAfterGraphics = false; this.graphicsPreparation.cancel();
@@ -225,6 +276,8 @@ export class GameSessionCoordinator {
     }
     ++this.graphicsOwnerGeneration;
     this.initialPreparationPending = false;
+    this.deferGraphicsPreparation = false;
+    this.calibrationPending = this.restartAfterCalibration = false;
     this.queuedGraphics = undefined;
     this.resumeAfterGraphics = false;
     this.graphicsPreparation.cancel();
@@ -297,6 +350,7 @@ export class GameSessionCoordinator {
       return;
     }
 
+    this.deferGraphicsPreparation = false;
     if (this.runtime.state === 'running') this.runtime.stop();
     this.transitionPending = true;
     const transitionGeneration = ++this.transitionGeneration;

@@ -103,8 +103,8 @@ export class BlackoutLightingPass {
     const key=`${settings.shadowMapSizeCap}:${settings.effectsDensity}:${type}`;if(this.quality===key)return;
     this.quality=key;this.density=settings.effectsDensity;this.radiance.setQuality(settings);
     for(const light of this.shadowLights){
-      // Medium keeps bounded PCF; only High opts these two fixtures into PCSS.
-      light.shadow.radius=type===THREE.BasicShadowMap&&settings.shadowMapSizeCap===2048?-light.distance:1.5;
+      // Standard filtering keeps bounded PCF; soft filtering opts these fixtures into PCSS.
+      light.shadow.radius=type===THREE.BasicShadowMap?-light.distance:1.5;
       light.shadow.needsUpdate=true;
     }
     for(const {beam}of this.shafts){beam.setShadowType(type);const count=beam.mesh.geometry.index!.count;
