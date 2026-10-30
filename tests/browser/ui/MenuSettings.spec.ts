@@ -143,3 +143,26 @@ test('High and Ultra expose their budgets and restore custom shadow filtering', 
   await expect(page.locator('[data-setting="shadow-filtering"]')).toHaveValue('standard');
   await expect(page.locator('[data-setting="pixel-budget"]')).toHaveValue('3686400');
 });
+
+test('visible setting help cannot block Reset beneath the popover', async ({menuPage: page}) => {
+  await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+  await page.locator('[data-section="accessibility"]').click();
+  const motion = page.locator('[data-setting="reduce-menu-motion"]');
+  await motion.check();
+  await page.mouse.move(0, 0);
+  await motion.hover();
+  const help = page.locator('#setting-help');
+  await expect(help).toBeVisible();
+  await expect(help).toContainText('Keeps the title scene still');
+  const reset = page.locator('[data-action="reset-settings"]');
+  // Reproduce the CI overlap deterministically, regardless of viewport/font metrics.
+  const bounds = (await reset.boundingBox())!;
+  await help.evaluate((element, bounds) => {
+    Object.assign(element.style, {left: `${bounds.x}px`, top: `${bounds.y}px`,
+      width: `${bounds.width}px`, height: `${bounds.height}px`, transform: 'none'});
+  }, bounds);
+  await reset.click();
+  await expect(motion).not.toBeChecked();
+  await expect(page.locator('[data-settings-feedback]')).toContainText('Default settings restored');
+  await expect(help).toBeHidden();
+});

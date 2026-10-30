@@ -1034,6 +1034,8 @@
 }
 
 .setting-help {
+  /* Help is descriptive: never intercept clicks on controls beneath it. */
+  pointer-events: none;
   position: fixed;
   inset: auto;
   z-index: 100;
