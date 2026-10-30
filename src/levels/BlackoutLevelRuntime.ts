@@ -30,6 +30,7 @@ import { blackoutCompanionWalk, blackoutCompanionWaitingReason, type BlackoutCom
 import { goopSpeedEffectStrength } from '../ui/GoopSpeedOverlay.ts';
 import { MaintenanceDronePresentation } from '../render/environment/blackout/MaintenanceDronePresentation.ts';
 import {BlackoutVentArrival} from '../cinematics/BlackoutVentArrival.ts';
+import { BlackoutRoomOneSpeech } from '../render/environment/blackout/BlackoutRoomOneSpeech.ts';
 import { BlackoutElevatorAscent } from '../cinematics/BlackoutElevatorAscent.ts';
 import { BlackoutResearchFinale } from '../cinematics/BlackoutResearchFinale.ts';
 import { BossDefeatFinale } from '../cinematics/BossDefeatFinale.ts';
@@ -191,6 +192,7 @@ export interface BlackoutLevelRuntimeOptions {
 interface BlackoutRuntimeResources {
   readonly finalBoss?:FinalBossEncounter;
   readonly ventArrival?:BlackoutVentArrival;
+  readonly roomOneSpeech?: BlackoutRoomOneSpeech;
   readonly elevatorAscent?: BlackoutElevatorAscent;
   readonly researchFinale?: BlackoutResearchFinale;
   readonly defeatFinale?: BossDefeatFinale;
@@ -1008,6 +1010,13 @@ export class BlackoutLevelRuntime {
       }
       this.syncVisuals(resources);this.gameplayAudio?.update();this.input.endFixedUpdate();return;
     }
+    resources.roomOneSpeech?.update(deltaSeconds, {
+      activeSlimeId: resources.group.activeSlimeId,
+      enabled: this.currentRoom.roomId === 'room-1' && resources.phase.phase === 'three-slime' &&
+        resources.deathSequence.isPlaying && !resources.elevatorAscent?.active && !resources.researchFinale?.active,
+      rendered: this.host.dataset.cleanGameplay !== 'true',
+      goop: resources.group.goopBody.position, volt: resources.group.voltBody.position,
+    });
     resources.scene.transitRoom?.update(deltaSeconds);
     if (this.debugAvailable && this.authoredRoomOne && this.debugInteractionEnabled && this.input.enabled) {
       if(this.input.wasPressed('debugTeleportRoomFour')) {
@@ -1651,6 +1660,10 @@ export class BlackoutLevelRuntime {
       );
       interpolateBodyPosition(resources.group.goopBody, interpolationAlpha, resources.renderedGoopPosition);
       interpolateBodyPosition(resources.group.voltBody, interpolationAlpha, resources.renderedVoltPosition);
+      resources.roomOneSpeech?.present({
+        activeSlimeId: resources.group.activeSlimeId,
+        goop: resources.renderedGoopPosition, volt: resources.renderedVoltPosition,
+      });
       }
       if(!resources.researchFinale?.active && !resources.defeatFinale?.active) {
         interpolateBodyPosition(resources.specimenBody, interpolationAlpha, resources.renderedSpecimenPosition);
@@ -2370,6 +2383,11 @@ export class BlackoutLevelRuntime {
         bodies:{bob:group.bobBody,goop:group.goopBody,volt:group.voltBody},
         presentations:{bob:bobPresentation,goop:goopPresentation,volt:voltPresentation}}):undefined;
       if(ventArrival)rollback(()=>ventArrival.dispose());
+      const roomOneSpeech = scene.maintenanceBay ? new BlackoutRoomOneSpeech() : undefined;
+      if (roomOneSpeech) {
+        scene.root.add(roomOneSpeech.root);
+        rollback(() => roomOneSpeech.dispose());
+      }
       const elevatorAscent = scene.bossStaging?.ascentLift ? new BlackoutElevatorAscent({ root: scene.root, host: this.host,
         lift: scene.bossStaging.ascentLift, bodies: { bob: group.bobBody, goop: group.goopBody, volt: group.voltBody },
         presentations: { bob: bobPresentation, goop: goopPresentation, volt: voltPresentation } }) : undefined;
@@ -2394,6 +2412,7 @@ export class BlackoutLevelRuntime {
         lighting,
         finalBoss,
         ventArrival,
+        roomOneSpeech,
         elevatorAscent,
         researchFinale,
         defeatFinale,
@@ -2535,6 +2554,7 @@ export class BlackoutLevelRuntime {
     this.resetCompanions();
     this.gameplayAudio?.setEnabled(false);
     const resources = this.requireResources();
+    resources.roomOneSpeech?.hide();
     resources.electricalSystem.cancelAim();
     resources.acidProjectileSystem.cancelAim();
     resources.goopAcidPresentation.suspend();
@@ -2552,6 +2572,7 @@ export class BlackoutLevelRuntime {
     this.releaseBossTransmissionCap?.(); this.releaseBossTransmissionCap = undefined;
     this.gameplayAudio?.reset();
     const resources = this.requireResources();
+    resources.roomOneSpeech?.reset();
     resources.defeatFinale?.reset();
     resources.finalBoss?.restoreCamera(this.renderLayer.cameraRig.camera);resources.finalBoss?.reset();
     resources.ventArrival?.cancel();this.clearArrivalUi();
@@ -2636,6 +2657,7 @@ export class BlackoutLevelRuntime {
     resources.defeatFinale?.dispose();
     resources.finalBoss?.restoreCamera(this.renderLayer.cameraRig.camera);resources.finalBoss?.dispose();
     resources.ventArrival?.dispose();this.clearArrivalUi();
+    resources.roomOneSpeech?.dispose();
     resources.elevatorAscent?.dispose();
     resources.researchFinale?.dispose();
     resources.lighting?.dispose();
@@ -2786,6 +2808,7 @@ export class BlackoutLevelRuntime {
     resumeInput: boolean,
   ): void {
     this.resetCompanions();
+    resources.roomOneSpeech?.reset(true);
     resources.defeatFinale?.reset();
     resources.finalBoss?.restoreCamera(this.renderLayer.cameraRig.camera);resources.finalBoss?.reset();
     resources.ventArrival?.cancel();this.clearArrivalUi();

@@ -488,10 +488,13 @@ export function createContainmentSpeechTexture(): THREE.DataTexture {
 }
 
 export function paintContainmentSpeechTexture(texture: THREE.DataTexture, text: string,
-  typing: boolean, sectionIndex: number, sectionCount = 4): void {
+  typing: boolean, sectionIndex: number, sectionCount = 4, speaker: 'goop' | 'volt' = 'goop'): void {
   const pixels = texture.image.data as Uint8Array;
-  const accent: Rgba = [179, 230, 116, 255], border: Rgba = [74, 125, 86, 255];
-  const background: Rgba = [8, 23, 24, 248], primary: Rgba = [231, 245, 225, 255];
+  const volt = speaker === 'volt';
+  const accent: Rgba = volt ? [255, 225, 107, 255] : [179, 230, 116, 255];
+  const border: Rgba = volt ? [155, 119, 45, 255] : [74, 125, 86, 255];
+  const background: Rgba = volt ? [24, 21, 12, 248] : [8, 23, 24, 248];
+  const primary: Rgba = volt ? [255, 249, 221, 255] : [231, 245, 225, 255];
   pixels.fill(0);
   // Tail and chamfered outline are pixels in the same texture, not extra draws.
   for (let y = 205; y < 247; y++) {
@@ -509,8 +512,16 @@ export function paintContainmentSpeechTexture(texture: THREE.DataTexture, text: 
   }
   fillRect(pixels, 242, 204, 28, 9, background);
   fillRect(pixels, 28, 29, 4, 28, accent);
-  drawVectorTextFit(pixels, 'GOOP', 44, 29, 220, 23, accent, 2.2);
-  drawVectorTextFit(pixels, 'SP-02', 376, 34, 100, 13, [117, 155, 136, 255], 1.5);
+  drawVectorTextFit(pixels, volt ? 'VOLT' : 'GOOP', 44, 29, 220, 23, accent, 2.2);
+  drawVectorTextFit(pixels, volt ? 'SP-03' : 'SP-02', 376, 34, 100, 13,
+    volt ? border : [117, 155, 136, 255], 1.5);
+  if (volt) {
+    for (let y = 0; y < 24; y++) {
+      const x = y < 12 ? 299 - y : 310 - y;
+      fillRect(pixels, x, 28 + y, 9, 1, accent);
+    }
+    fillRect(pixels, 288, 39, 22, 3, accent);
+  }
   fillRect(pixels, 28, 69, 456, 1, border);
   const lines = text.split('\n');
   lines.forEach((line, index) => drawVectorTextFit(pixels, line, 30, 89 + index * 43, 448, 31, primary, 2.5));
