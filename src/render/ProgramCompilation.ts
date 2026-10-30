@@ -57,6 +57,20 @@ export class ProgramCompilation {
       });
       const materials = new Set<THREE.Material>();
       try {
+        // Resolve the tiny state-setting shaders before scene compilation can
+        // queue expensive work ahead of their synchronous first use. Retain
+        // every per-group seed below to establish the correct clipping state.
+        if (groups.size > 1) {
+          const beforeSeeds = new Set(this.info.programs);
+          for (const {planes,intersection} of groups.values()) {
+            owner.material.clippingPlanes = planes; owner.material.clipIntersection = intersection;
+            withIsolatedPrewarmState(this, () => this.render(owner.scene,camera), owner.target);
+          }
+          // Observe real completion now, rather than first querying already
+          // drawn seeds behind the later scene-program queue. Never force ready.
+          for (const program of this.info.programs ?? []) if (!beforeSeeds.has(program))
+            (program as unknown as PendingProgram).isReady();
+        }
         for (const {group,planes,intersection} of groups.values()) {
           owner.material.clippingPlanes = planes; owner.material.clipIntersection = intersection;
           withIsolatedPrewarmState(this, () => this.render(owner.scene,camera), owner.target);
