@@ -180,7 +180,7 @@ const appendCreditsLedger = (
     if (line.startsWith('## ')) {
       const heading = ledger.ownerDocument.createElement('h2');
       const label = line.slice(3);
-      const symbols = { 'Game developers': 'Code', Music: 'Music2', 'Sound effects': 'Volume2', Tools: 'Cpu', Fonts: 'Type', Code: 'Code' } as const;
+      const symbols = { 'Game developers': 'Code', Models: 'Cuboid', Music: 'Music2', 'Sound effects': 'Volume2', Tools: 'Cpu', Fonts: 'Type', Code: 'Code' } as const;
       const symbol = symbols[label as keyof typeof symbols];
       if (symbol) heading.innerHTML = icon(symbol);
       heading.append(ledger.ownerDocument.createTextNode(label));
