@@ -14,9 +14,11 @@ export class GoopSpeechFraming {
   private revealScale = 1;
   private readonly root: THREE.Object3D;
   private readonly mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  private readonly insetX: number | undefined;
 
-  constructor(root: THREE.Object3D, mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>) {
+  constructor(root: THREE.Object3D, mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>, insetX?: number) {
     this.root = root; this.mesh = mesh;
+    this.insetX = insetX;
     // Framing runs after the render list is built, including when the original
     // above-head anchor is outside the viewport in first-person/near-wall views.
     mesh.frustumCulled = false;
@@ -47,7 +49,7 @@ export class GoopSpeechFraming {
       const scale = Math.min(halfWidth * 1.44 / GOOP_SPEECH_SIZE.width,
         halfHeight * .4 / GOOP_SPEECH_SIZE.height) * this.revealScale;
       const portrait = perspective.aspect < 1;
-      const x = portrait ? 0 : perspective.aspect < 1.5 ? -.45 : -.06;
+      const x = portrait ? 0 : this.insetX ?? (perspective.aspect < 1.5 ? -.45 : -.06);
       this.position.set(halfWidth * x, halfHeight * (portrait ? -.42 : .64), -depth).applyMatrix4(camera.matrixWorld);
       this.root.worldToLocal(this.position);
       this.mesh.position.copy(this.position);

@@ -13,7 +13,7 @@ import { VoltCharacterPresentation } from '../../../src/render/volt/VoltCharacte
 import { gameplayAudioEvents } from '../../../src/audio/GameplayAudioEvents.ts';
 import { cinematicMusicEvents, type CinematicMusic } from '../../../src/audio/CinematicMusic.ts';
 
-function setup() {
+function setup(continueToCinematic = false) {
   const lift = new BlackoutAscentLift(), root = new THREE.Group(), world = new CollisionWorld(), surfaces = new SurfaceRegistry();
   root.add(lift.root); const ambient = new THREE.HemisphereLight(0x34404a, 0x080a0b, .025); root.add(ambient);
   world.registerAll(lift.collisionMeshes, undefined, ColliderTransformMode.Static); surfaces.registerAll(lift.collisionMeshes);
@@ -24,7 +24,7 @@ function setup() {
   const presentations = { bob: new BobCharacterPresentation(.45), goop: new GoopCharacterPresentation(.45), volt: new VoltCharacterPresentation(.45) };
   Object.values(presentations).forEach(p => root.add(p.root));
   const host = { dataset: {} } as HTMLElement, camera = new THREE.PerspectiveCamera(48, 16 / 9, .1, 200);
-  const movie = new BlackoutElevatorAscent({ root, host, lift, bodies, presentations });
+  const movie = new BlackoutElevatorAscent({ root, host, lift, bodies, presentations, continueToCinematic });
   return { root, world, surfaces, lift, bodies, presentations, host, camera, movie, ambient,
     dispose() { movie.dispose(); Object.values(presentations).forEach(p => p.dispose()); lift.dispose(); world.clear(); surfaces.clear(); } };
 }
@@ -173,6 +173,23 @@ test('the ascent borrows real slimes once, keeps rendering non-authoritative, sp
     assert.ok(cues.some(c => c.sound === 'bob-contact-01' && c.volumeScale === .3 && c.position!.z < 180), 'boarding has resolved movement contacts');
     assert.equal(s.movie.begin(s.camera), false);
   } finally { off(); s.dispose(); }
+});
+
+test('a chained ascent holds its final cinematic camera instead of blending back into gameplay', () => {
+  const s = setup(true);
+  try {
+    s.movie.begin(s.camera);
+    while (s.movie.seconds < s.movie.boardingSeconds + T.duration - .1) s.movie.update(1 / 60);
+    s.camera.position.set(80, 80, 80);
+    s.camera.fov = 48;
+    s.movie.present(s.camera, 1);
+    assert.equal(s.movie.active, true);
+    assert.equal(s.host.dataset.cinematic, 'blackout-elevator');
+    assert.equal(s.camera.fov, 57);
+    assert.ok(s.camera.position.z > 177 && s.camera.position.z < 185);
+    assert.ok(s.camera.position.y < 3);
+    assert.ok(s.ambient.intensity >= .16);
+  } finally { s.dispose(); }
 });
 
 test('skip and reset release movie ownership without waiting for the motor, and recovery does not replay a completed ascent', () => {
