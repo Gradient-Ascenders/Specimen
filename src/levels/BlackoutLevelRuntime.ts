@@ -1083,6 +1083,10 @@ export class BlackoutLevelRuntime {
       this.gameplayAudio?.update(); this.input.endFixedUpdate(); return;
     }
 
+    if (resources.researchFinale && !resources.researchFinale.active && !resources.researchFinale.complete &&
+      resources.phase.phase === 'three-slime' && this.currentRoom.local.elevatorComplete === true) {
+      this.beginResearchFinale(resources);
+    }
     if (resources.researchFinale?.active) {
       const before = resources.researchFinale.seconds;
       if (resources.researchFinale.update(deltaSeconds, this.input.wasPressed('skipCinematic'))) this.finishResearchFinale(resources);
@@ -1093,7 +1097,8 @@ export class BlackoutLevelRuntime {
     if (resources.elevatorAscent?.active) {
       resources.scene.maintenanceBay?.advanceAcid(deltaSeconds);
       if (resources.elevatorAscent.update(deltaSeconds, this.input.wasPressed('skipCinematic'))) {
-        this.activateCheckpoint('cp6'); this.input.resetState(); this.retargetCamera(resources);
+        this.activateCheckpoint('cp6'); this.input.resetState();
+        if (!this.beginResearchFinale(resources)) this.retargetCamera(resources);
       }
       this.syncVisuals(resources); this.gameplayAudio?.update(); this.input.endFixedUpdate(); return;
     }
@@ -1613,12 +1618,10 @@ export class BlackoutLevelRuntime {
       }
     }
 
-    if(resources.finalBoss&&resources.phase.phase==='three-slime'&&
+    if(!resources.researchFinale&&resources.finalBoss&&resources.phase.phase==='three-slime'&&
       this.currentRoom.local.elevatorComplete===true&&resources.group.bodies.every(body=>body.position.z>185.5)) {
       resources.transit?.setActive(false);
-      if(resources.researchFinale) {
-        if(!resources.researchFinale.complete&&resources.group.activeBody.position.z>187.8)this.beginResearchFinale(resources);
-      } else if(resources.group.activeBody.position.z>189)this.beginMerge();
+      if(resources.group.activeBody.position.z>189)this.beginMerge();
     }
 
     if (!resources.deathSequence.isPlaying) {
@@ -2410,6 +2413,7 @@ export class BlackoutLevelRuntime {
         rollback(() => roomOneSpeech.dispose());
       }
       const elevatorAscent = scene.bossStaging?.ascentLift ? new BlackoutElevatorAscent({ root: scene.root, host: this.host,
+        continueToCinematic: !!(finalPresentation && scene.finalArena),
         lift: scene.bossStaging.ascentLift, bodies: { bob: group.bobBody, goop: group.goopBody, volt: group.voltBody },
         presentations: { bob: bobPresentation, goop: goopPresentation, volt: voltPresentation } }) : undefined;
       if (elevatorAscent) rollback(() => elevatorAscent.dispose());

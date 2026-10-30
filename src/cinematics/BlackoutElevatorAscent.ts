@@ -14,6 +14,7 @@ import { ELEVATOR_DIALOGUE, ELEVATOR_TIMING as T, elevatorBoardingRoute, sampleE
 type Presentation = BobCharacterPresentation | GoopCharacterPresentation | VoltCharacterPresentation;
 interface Options {
   readonly root: THREE.Group; readonly host: HTMLElement; readonly lift: BlackoutAscentLift;
+  readonly continueToCinematic?: boolean;
   readonly bodies: Readonly<Record<ElevatorSlime, KinematicBody>>;
   readonly presentations: Readonly<Record<ElevatorSlime, Presentation>>;
 }
@@ -185,7 +186,7 @@ export class BlackoutElevatorAscent {
       const u = smooth((t - T.exit) / 5); this.eye.set(-3.05 + .4 * u, 2.7, 177.6 + 2 * u); this.target.set(0, 1.3, 181.6 + 4.8 * u); fov = 57;
     }
     this.look.lookAt(this.eye, this.target, UP); this.orientation.setFromRotationMatrix(this.look);
-    const blend = smooth((t - T.handback) / (T.duration - T.handback));
+    const blend = this.options.continueToCinematic ? 0 : smooth((t - T.handback) / (T.duration - T.handback));
     if (this.ambient) this.ambient.intensity = THREE.MathUtils.lerp(Math.max(.16, this.savedAmbient), this.savedAmbient, blend);
     camera.position.lerpVectors(this.eye, camera.position, blend); camera.quaternion.slerp(this.orientation, 1 - blend);
     camera.fov = THREE.MathUtils.lerp(fov, this.savedFov, blend); camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);

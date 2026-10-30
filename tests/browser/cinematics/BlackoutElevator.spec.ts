@@ -5,7 +5,12 @@ import { writeFile } from 'node:fs/promises';
 async function advanceTo(page: Page, movieTime: number) {
   await page.evaluate(t => {
     const r = (window as any).__elevatorSession.runtime, movie = r.resources.elevatorAscent;
-    for (let i = 0; i < 12000 && movie.active && movie.seconds < movie.boardingSeconds + t; i++) r.fixedUpdate(1 / 60);
+    for (let i = 0; i < 12000 && movie.active && movie.seconds < movie.boardingSeconds + t; i++) {
+      r.fixedUpdate(1 / 60);
+      if (!movie.active && (!r.resources.researchFinale.active || r.host.dataset.cinematic !== 'blackout-research')) {
+        throw new Error('Lift completion must start research within the same fixed update, without a gameplay frame');
+      }
+    }
     r.render(1, { frameDeltaSeconds: 1 / 60 });
   }, movieTime);
 }
@@ -13,6 +18,7 @@ async function capture(page: Page, path: string) {
   const result = await page.evaluate(() => {
     const r = (window as any).__elevatorSession.runtime, l = r.renderLayer, lift = r.resources.scene.bossStaging.ascentLift;
     r.render(1, { frameDeltaSeconds: 1 / 60 });
+    l.render();
     const png = l.canvas.toDataURL('image/png');
     return { png, metrics: { seconds: r.resources.elevatorAscent.seconds, boarding: r.resources.elevatorAscent.boardingSeconds,
       active: r.resources.elevatorAscent.active, complete: r.resources.elevatorAscent.complete, room: r.roomState,
@@ -29,7 +35,7 @@ async function capture(page: Page, path: string) {
   return result.metrics;
 }
 
-test('the production elevator boards persistent slimes, powers the outlet, passes real lights, pauses and lands in the lab', async ({ page }, info) => {
+test('the production elevator boards slimes, powers the outlet, pauses and continues directly into research', async ({ page }, info) => {
   test.setTimeout(420_000);
   const failures: string[] = [];
   page.on('pageerror', e => failures.push(e.message));
@@ -73,18 +79,46 @@ test('the production elevator boards persistent slimes, powers the outlet, passe
   await advanceTo(page, 27);
   expect(await page.evaluate(() => (window as any).__elevatorSession.runtime.resources.elevatorAscent.seconds)).toBe(frozen);
   await page.locator('[data-action="resume"]').click();
-  for (const [t, name] of [[29.5, '07-volt-quiet-reply'], [34, '08-shaft-shadow'], [36.5, '09-passing-light'], [43, '10-arrival-braking'], [47.5, '11-lab-reveal'], [51, '12-walk-off'], [55, '13-lab-handoff']] as const) {
+  for (const [t, name] of [[29.5, '07-volt-quiet-reply'], [34, '08-shaft-shadow'], [36.5, '09-passing-light'], [43, '10-arrival-braking'], [47.5, '11-lab-reveal'], [51, '12-walk-off'], [54.8, '13-continuous-cinematic-camera'], [55, '14-direct-research-handoff']] as const) {
     await advanceTo(page, t); evidence.push(await capture(page, info.outputPath(`${name}.png`)));
   }
+  expect(await page.locator('#app').getAttribute('data-cinematic')).toBe('blackout-research');
+  await expect(page.locator('.blackout-elevator')).toBeHidden();
+  await expect(page.locator('.blackout-research')).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__elevatorSession.runtime.resources.researchFinale.seconds)).toBe(0);
   const result = await page.evaluate(() => {
     const r = (window as any).__elevatorSession.runtime;
     r.recoverActiveCheckpoint(); for (let i = 0; i < 3; i++) r.fixedUpdate(1 / 60);
     return { checkpoint: r.activeCheckpoint.checkpointId, room: r.roomState, phase: r.phase, active: r.resources.elevatorAscent.active,
-      identity: r.getSlimeHUDSnapshot().activeSlimeId, gate: r.resources.scene.bossStaging.ascentLift.frontGate.position.y };
+      identity: r.getSlimeHUDSnapshot().activeSlimeId, gate: r.resources.scene.bossStaging.ascentLift.frontGate.position.y,
+      research: r.resources.researchFinale.active, cinematic: r.host.dataset.cinematic };
   });
-  expect(result).toMatchObject({ checkpoint: 'cp6', phase: 'three-slime', active: false, identity: 'volt', gate: 8.4 });
+  expect(result).toMatchObject({ checkpoint: 'cp6', phase: 'three-slime', active: false, identity: 'volt', gate: 8.4,
+    research: true, cinematic: 'blackout-research' });
   expect(result.room.local.elevatorComplete).toBe(true);
   expect((evidence as { glError: number }[]).every(e => e.glError === 0)).toBe(true);
+  await page.evaluate(() => {
+    const r = (window as any).__elevatorSession.runtime;
+    r.restartResources(); r.activateCheckpoint('cp3');
+    const group = r.resources.group, v = group.voltBody.position.clone();
+    group.bobBody.teleport(v.set(-1.65, .86, 181.65));
+    group.goopBody.teleport(v.set(0, .86, 180.25));
+    group.voltBody.teleport(v.set(1.65, .86, 181.2));
+    r.fixedUpdate(1 / 60);
+  });
+  await expect(page.locator('.blackout-elevator')).toBeVisible();
+  await page.keyboard.down('Enter');
+  const skipped = await page.evaluate(() => {
+    const r = (window as any).__elevatorSession.runtime;
+    r.fixedUpdate(1 / 60);
+    const start = r.resources.researchFinale.seconds;
+    r.fixedUpdate(1 / 60);
+    return { start, seconds: r.resources.researchFinale.seconds, active: r.resources.researchFinale.active,
+      cinematic: r.host.dataset.cinematic, checkpoint: r.activeCheckpoint.checkpointId };
+  });
+  await page.keyboard.up('Enter');
+  expect(skipped).toMatchObject({ start: 0, active: true, cinematic: 'blackout-research', checkpoint: 'cp6' });
+  expect(skipped.seconds).toBeCloseTo(1 / 60);
   await writeFile(info.outputPath('elevator-evidence.json'), JSON.stringify({ evidence, result, failures }, null, 2));
   expect(failures).toEqual([]);
 });
