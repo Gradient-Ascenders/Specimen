@@ -54,6 +54,7 @@ export function createSettingsPanelMarkup(): string {
               <option value="minimum">Low</option>
               <option value="standard">Medium</option>
               <option value="high">High</option>
+              <option value="ultra">Ultra</option>
               <option value="custom">Custom</option>`)}
             <button type="button" class="system-action graphics-auto-detect" data-action="calibrate-graphics">${icon('RotateCcw')}<span>Auto-detect</span></button>
           </div>
@@ -76,10 +77,13 @@ export function createSettingsPanelMarkup(): string {
               <h2 id="graphics-effects-heading">${icon('Cpu')}<span>Lighting &amp; effects</span></h2>
               ${select('gel-rendering', 'gel-rendering', 'Character gel', `
                 <option value="minimum">Glossy</option>
-                <option value="reduced-transmission">Balanced refraction</option>
+                <option value="reduced-transmission">Efficient refraction</option>
+                <option value="balanced-transmission">Balanced refraction</option>
                 <option value="physical">Full refraction</option>`)}
               ${select('shadow-quality', 'shadow-quality', 'Shadow detail', `
                 <option value="512">Low</option><option value="1024">Medium</option><option value="2048">High</option>`)}
+              ${select('shadow-filtering', 'shadow-filtering', 'Shadow softness', `
+                <option value="standard">Standard</option><option value="soft">Soft</option>`)}
               ${select('effects-density', 'effects-density', 'Particle density', `
                 <option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option>`)}
             </section>

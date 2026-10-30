@@ -1,5 +1,6 @@
-import { calibrateGraphics, chooseAutomaticGraphicsProfile, GRAPHICS_CALIBRATION_BUDGET_MS, type CalibrationView, type GraphicsCalibrationResult } from '../render/GraphicsCalibration.ts';
-import { GRAPHICS_PROFILES } from '../render/GraphicsProfiles.ts';
+import { calibrateGraphics, calibrateGraphicsProfiles, combineGraphicsMeasurements, incompleteGraphicsMeasurement, GRAPHICS_CALIBRATION_BUDGET_MS, type CalibrationProgress, type GraphicsCalibrationMeasurement, type GraphicsCalibrationResult } from '../render/GraphicsCalibration.ts';
+import { GraphicsPreparationYield } from '../render/GraphicsPreparationYield.ts';
+import { GRAPHICS_PROFILES, graphicsPreparationKey, graphicsTransmissionResourceKey } from '../render/GraphicsProfiles.ts';
 import { loadRoomOneCompressedShell } from '../render/environment/containment/RoomOneShell.ts';
 import { GameplayAudio } from '../audio/GameplayAudio.ts';
 import { containmentDroneFlightSound, stopContainmentFinaleAudio } from '../audio/ContainmentFinaleAudio.ts';
@@ -492,69 +493,91 @@ export class GreyboxLevelRuntime {
     room.setOpeningAftermath();
   }
 
-  /** Two real Containment views, sharing the context/materials with normal warm-up. */
-  async calibrateInitialGraphics(isCurrent: () => boolean): Promise<GraphicsCalibrationResult> {
+  /** Fixed real views share gameplay's light/occlusion policies and preset costs. */
+  async calibrateInitialGraphics(isCurrent: () => boolean, onProgress: CalibrationProgress,
+    onResourcesChanged: () => void): Promise<GraphicsCalibrationResult> {
     const resources = this.requireResources(), layer = this.renderLayer, renderer = layer.renderer;
     const previous = layer.graphicsConfiguration;
     const camera = layer.cameraRig.camera, savedCamera = camera.clone();
     const target = new THREE.WebGLRenderTarget(1, 1);
+    const tasks = new GraphicsPreparationYield();
     const now = () => this.hostWindow.performance.now();
+    let charactersPrepared = false;
     try {
-      layer.setGraphicsSettings(GRAPHICS_PROFILES.standard.settings);
-      await this.prepareCharacterModels(resources);
-      if (!isCurrent()) return { profile: 'minimum', sampleCount: 0, frameMs: 0, timedOut: true };
-      const viewport = layer.getGameplayPrewarmViewport(new THREE.Vector4());
-      const ratio = renderer.getPixelRatio();
-      target.setSize(Math.max(1, Math.round(viewport.z * ratio)), Math.max(1, Math.round(viewport.w * ratio)));
-      const draw = (): void => withIsolatedPrewarmState(renderer, () => {
-        renderer.setViewport(0, 0, target.width / ratio, target.height / ratio);
-        renderer.setScissorTest(false);
-        renderer.transmissionResolutionScale = 0.5;
-        // Calibration draws the live lighting workload. Let Three initialize
-        // shadow maps before receivers sample them, including dormant slots.
-        this.prepareContainmentShadows(resources.testScene, [resources.body.position, resources.goopBody.position]);
-        layer.render();
-      }, target);
-      let result: GraphicsCalibrationResult = { profile: 'minimum', sampleCount: 0, frameMs: 0, timedOut: true };
-      // The lighting owner restores all visibility/reflection state even on failure.
-      await resources.testScene.lighting.prewarmShaderConfigurations(async (roomId, coverage) => {
-        if ((roomId !== 1 && roomId !== 3) || coverage.length !== 1 || !isCurrent() || (roomId === 3 && result.timedOut)) return;
-        this.lightLayout?.sync();
-        const at = LIGHTING_PREWARM_CAMERA_TARGETS[roomId];
-        if (roomId === 1) {
-          // Vent-like gel screen coverage without moving authoritative bodies.
-          const bob = resources.testScene.bob.root.getWorldPosition(new THREE.Vector3());
-          camera.position.set(bob.x, bob.y + 1.1, bob.z - 2);
-          camera.lookAt(bob.x, bob.y + 0.4, bob.z);
-        } else {
-          camera.position.set(at[0], at[1] + 1.2, at[2] - 5);
-          camera.lookAt(at[0], at[1] + 0.5, at[2] + 2);
-        }
-        camera.updateMatrixWorld();
-        // Each view is sampled while its authored lighting configuration is active.
-        const view: CalibrationView = {
-          warm: async () => {
-            const subset = createRoomCompileSubset(resources, roomId);
-            try {
-              await withIsolatedPrewarmState(renderer, () => renderer.compileAsync(subset, camera, layer.scene), target);
-            } finally { disposeCompileInstances(subset); subset.clear(); }
-            draw();
-          }, draw,
-        };
-        const measured = await calibrateGraphics({ context: renderer.getContext() as WebGL2RenderingContext,
-          views: [view], now, budgetMs: GRAPHICS_CALIBRATION_BUDGET_MS / 2, yieldTask: () => new Promise(resolve => this.hostWindow.setTimeout(resolve, 0)), isCurrent });
-        // Combine the slower view with the close-up before assigning a tier.
-        if (roomId === 1) result = measured;
-        else result = { ...measured, sampleCount: result.sampleCount + measured.sampleCount,
-          frameMs: Math.max(result.frameMs, measured.frameMs), timedOut: result.timedOut || measured.timedOut };
-      });
-      return { ...result, profile: result.timedOut ? 'minimum' :
-        chooseAutomaticGraphicsProfile(Array.from({ length: result.sampleCount }, () => result.frameMs)) };
+      return await calibrateGraphicsProfiles({ isCurrent, now,
+        measure: async (profile, timing) => {
+          onProgress('preparing', profile);
+          await tasks.yield();
+          if (!isCurrent()) return incompleteGraphicsMeasurement('interrupted');
+          if (now() >= timing.measurementDeadline) return incompleteGraphicsMeasurement('timed-out');
+          const next = GRAPHICS_PROFILES[profile].settings;
+          if (graphicsPreparationKey(next) !== graphicsPreparationKey(previous) ||
+              graphicsTransmissionResourceKey(next) !== graphicsTransmissionResourceKey(previous)) onResourcesChanged();
+          layer.setGraphicsSettings(next);
+          if (!charactersPrepared) {
+            const prepared = await timing.prepare(async () => {
+              await this.prepareCharacterModels(resources);
+              return isCurrent() ? 'complete' : 'interrupted';
+            });
+            if (prepared !== 'complete') return incompleteGraphicsMeasurement(prepared);
+            charactersPrepared = true;
+          }
+          if (!isCurrent()) return incompleteGraphicsMeasurement('interrupted');
+          if (now() >= timing.measurementDeadline) return incompleteGraphicsMeasurement('timed-out');
+          const viewport = layer.getGameplayPrewarmViewport(new THREE.Vector4()), ratio = renderer.getPixelRatio();
+          const transmissionScale = renderer.transmissionResolutionScale;
+          target.setSize(Math.max(1, Math.round(viewport.z * ratio)), Math.max(1, Math.round(viewport.w * ratio)));
+          const measurements: GraphicsCalibrationMeasurement[] = [];
+          await resources.testScene.lighting.prewarmShaderConfigurations(async (roomId, coverage) => {
+            if ((roomId !== 1 && roomId !== 3) || coverage.length !== 1 || !isCurrent() ||
+                measurements.some(sample => sample.status !== 'complete')) return;
+            this.lightLayout?.sync();
+            const at = LIGHTING_PREWARM_CAMERA_TARGETS[roomId];
+            const position = roomId === 1 ? resources.testScene.bob.root.getWorldPosition(new THREE.Vector3())
+              : new THREE.Vector3(at[0], at[1], at[2]);
+            camera.position.set(position.x, position.y + 1.2, position.z - (roomId === 1 ? 2 : 5));
+            camera.lookAt(position.x, position.y + 0.5, position.z + (roomId === 1 ? 0 : 2));
+            camera.updateMatrixWorld();
+            const withView = <T>(action: () => T): T => {
+              const scoped = () => resources.testScene.withEnclosedRoomOcclusion(position, camera.position, action);
+              return roomId === 1 && this.lightLayout ? this.lightLayout.withRoomOneView(position, camera, scoped) : scoped();
+            };
+            const draw = (): void => withIsolatedPrewarmState(renderer, () => {
+              renderer.setViewport(0, 0, target.width / ratio, target.height / ratio);
+              renderer.setScissorTest(false);
+              renderer.transmissionResolutionScale = transmissionScale;
+              withView(() => {
+                this.prepareContainmentShadows(resources.testScene, [position]);
+                layer.render();
+              });
+            }, target);
+            onProgress('preparing', profile);
+            measurements.push(await calibrateGraphics({ context: renderer.getContext() as WebGL2RenderingContext,
+              views: [{ warm: async preparationDeadline => {
+                const subset = createRoomCompileSubset(resources, roomId);
+                try {
+                  await withView(() => withIsolatedPrewarmState(renderer,
+                    () => renderer.compileAsync(subset, camera, layer.scene), target));
+                } finally { disposeCompileInstances(subset); subset.clear(); }
+                if (!isCurrent() || now() >= preparationDeadline) return false;
+                draw();
+              }, draw }], now, timing, budgetMs: GRAPHICS_CALIBRATION_BUDGET_MS / 2,
+              yieldTask: () => tasks.yield(), isCurrent, onMeasuring: () => onProgress('measuring', profile) }));
+          });
+          if (!isCurrent()) return incompleteGraphicsMeasurement('interrupted');
+          if (measurements.length !== 2 && measurements.every(sample => sample.status === 'complete'))
+            return incompleteGraphicsMeasurement('unavailable');
+          return combineGraphicsMeasurements(measurements);
+        } });
     } finally {
-      target.dispose();
-      // Reuse the live camera's capture; proxy cameras retain orphan GPU targets.
-      camera.copy(savedCamera);
+      tasks.dispose(); target.dispose();
+      // Only the pose belongs to the probe. A resize or FOV edit while awaiting
+      // compilation must retain the user's new projection.
+      camera.position.copy(savedCamera.position);
+      camera.quaternion.copy(savedCamera.quaternion);
+      camera.updateMatrixWorld();
       layer.setGraphicsSettings(previous);
+      resources.testScene.configureLightingQuality(previous, renderer.shadowMap.type);
     }
   }
 

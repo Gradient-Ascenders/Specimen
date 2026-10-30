@@ -29,4 +29,4 @@ const tick = (now: number) => {
   frame = requestAnimationFrame(tick);
 };
 frame = requestAnimationFrame(tick);
-(window as any).__menuFixture = { dispose() { cancelAnimationFrame(frame); ui.dispose(); } };
+(window as any).__menuFixture = { ui, settings, dispose() { cancelAnimationFrame(frame); ui.dispose(); } };

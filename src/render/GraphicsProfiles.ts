@@ -3,13 +3,14 @@ import { isRenderPixelRatioCap, isRenderScale, type RenderPixelRatioCap, type Re
 import type { GraphicsPreset } from './GraphicsQuality.ts';
 import { resolveGraphicsQuality } from './GraphicsQuality.ts';
 
-export const GRAPHICS_PROFILE_IDS = ['minimum', 'standard', 'high'] as const;
+export const GRAPHICS_PROFILE_IDS = ['minimum', 'standard', 'high', 'ultra'] as const;
 export type GraphicsProfileId = (typeof GRAPHICS_PROFILE_IDS)[number];
 
 export const GRAPHICS_PIXEL_BUDGETS = [921600, 2073600, 3686400] as const;
 export const SHADOW_MAP_CAPS = [512, 1024, 2048] as const;
 export const EFFECTS_DENSITIES = [0.5, 0.75, 1] as const;
 export type GraphicsPixelBudget = (typeof GRAPHICS_PIXEL_BUDGETS)[number];
+export type ShadowFiltering = 'standard' | 'soft';
 export type ShadowMapCap = (typeof SHADOW_MAP_CAPS)[number];
 export type EffectsDensity = (typeof EFFECTS_DENSITIES)[number];
 
@@ -20,6 +21,7 @@ export interface GraphicsSettings {
   readonly customGraphicsProfile: boolean;
   readonly pixelBudget: GraphicsPixelBudget;
   readonly shadowMapSizeCap: ShadowMapCap;
+  readonly shadowFiltering: ShadowFiltering;
   readonly effectsDensity: EffectsDensity;
   readonly graphicsPreset: GraphicsPreset;
   readonly renderPixelRatioCap: RenderPixelRatioCap;
@@ -27,9 +29,8 @@ export interface GraphicsSettings {
   readonly gelRenderingMode: GelRenderingMode;
 }
 
-/** Gel shader features change only when transmission crosses zero. High's
- * opted-in raw-depth shadow programs are covered by graphicsPreparationKey's
- * shadow cap. Physical and reduced transmission share gel programs. */
+/** Gel shader features change only when transmission crosses zero. Shadow
+ * filtering programs are covered separately by graphicsPreparationKey. */
 export function graphicsShaderKey(settings: Pick<GraphicsSettings, 'gelRenderingMode'>): string {
   return settings.gelRenderingMode === 'minimum' ? 'opaque-gel' : 'transmissive-gel';
 }
@@ -38,7 +39,7 @@ export function graphicsShaderKey(settings: Pick<GraphicsSettings, 'gelRendering
  * storage even when shader source is unchanged, so retain the full loading
  * path for that change. Transmission-scale-only changes keep the lighter path. */
 export function graphicsPreparationKey(settings: GraphicsSettings): string {
-  return `${graphicsShaderKey(settings)}:shadow-cap:${settings.shadowMapSizeCap}`;
+  return `${graphicsShaderKey(settings)}:shadow-cap:${settings.shadowMapSizeCap}:filter:${settings.shadowFiltering}`;
 }
 
 /** Target storage can change without shader source changing. Include the gel
@@ -60,22 +61,27 @@ export const GRAPHICS_PROFILES = {
   minimum: profile('Low', {
     graphicsProfile: 'minimum', customGraphicsProfile: false, graphicsPreset: 'normal',
     renderPixelRatioCap: 1, renderScale: 0.75, gelRenderingMode: 'minimum',
-    pixelBudget: 921600, shadowMapSizeCap: 512, effectsDensity: 0.5,
+    pixelBudget: 921600, shadowMapSizeCap: 512, shadowFiltering: 'standard', effectsDensity: 0.5,
   }),
   standard: profile('Medium', {
     graphicsProfile: 'standard', customGraphicsProfile: false, graphicsPreset: 'normal',
     renderPixelRatioCap: 1.5, renderScale: 1, gelRenderingMode: 'reduced-transmission',
-    pixelBudget: 2073600, shadowMapSizeCap: 1024, effectsDensity: 1,
+    pixelBudget: 2073600, shadowMapSizeCap: 1024, shadowFiltering: 'standard', effectsDensity: 1,
   }),
   high: profile('High', {
     graphicsProfile: 'high', customGraphicsProfile: false, graphicsPreset: 'normal',
+    renderPixelRatioCap: 2, renderScale: 1, gelRenderingMode: 'balanced-transmission',
+    pixelBudget: 2073600, shadowMapSizeCap: 2048, shadowFiltering: 'standard', effectsDensity: 1,
+  }),
+  ultra: profile('Ultra', {
+    graphicsProfile: 'ultra', customGraphicsProfile: false, graphicsPreset: 'normal',
     renderPixelRatioCap: 2, renderScale: 1, gelRenderingMode: 'physical',
-    pixelBudget: 3686400, shadowMapSizeCap: 2048, effectsDensity: 1,
+    pixelBudget: 3686400, shadowMapSizeCap: 2048, shadowFiltering: 'soft', effectsDensity: 1,
   }),
 } as const;
 
 // Provisional engineering defaults, not an assessment-PC performance guarantee.
-export const DEFAULT_GRAPHICS_SETTINGS: GraphicsSettings = GRAPHICS_PROFILES.minimum.settings;
+export const DEFAULT_GRAPHICS_SETTINGS: GraphicsSettings = GRAPHICS_PROFILES.standard.settings;
 export const GRAPHICS_LIGHTING_POLICY = 'authored-room-scopes; Cultivation 4 point/3 spot maximum';
 
 export const isGraphicsProfileId = (value: string): value is GraphicsProfileId =>
@@ -84,7 +90,7 @@ export const isGraphicsProfileId = (value: string): value is GraphicsProfileId =
 export function graphicsProfileName(settings: GraphicsSettings, gelMode = settings.gelRenderingMode): GraphicsProfileId | 'custom' {
   const preset = GRAPHICS_PROFILES[settings.graphicsProfile].settings;
   return !settings.customGraphicsProfile && preset.pixelBudget === settings.pixelBudget &&
-    preset.shadowMapSizeCap === settings.shadowMapSizeCap && preset.effectsDensity === settings.effectsDensity &&
+    preset.shadowFiltering === settings.shadowFiltering && preset.shadowMapSizeCap === settings.shadowMapSizeCap && preset.effectsDensity === settings.effectsDensity &&
     preset.graphicsPreset === settings.graphicsPreset && preset.renderPixelRatioCap === settings.renderPixelRatioCap && preset.renderScale === settings.renderScale &&
     preset.gelRenderingMode === gelMode ? settings.graphicsProfile : 'custom';
 }
@@ -93,6 +99,10 @@ export function graphicsProfileName(settings: GraphicsSettings, gelMode = settin
 export function readGraphicsSettings(value: unknown): GraphicsSettings | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const s = value as Record<string, unknown>;
+  // Pre-Ultra preferences had no filter control: 2048 implicitly enabled soft
+  // shadows. Preserve all authored/custom values and rename their High base.
+  const legacy = s.shadowFiltering === undefined;
+  const shadowFiltering = legacy ? (s.shadowMapSizeCap === 2048 ? 'soft' : 'standard') : s.shadowFiltering;
   if (typeof s.graphicsProfile !== 'string' || !isGraphicsProfileId(s.graphicsProfile) ||
     typeof s.customGraphicsProfile !== 'boolean' ||
     (s.graphicsPreset !== 'normal' && s.graphicsPreset !== 'performance') ||
@@ -100,10 +110,11 @@ export function readGraphicsSettings(value: unknown): GraphicsSettings | undefin
     !GRAPHICS_PIXEL_BUDGETS.includes(s.pixelBudget as GraphicsPixelBudget) ||
     !SHADOW_MAP_CAPS.includes(s.shadowMapSizeCap as ShadowMapCap) ||
     !EFFECTS_DENSITIES.includes(s.effectsDensity as EffectsDensity) ||
-    !['minimum', 'physical', 'reduced-transmission'].includes(s.gelRenderingMode as string)) return undefined;
-  return { graphicsProfile: s.graphicsProfile, customGraphicsProfile: s.customGraphicsProfile,
+    (shadowFiltering !== 'standard' && shadowFiltering !== 'soft') ||
+    !['minimum', 'physical', 'reduced-transmission', 'balanced-transmission'].includes(s.gelRenderingMode as string)) return undefined;
+  return { graphicsProfile: legacy && s.graphicsProfile === 'high' ? 'ultra' : s.graphicsProfile, customGraphicsProfile: s.customGraphicsProfile,
     graphicsPreset: s.graphicsPreset, renderScale: s.renderScale as RenderScale,
     renderPixelRatioCap: s.renderPixelRatioCap as RenderPixelRatioCap, pixelBudget: s.pixelBudget as GraphicsPixelBudget,
-    shadowMapSizeCap: s.shadowMapSizeCap as ShadowMapCap, effectsDensity: s.effectsDensity as EffectsDensity,
+    shadowMapSizeCap: s.shadowMapSizeCap as ShadowMapCap, shadowFiltering, effectsDensity: s.effectsDensity as EffectsDensity,
     gelRenderingMode: s.gelRenderingMode as GelRenderingMode };
 }

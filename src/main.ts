@@ -32,7 +32,8 @@ import { OPENING_GAME_TIMING } from './cinematics/OpeningGameTimeline.ts';
 import { CleanGameplayMode } from './ui/CleanGameplayMode.ts';
 import { GraphicsPreparationOverlay } from './ui/GraphicsPreparationOverlay.ts';
 import { GoopSpeedOverlay } from './ui/GoopSpeedOverlay.ts';
-import { graphicsPreparationKey, graphicsTransmissionResourceKey } from './render/GraphicsProfiles.ts';
+import { GRAPHICS_PROFILES, graphicsProfileName, graphicsPreparationKey, graphicsTransmissionResourceKey } from './render/GraphicsProfiles.ts';
+import type { CalibrationProgress } from './render/GraphicsCalibration.ts';
 import '@fontsource/michroma/400.css';
 import '@fontsource-variable/space-grotesk';
 import './style.css';
@@ -187,30 +188,71 @@ function startGame(): void {
   let initialGraphicsTask: Promise<void> | undefined;
   let preparedInitialGraphicsKey: string | undefined;
   const initialGraphicsKey = () => `${graphicsPreparationKey(settings.value)}:${graphicsTransmissionResourceKey(settings.value)}`;
-  const selectInitialGraphics = async (): Promise<void> => {
-    if (!settings.needsGraphicsCalibration) return;
+  let graphicsCalibrationTask: Promise<string> | undefined;
+  const runGraphicsCalibration = async (onProgress: (message: string) => void): Promise<string> => {
+    settings.requestGraphicsCalibration();
     const revision = settings.graphicsRevision;
-    const isCurrent = () => !shuttingDown && settings.needsGraphicsCalibration &&
-      settings.graphicsRevision === revision && !document.hidden && document.hasFocus();
-    let profile: import('./render/GraphicsProfiles.ts').GraphicsProfileId = 'minimum';
+    const viewport = { width: app.clientWidth, height: app.clientHeight, dpr: window.devicePixelRatio,
+      fov: settings.value.fieldOfViewDegrees };
+    let applied = false;
+    autoDetecting = true;
     try {
-      if (isCurrent()) profile = (await (levelOneRuntime.state === 'unloaded'
-        ? renderLayer.calibrateCurrentView(isCurrent) : levelOneRuntime.calibrateInitialGraphics(isCurrent))).profile;
+      await initialGraphicsTask;
+      const available = () => !shuttingDown && settings.needsGraphicsCalibration &&
+        settings.graphicsRevision === revision && !document.hidden && document.hasFocus() &&
+        app.clientWidth === viewport.width && app.clientHeight === viewport.height &&
+        window.devicePixelRatio === viewport.dpr && settings.value.fieldOfViewDegrees === viewport.fov;
+      if (!available()) return 'Check interrupted. Your settings are kept.';
+      if (titlePresentation && levelOneRuntime.state === 'unloaded') {
+        onProgress('Preparing graphics test…');
+        void levelOneAssets.preload('high');
+        gameSession.load();
+      }
+      let message = 'Could not measure graphics reliably. Your settings are kept.';
+      await gameSession.withGraphicsCalibration(async controls => {
+        const isCurrent = () => available() && controls.isCurrent();
+        const progress: CalibrationProgress = (phase, profile) => onProgress(
+          `${phase === 'preparing' ? 'Preparing' : 'Checking'} ${GRAPHICS_PROFILES[profile].label}${phase === 'preparing' ? ' test' : ''}…`);
+        const invalidate = () => { controls.invalidateResources(); preparedInitialGraphicsKey = undefined; };
+        const result = await (levelOneRuntime.state === 'unloaded'
+          ? renderLayer.calibrateCurrentView(isCurrent, progress, invalidate, controls.drawCurrentView)
+          : levelOneRuntime.calibrateInitialGraphics(isCurrent, progress, invalidate));
+        if (!isCurrent() || result.status === 'interrupted') {
+          message = 'Check interrupted. Your settings are kept.';
+        } else if (result.status === 'timed-out') {
+          message = 'Check took too long. Your settings are kept.';
+        } else if (result.status === 'complete' && result.profile) {
+          const same = graphicsProfileName(settings.value) === result.profile;
+          applied = settings.applyAutomaticGraphicsProfile(result.profile, revision);
+          const label = GRAPHICS_PROFILES[result.profile].label;
+          message = applied ? same ? `Already using the recommended ${label} settings.` : `${label} recommended and applied.`
+            : 'Check interrupted. Your latest settings are kept.';
+        }
+        onProgress('Finishing graphics check…');
+      }, Boolean(titlePresentation));
+      if (settings.graphicsRevision !== revision) return 'Check interrupted. Your latest settings are kept.';
+      return message;
     } catch {
-      // Optional calibration must never prevent normal level preparation.
+      return applied ? 'Could not finish preparing the recommended settings. Reload to retry.'
+        : 'Could not check graphics. Your settings are kept.';
+    } finally {
+      settings.finishGraphicsCalibration(revision);
+      autoDetecting = false;
+      levelOneAssets.clear();
     }
-    if (!shuttingDown) settings.applyAutomaticGraphicsProfile(profile, revision);
   };
   const prepareFirstGraphics = (): Promise<void> => {
     if (initialGraphicsTask) return initialGraphicsTask;
-    if (!settings.needsGraphicsCalibration && preparedInitialGraphicsKey === initialGraphicsKey()) return Promise.resolve();
-    if (levelOneRuntime.state === 'unloaded') {
-      void levelOneAssets.preload('high');
-      gameSession.load();
-    }
-    initialGraphicsTask = gameSession.prepareInitialGraphics(selectInitialGraphics).then(() => {
+    initialGraphicsTask = (async () => {
+      await graphicsCalibrationTask;
+      if (shuttingDown || preparedInitialGraphicsKey === initialGraphicsKey()) return;
+      if (levelOneRuntime.state === 'unloaded') {
+        void levelOneAssets.preload('high');
+        gameSession.load();
+      }
+      await gameSession.prepareInitialGraphics();
       preparedInitialGraphicsKey = initialGraphicsKey();
-    }).finally(() => { initialGraphicsTask = undefined; levelOneAssets.clear(); });
+    })().finally(() => { initialGraphicsTask = undefined; levelOneAssets.clear(); });
     return initialGraphicsTask;
   };
   const escapePreviewFromUrl = import.meta.env.DEV && new URLSearchParams(window.location.search).get('cutscene') === 'escape';
@@ -249,6 +291,7 @@ function startGame(): void {
     }
   };
   const playOpening = (forceIntro = false): void => {
+    if (graphicsCalibrationTask) { void graphicsCalibrationTask.then(() => playOpening(forceIntro)); return; }
     if (escapePreviewFromUrl && !forceIntro) { void previewEscape(); return; }
     if (!titleRoom) return;
     titlePresentation?.dispose({ keepScene: true });
@@ -311,7 +354,7 @@ function startGame(): void {
   const startSelectedLevel = async (levelId: 'level-2' | 'level-3'): Promise<void> => {
     // Finish title-settings preparation before replacing its runtime.
     await initialGraphicsTask;
-    await selectInitialGraphics();
+    await graphicsCalibrationTask;
     if (shuttingDown) return;
     titlePresentation?.dispose();
     titlePresentation = undefined;
@@ -343,6 +386,7 @@ function startGame(): void {
       enableMusic: unlockAudio,
       playMenuConfirm: () => { audio.unlock(); audio.playUI(); },
       returnToMenu: async () => {
+        await graphicsCalibrationTask;
         await initialGraphicsTask;
         if (shuttingDown) return;
         openingPresentation?.dispose();
@@ -390,13 +434,9 @@ function startGame(): void {
       isCinematicPlaying: () => gameFlowCinematicCanPause(app.dataset.cinematic, app.dataset.gameState),
       restartLevel: () => lifecycleCoordinator.restartLevel(),
       restartGame:()=>window.location.reload(),
-      recalibrateGraphics: async () => {
-        settings.requestGraphicsCalibration();
-        autoDetecting = true;
-        try {
-          if (titlePresentation || levelOneRuntime.state !== 'unloaded') await prepareFirstGraphics();
-          else await gameSession.prepareInitialGraphics(selectInitialGraphics);
-        } finally { autoDetecting = false; }
+      recalibrateGraphics: onProgress => {
+        graphicsCalibrationTask ??= runGraphicsCalibration(onProgress).finally(() => { graphicsCalibrationTask = undefined; });
+        return graphicsCalibrationTask;
       },
       applySettings: (nextSettings) => {
         app.dataset.reducedMenuMotion = String(nextSettings.reduceMenuMotion);
@@ -540,8 +580,8 @@ function startGame(): void {
       gameFlow.updateFrame(stats.rawFrameDeltaSeconds);
       if (gameFlow.state !== 'playing' || titlePresentation || openingPresentation) goopSpeedOverlay.reset();
       else goopSpeedOverlay.update(stats.frameDeltaSeconds, gameSession.getSpeedEffectStrength());
+      if (autoDetecting) return;
       if (titlePresentation) {
-        if (autoDetecting) return;
         titlePresentation.render(stats.frameDeltaSeconds);
         return;
       }

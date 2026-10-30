@@ -2,7 +2,7 @@ import { DEFAULT_USER_KEY_BINDINGS, isBindableKey, reconcileUserKeyBindings, typ
 import type { GelRenderingMode } from '../render/slime/GelRendering.ts';
 import {
   DEFAULT_GRAPHICS_SETTINGS, GRAPHICS_PROFILES, readGraphicsSettings, type GraphicsProfileId, type GraphicsSettings,
-  type GraphicsPixelBudget, type ShadowMapCap, type EffectsDensity,
+  type GraphicsPixelBudget, type ShadowMapCap, type ShadowFiltering, type EffectsDensity,
 } from '../render/GraphicsProfiles.ts';
 import {
   DEFAULT_CAMERA_RIG_CONFIG,
@@ -65,6 +65,9 @@ export const DEFAULT_GAME_SETTINGS: Readonly<GameSettingsSnapshot> = {
 };
 
 export const GRAPHICS_PREFERENCES_KEY = 'specimen.graphics-preferences.v1';
+// Older automatic results included timer delays and saved failed checks as Low.
+// Manual preferences remain compatible with the existing storage key.
+export const GRAPHICS_CALIBRATION_VERSION = 2;
 export const PRESENTATION_PREFERENCES_KEY = 'specimen.presentation-preferences.v1';
 export type SettingsStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -80,7 +83,7 @@ export class GameSettings {
   private readonly listeners = new Set<GameSettingsListener>();
   private current: GameSettingsSnapshot = { ...DEFAULT_GAME_SETTINGS };
   private readonly storage: SettingsStorage | undefined;
-  private calibrationPending = true;
+  private calibrationPending = false;
   private graphicsSelectionRevision = 0;
 
   constructor(options: { storage?: SettingsStorage | null } = {}) {
@@ -119,11 +122,12 @@ export class GameSettings {
     try {
       const saved = JSON.parse(this.storage?.getItem(GRAPHICS_PREFERENCES_KEY) ?? 'null');
       const graphics = readGraphicsSettings(saved?.settings);
-      if ((saved?.mode === 'automatic' || saved?.mode === 'manual') && graphics) {
+      if ((saved?.mode === 'manual' ||
+          (saved?.mode === 'automatic' && saved.calibrationVersion === GRAPHICS_CALIBRATION_VERSION)) && graphics) {
         this.current = { ...this.current, ...graphics };
         this.calibrationPending = false;
       }
-    } catch { /* A missing or invalid cache gets one safe first-launch check. */ }
+    } catch { /* A missing or invalid cache keeps Medium; detection is opt-in. */ }
   }
 
   get needsGraphicsCalibration(): boolean { return this.calibrationPending; }
@@ -132,7 +136,10 @@ export class GameSettings {
   requestGraphicsCalibration(): void {
     this.calibrationPending = true;
     ++this.graphicsSelectionRevision;
-    try { this.storage?.removeItem(GRAPHICS_PREFERENCES_KEY); } catch { /* Optional. */ }
+  }
+
+  finishGraphicsCalibration(revision: number): void {
+    if (revision === this.graphicsSelectionRevision) this.calibrationPending = false;
   }
 
   applyAutomaticGraphicsProfile(profile: GraphicsProfileId, revision: number): boolean {
@@ -145,7 +152,9 @@ export class GameSettings {
 
   private saveGraphics(mode: 'automatic' | 'manual'): void {
     const graphics = readGraphicsSettings(this.current)!;
-    try { this.storage?.setItem(GRAPHICS_PREFERENCES_KEY, JSON.stringify({ mode, settings: graphics })); } catch { /* Optional. */ }
+    try { this.storage?.setItem(GRAPHICS_PREFERENCES_KEY, JSON.stringify({ mode, settings: graphics,
+      ...(mode === 'automatic' ? { calibrationVersion: GRAPHICS_CALIBRATION_VERSION } : {}),
+    })); } catch { /* Optional. */ }
   }
 
   get value(): Readonly<GameSettingsSnapshot> {
@@ -210,6 +219,10 @@ export class GameSettings {
     this.updateGraphics({ shadowMapSizeCap: value });
   }
 
+  setShadowFiltering(value: ShadowFiltering): void {
+    this.updateGraphics({ shadowFiltering: value });
+  }
+
   setEffectsDensity(value: EffectsDensity): void {
     this.updateGraphics({ effectsDensity: value });
   }
@@ -248,8 +261,10 @@ export class GameSettings {
   }
 
   resetToDefaults(): void {
-    this.requestGraphicsCalibration();
+    this.calibrationPending = false;
+    ++this.graphicsSelectionRevision;
     this.update(DEFAULT_GAME_SETTINGS);
+    try { this.storage?.removeItem(GRAPHICS_PREFERENCES_KEY); } catch { /* Optional storage. */ }
     try { this.storage?.removeItem(PRESENTATION_PREFERENCES_KEY); } catch { /* Optional storage. */ }
   }
 

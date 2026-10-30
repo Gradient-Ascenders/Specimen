@@ -19,6 +19,9 @@ export class GraphicsPreparation {
   constructor(notify: (pending: boolean, error?: unknown) => void) { this.notify = notify; }
   get pending(): boolean { return this.blocked; }
 
+  /** Temporary preset probes may release storage even if the final choice is unchanged. */
+  invalidatePrepared(): void { this.key = this.resourceKey = undefined; }
+
   update(key: string, apply: () => void, prepare: () => Promise<void>, resources?: ResourcePreparation): void {
     if (!this.blocked && (this.firstUpdate || (this.key === key && this.resourceKey === resources?.key))) {
       apply(); this.firstUpdate = false; this.appliedKey = this.key = key;

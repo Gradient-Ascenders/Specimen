@@ -10,7 +10,7 @@ export const CONTAINMENT_PCSS_SOURCES=new Set([
 ]);
 
 const rawShadowGLSL=/* glsl */`
-  #else // SHADOWMAP_TYPE_BASIC: Containment High raw-depth PCF / PCSS
+  #else // SHADOWMAP_TYPE_BASIC: Containment soft raw-depth PCF / PCSS
     vec2 cShadowDisk(int index,int count,float phase){
       float radius=sqrt((float(index)+0.5)/float(count));
       float theta=float(index)*2.39996323+phase;

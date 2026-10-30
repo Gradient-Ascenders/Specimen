@@ -5,7 +5,7 @@ import {finishOpening} from '../../helpers/OpeningHandoff.ts';
 import {GRAPHICS_PROFILES} from '../../../src/render/GraphicsProfiles.ts';
 
 test('all five authored rooms render prepared lighting through travel and restart',async({page})=>{
-  test.setTimeout(300_000);await page.setViewportSize(process.env.CONTAINMENT_LIGHTING_1080==='1'?{width:1920,height:1080}:process.env.CONTAINMENT_LIGHTING_PROFILE==='high'?{width:640,height:400}:{width:960,height:600});
+  test.setTimeout(300_000);await page.setViewportSize(process.env.CONTAINMENT_LIGHTING_1080==='1'?{width:1920,height:1080}:process.env.CONTAINMENT_LIGHTING_PROFILE==='ultra'?{width:640,height:400}:{width:960,height:600});
   const errors:string[]=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('console',message=>{if(message.type()==='error'||/GL_INVALID_|CONTEXT_LOST_WEBGL/.test(message.text()))errors.push(message.text());});
@@ -14,7 +14,7 @@ test('all five authored rooms render prepared lighting through travel and restar
     (window as any).__lightingPrograms=0;
     const create=WebGL2RenderingContext.prototype.createProgram;
     WebGL2RenderingContext.prototype.createProgram=function(){(window as any).__lightingPrograms++;return create.call(this);};
-  },GRAPHICS_PROFILES[process.env.CONTAINMENT_LIGHTING_PROFILE==='high'?'high':'standard'].settings);
+  },GRAPHICS_PROFILES[process.env.CONTAINMENT_LIGHTING_PROFILE==='ultra'?'ultra':process.env.CONTAINMENT_LIGHTING_PROFILE==='high'?'high':'standard'].settings);
   await exposeGame(page, { runtime: '__lightingRuntime' });
   await page.goto('./',{waitUntil:'domcontentloaded'});
   await page.locator('[data-action="start"]').click({timeout:120_000});await finishOpening(page,false);
@@ -41,7 +41,7 @@ test('all five authored rooms render prepared lighting through travel and restar
     ['room-5-lockdown',5,[.084,77.397,102.793],Math.PI],
     ['room-5-observation',5,[-10,97.96,129.6],Math.PI],
   ];
-  if(process.env.CONTAINMENT_LIGHTING_PROFILE==='high')poses=poses.filter(p=>!['room-1-workstations','room-3-high-route','room-5-lockdown','room-5-observation'].includes(p[0]));
+  if(process.env.CONTAINMENT_LIGHTING_PROFILE==='ultra')poses=poses.filter(p=>!['room-1-workstations','room-3-high-route','room-5-lockdown','room-5-observation'].includes(p[0]));
   poses.push(['room-2-3-handoff',2,[0,12,49],Math.PI]);
   if(process.env.CONTAINMENT_LIGHTING_QUALITY_ONLY==='1')poses=poses.filter(p=>p[0]==='room-5-cell');
   const evidence=`artifacts/evidence/containment-lighting/${process.env.LIGHTING_CAPTURE_PHASE??'after'}`;
@@ -84,20 +84,20 @@ test('all five authored rooms render prepared lighting through travel and restar
   }
   const qualitySwitches=[];
   if(process.env.CONTAINMENT_LIGHTING_QUALITY_ONLY==='1'){
-    for(const profile of ['minimum','high'] as const){
+    for(const profile of ['minimum','high','ultra','high'] as const){
       const switched=await page.evaluate(settings=>{
         const runtime=(window as any).__lightingRuntime,layer=runtime.renderLayer,r=runtime.resources;
         layer.setGraphicsSettings(settings);
         // Exercise the resource transition directly. Startup already covers
         // the full hidden prewarm; these draws must allocate valid sampler
-        // types for formerly dormant maps and restore High's cached programs.
+        // types for formerly dormant maps and restore Ultra's cached programs.
         r.containmentLevel.teleportToRoomForDebug(5);r.body.teleport({x:3.9,y:75.21,z:101.5});
         r.testScene.update(0,r.body.position,r.body.position);runtime.retargetCameraToActiveSlime(r);
         const stats={fixedDeltaSeconds:1/60,rawFrameDeltaSeconds:.08,frameDeltaSeconds:.08,stepsThisFrame:0,interpolationAlpha:1,droppedSimulationTimeSeconds:0,renderFps:60};
         runtime.render(1,stats);runtime.render(1,stats);
         return {profile:settings.graphicsProfile,type:layer.renderer.shadowMap.type,error:layer.renderer.getContext().getError()};
       },GRAPHICS_PROFILES[profile].settings);
-      qualitySwitches.push(switched);expect(switched.error).toBe(0);expect(switched.type).toBe(profile==='high'?0:1);
+      qualitySwitches.push(switched);expect(switched.error).toBe(0);expect(switched.type).toBe(profile==='ultra'?0:1);
     }
   }
   const restart=await page.evaluate(()=>{const r=(window as any).__lightingRuntime;r.restartLevel();return {ready:r.resources.testScene.roomFive.art.shell.ready,error:r.renderLayer.renderer.getContext().getError()};});
@@ -111,7 +111,7 @@ test('all five authored rooms render prepared lighting through travel and restar
   expect(initial.radiance.textureCount).toBe(2);expect(initial.radiance.runtimeCaptures).toBe(0);
   expect(initial.radiance.textureBytes).toBeLessThan(4_000_000);
   expect(initial.shafts.extraShadowMaps).toBe(0);expect(initial.shafts.fullScreenPasses).toBe(0);
-  expect(initial.shadowType).toBe(process.env.CONTAINMENT_LIGHTING_PROFILE==='high'?0:1);
+  expect(initial.shadowType).toBe(process.env.CONTAINMENT_LIGHTING_PROFILE==='ultra'?0:1);
   for(const sample of samples){expect(sample.glError,sample.name).toBe(0);expect(sample.programs,`${sample.name}: cold program`).toBe(initial.programs);
     if(sample.cullingChangedChannels!==undefined)expect(sample.cullingChangedChannels,`${sample.name}: atrium culling pixels`).toBe(0);}
   expect(restart.ready).toBe(true);expect(restart.error).toBe(0);expect(errors).toEqual([]);

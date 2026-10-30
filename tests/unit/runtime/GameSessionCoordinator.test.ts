@@ -581,3 +581,76 @@ test('initial calibration applies its selected settings before one full warm-up'
   assert.deepEqual(calls, ['low', 'calibrate', 'medium', 'prepare', 'same']);
   session.dispose();
 });
+
+test('a completed unchanged probe skips full graphics preparation', async () => {
+  const runtime = new MockRuntime('level-1', progression);
+  let preparations = 0, draws = 0, updates = 0;
+  (runtime as GameLevelRuntime).prepareGraphics = async () => { preparations++; };
+  runtime.render = () => { draws++; };runtime.fixedUpdate = () => { updates++; };
+  const session = new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+  session.applyGraphicsSettings('medium',()=>{},'medium-target');session.load();
+  await session.prepareInitialGraphics();
+  await session.withGraphicsCalibration(async controls => {
+    session.render(0,{} as any);session.fixedUpdate(1/60);
+    assert.equal(draws,0);assert.equal(updates,0);
+    controls.drawCurrentView();assert.equal(draws,1);
+    session.applyGraphicsSettings('medium',()=>{},'medium-target');
+  });
+  assert.equal(preparations,1);session.dispose();
+});
+
+test('title detection defers full preparation until play, including later manual edits', async () => {
+  const runtime = new MockRuntime('level-1', progression);let preparations = 0;
+  (runtime as GameLevelRuntime).prepareGraphics = async () => { preparations++; };
+  const session = new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+  session.applyGraphicsSettings('medium',()=>{});session.load();
+  await session.withGraphicsCalibration(async controls => {
+    controls.invalidateResources();session.applyGraphicsSettings('high',()=>{});
+  },true);
+  assert.equal(preparations,0);
+  session.applyGraphicsSettings('low',()=>{});await Promise.resolve();await Promise.resolve();
+  assert.equal(preparations,0);
+  await session.prepareInitialGraphics();assert.equal(preparations,1);session.dispose();
+});
+
+test('a probe that changed resources restores preparation even when the choice stays the same', async () => {
+  const runtime = new MockRuntime('level-1', progression);let preparations = 0;
+  (runtime as GameLevelRuntime).prepareGraphics = async () => { preparations++; };
+  const session = new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+  session.applyGraphicsSettings('medium',()=>{});session.load();await session.prepareInitialGraphics();
+  await session.withGraphicsCalibration(async controls => { controls.invalidateResources(); });
+  assert.equal(preparations,2);session.dispose();
+});
+
+test('late manual edits apply after the probe releases materials, including a rejected probe', async () => {
+  const runtime = new MockRuntime('level-1', progression);const applied:string[]=[];
+  (runtime as GameLevelRuntime).prepareGraphics = async () => {};
+  const session = new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+  session.applyGraphicsSettings('medium',()=>applied.push('medium'));session.load();await session.prepareInitialGraphics();
+  await assert.rejects(session.withGraphicsCalibration(async controls => {
+    controls.invalidateResources();session.applyGraphicsSettings('high',()=>applied.push('high'));
+    assert.deepEqual(applied,['medium']);throw new Error('probe failed');
+  }),/probe failed/);
+  assert.deepEqual(applied,['medium','high']);session.dispose();
+});
+
+test('unloading during a probe cannot apply queued settings to the departed runtime', async () => {
+  const runtime = new MockRuntime('level-1', progression);let applied = 0;
+  const session = new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+  session.load();
+  await session.withGraphicsCalibration(async controls => {
+    controls.invalidateResources();session.applyGraphicsSettings('high',()=>applied++);
+    session.unload();assert.equal(controls.isCurrent(),false);
+  });
+  assert.equal(applied,0);session.dispose();
+});
+
+test('restart requested during calibration waits until renderer ownership is released', async () => {
+  const runtime = new MockRuntime('level-1', progression);
+  const session = new GameSessionCoordinator({initialRuntime:runtime,createLevelTwo:()=>runtime,scheduleTransition:t=>t()});
+  session.load();
+  await session.withGraphicsCalibration(async () => {
+    session.restartLevel();assert.equal(runtime.calls.includes('restart'),false);
+  });
+  assert.equal(runtime.calls.includes('restart'),true);session.dispose();
+});

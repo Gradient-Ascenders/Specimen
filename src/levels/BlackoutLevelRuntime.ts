@@ -1760,7 +1760,7 @@ export class BlackoutLevelRuntime {
     if (bossCapture) this.releaseBossTransmissionCap ??= this.renderLayer.gelRendering.requestReducedTransmissionCap(.25);
     else { this.releaseBossTransmissionCap?.(); this.releaseBossTransmissionCap = undefined; }
     const bossBudget = !!bossCapture && !resources?.finalBoss?.cinematic &&
-      this.renderLayer.graphicsConfiguration.graphicsProfile !== 'high';
+      this.renderLayer.graphicsConfiguration.graphicsProfile !== 'ultra';
     // Select after all cinematic cameras/actor poses have been presented.
     resources?.specimenCharacter.updateDetail(this.renderLayer.cameraRig.camera, bossBudget);
     resources?.scene.finalArena?.lighting.moonlight.setShaftEnabled(!bossBudget);

@@ -1,14 +1,15 @@
 import type * as THREE from 'three';
 
-export const GEL_RENDERING_MODES = ['physical', 'reduced-transmission', 'minimum'] as const;
+export const GEL_RENDERING_MODES = ['physical', 'balanced-transmission', 'reduced-transmission', 'minimum'] as const;
 export type GelRenderingMode = (typeof GEL_RENDERING_MODES)[number];
 export const DEFAULT_GEL_RENDERING_MODE: GelRenderingMode = 'physical';
 export const isGelRenderingMode = (value: string): value is GelRenderingMode =>
   GEL_RENDERING_MODES.some(mode => mode === value);
 
-/** Medium retains three quarters of each dimension; High uses native pixels. */
+/** High captures at 75% per dimension; Medium also accepts level-specific
+ * reductions. Ultra retains native capture resolution. */
 export function resolveGelTransmissionResolutionScale(mode: GelRenderingMode, cap: number): number {
-  return Math.min(cap, mode === 'reduced-transmission' ? 0.75 : 1);
+  return Math.min(cap, mode === 'reduced-transmission' || mode === 'balanced-transmission' ? 0.75 : 1);
 }
 
 /** Session-owned policy. Materials unregister on disposal, including failed loads. */

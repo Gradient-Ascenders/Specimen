@@ -4,6 +4,7 @@ test('settings keyboard/gamepad controls, persistence, reset and structured cred
   const title = page.locator('[data-flow-panel="title"]');
   await title.locator('[data-action="settings"]').click();
   const settings = page.locator('[data-flow-panel="settings"]');
+  await expect(settings.locator('[data-setting="graphics-profile"]')).toHaveValue('standard');
   expect(await settings.locator('legend').allTextContents()).toEqual(['Graphics', 'Display', 'Audio', 'Controls', 'Accessibility']);
   await expect(settings.locator('[data-section="graphics"]')).toBeFocused();
   await settings.locator('[data-section="accessibility"]').click();
@@ -44,6 +45,7 @@ test('settings keyboard/gamepad controls, persistence, reset and structured cred
   await settings.locator('[data-setting="show-fps"]').check();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('specimen.presentation-preferences.v1')!).showFPS)).toBe(true);
   await settings.locator('[data-action="reset-settings"]').click();
+  await expect(settings.locator('[data-setting="graphics-profile"]')).toHaveValue('standard');
   await expect(settings.locator('[data-setting="show-fps"]')).not.toBeChecked();
   await expect(settings.locator('[data-setting-output="sensitivity"]')).toHaveText('1.0×');
   await expect(settings.locator('[data-settings-feedback]')).toContainText('Default settings restored');
@@ -62,4 +64,82 @@ test('settings keyboard/gamepad controls, persistence, reset and structured cred
   await credits.locator('[data-action="back"]').click();
   await expect(page.locator('canvas')).toHaveCount(0);
   expect(menuRequests.filter(url => /\.(?:glb|bin|mp4)(?:\?|$)/.test(url))).toEqual([]);
+});
+
+test('auto-detect keeps progress steady and releases the button after completion or failure', async ({menuPage:page}) => {
+  await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+  const button = page.locator('[data-action="calibrate-graphics"]');
+  const feedback = page.locator('[data-settings-feedback]');
+  const footer = page.locator('.settings-footer');
+  await page.locator('.settings-panel').evaluate(async element => {
+    await Promise.all(element.getAnimations().map(animation => animation.finished));
+  });
+  const before = await footer.boundingBox();
+  await page.evaluate(() => {
+    const fixture = (window as any).__menuFixture;
+    fixture.ui.actions.recalibrateGraphics = (progress: (message:string)=>void) => {
+      progress('Preparing Medium test…');
+      fixture.progressDetection = progress;
+      return new Promise<string>(resolve => { fixture.finishDetection = resolve; });
+    };
+  });
+  await button.click();
+  await expect(button).toBeDisabled();
+  await expect(button).toHaveAttribute('aria-busy', 'true');
+  await expect(feedback).toHaveText('Checking graphics…');
+  await page.evaluate(() => {
+    const fixture = (window as any).__menuFixture;
+    for (const message of ['Checking Medium…','Preparing High test…','Checking High…','Finishing graphics check…'])
+      fixture.progressDetection(message);
+  });
+  await expect(feedback).toHaveText('Checking graphics…');
+  expect(await footer.boundingBox()).toEqual(before);
+  const icon = button.locator('.ui-icon');
+  await expect(icon).toHaveCSS('animation-name', 'graphics-detect-spin');
+  await page.evaluate(() => (window as any).__menuFixture.settings.setReduceMenuMotion(true));
+  await expect(icon).toHaveCSS('animation-name', 'none');
+  await page.evaluate(() => (window as any).__menuFixture.settings.setReduceMenuMotion(false));
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await expect(icon).toHaveCSS('animation-name', 'none');
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.locator('.settings-panel').evaluate(async element => {
+    await Promise.all(element.getAnimations().map(animation => animation.finished));
+  });
+  await page.evaluate(() => (window as any).__menuFixture.finishDetection('Already using the recommended Medium settings.'));
+  await expect(feedback).toHaveText('Already using the recommended Medium settings.');
+  await expect(button).toBeEnabled();
+  await expect(button).not.toHaveAttribute('aria-busy');
+  expect(await footer.boundingBox()).toEqual(before);
+  await page.evaluate(() => {
+    (window as any).__menuFixture.ui.actions.recalibrateGraphics = async () => { throw Error('unavailable'); };
+  });
+  await button.click();
+  await expect(feedback).toHaveText('Could not check graphics. Your settings are kept.');
+  await expect(button).toBeEnabled();
+  await expect(page.locator('[data-setting="graphics-profile"]')).toHaveValue('standard');
+});
+
+test('High and Ultra expose their budgets and restore custom shadow filtering', async ({menuPage:page}) => {
+  await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+  const profile = page.locator('[data-setting="graphics-profile"]');
+  for (const [id, budget, gel, filtering] of [
+    ['high', '2073600', 'balanced-transmission', 'standard'],
+    ['ultra', '3686400', 'physical', 'soft'],
+  ]) {
+    await profile.selectOption(id);
+    await expect(page.locator('[data-setting="pixel-budget"]')).toHaveValue(budget);
+    await expect(page.locator('[data-setting="gel-rendering"]')).toHaveValue(gel);
+    await expect(page.locator('[data-setting="shadow-filtering"]')).toHaveValue(filtering);
+    await expect(page.locator('[data-setting="shadow-quality"]')).toHaveValue('2048');
+  }
+  await page.reload();
+  await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+  await expect(profile).toHaveValue('ultra');
+  await page.locator('[data-setting="shadow-filtering"]').selectOption('standard');
+  await expect(profile).toHaveValue('custom');
+  await page.reload();
+  await page.locator('[data-flow-panel="title"] [data-action="settings"]').click();
+  await expect(profile).toHaveValue('custom');
+  await expect(page.locator('[data-setting="shadow-filtering"]')).toHaveValue('standard');
+  await expect(page.locator('[data-setting="pixel-budget"]')).toHaveValue('3686400');
 });

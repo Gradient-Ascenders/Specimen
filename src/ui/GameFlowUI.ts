@@ -436,7 +436,7 @@ export interface GameFlowActions {
   isCinematicPlaying?(): boolean;
   restartLevel(): void;
   restartGame?():void;
-  recalibrateGraphics?(): Promise<void>;
+  recalibrateGraphics?(onProgress: (message: string) => void): Promise<string>;
   applySettings(settings: Readonly<GameSettingsSnapshot>): void;
   getGraphicsDiagnostics?(): GraphicsDiagnostics;
   subscribeGraphicsDiagnostics?(listener: () => void): () => void;
@@ -1316,7 +1316,8 @@ export class GameFlowUI {
         break;
       case 'settings':
         this.focusTargets.set(this.model.state, target);
-        this.settingsFeedback.textContent = '';
+        this.settingsFeedback.textContent = this.element.querySelector('[data-action="calibrate-graphics"][aria-busy="true"]')
+          ? 'Checking graphics…' : '';
         this.selectSettingsSection(this.requireElement<HTMLButtonElement>('#settings-tab-graphics'));
         if (this.model.openSettings()) this.syncState();
         break;
@@ -1332,13 +1333,25 @@ export class GameFlowUI {
       case 'calibrate-graphics':
         if (!this.actions.recalibrateGraphics || target.disabled) break;
         target.disabled = true;
+        target.setAttribute('aria-busy', 'true');
         this.settingHelp.dismiss();
+        this.settingsFeedback.dataset.detectionState = 'checking';
         this.settingsFeedback.textContent = 'Checking graphics…';
-        void this.actions.recalibrateGraphics().then(() => {
-          if (!this.disposed) this.settingsFeedback.textContent = 'Graphics adjusted.';
+        // Per-view preparation/sampling phases can change several times in a
+        // frame. Keep the visible/live-region message stable until completion.
+        void this.actions.recalibrateGraphics(() => {}).then(message => {
+          if (!this.disposed && this.model.state === 'settings') {
+            this.settingsFeedback.textContent = message;
+            this.settingsFeedback.dataset.detectionState = 'result';
+          }
         }, () => {
-          if (!this.disposed) this.settingsFeedback.textContent = 'Could not check graphics. Your settings are kept.';
-        }).finally(() => { if (!this.disposed) target.disabled = false; });
+          if (!this.disposed && this.model.state === 'settings') {
+            this.settingsFeedback.textContent = 'Could not check graphics. Your settings are kept.';
+            this.settingsFeedback.dataset.detectionState = 'result';
+          }
+        }).finally(() => {
+          if (!this.disposed) { target.disabled = false; target.removeAttribute('aria-busy'); }
+        });
         break;
       case 'reset-settings':
         if (this.model.state !== 'settings') break;
@@ -1507,7 +1520,7 @@ export class GameFlowUI {
       'graphics-preset': performance ? 'On' : 'Off',
       'render-resolution': `${Number(this.renderResolutionInput.value).toFixed(2)}×`,
       'render-scale': `${Math.round(settings.renderScale * 100)}%`,
-      'gel-rendering': settings.gelRenderingMode === 'minimum' ? 'Glossy' : settings.gelRenderingMode === 'physical' ? 'High' : 'Balanced',
+      'gel-rendering': this.gelRenderingInput.selectedOptions[0]?.textContent ?? '',
       'show-fps': settings.showFPS ? 'On' : 'Off',
       'reduce-menu-motion': settings.reduceMenuMotion ? 'On' : 'Off',
     };
