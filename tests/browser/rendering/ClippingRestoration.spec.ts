@@ -16,7 +16,17 @@ for(const parallel of [true,false])test('clipping seeds restore rendering after 
   await page.goto('./__readiness-probe');
   await page.waitForFunction(()=>typeof(window as any).probeClippingRestoration==='function');
   const r=await page.evaluate(()=>(window as any).probeClippingRestoration());
-  expect(r.gpu).toBeTruthy();expect(r.gpu).not.toMatch(/swiftshader|llvmpipe|software|warp/i);expect(r.lostContext).toBe(true);expect(r.restoredContext).toBe(true);
+  // This is a correctness probe on both software and native WebGL. Record the
+  // renderer; native-only performance qualification lives in diagnostics.
+  await test.info().attach('renderer', { body: JSON.stringify({gpu:r.gpu}), contentType:'application/json' });
+  expect(r.gpu).toBeTruthy();expect(r.lostContext).toBe(true);expect(r.restoredContext).toBe(true);
   expect(r.newIdentity).toBe(true);expect(r.after).toEqual(r.before);
+  const pixel=(x:number,y:number)=>r.before.slice((y*32+x)*4,(y*32+x+1)*4);
+  // Shared output tone-maps primaries; verify their meaning here, retaining
+  // exact whole-buffer equality across restoration above.
+  const red=pixel(10,16),green=pixel(24,16);
+  expect(red[0]).toBeGreaterThan(200);expect(red[1]).toBeLessThan(64);expect(red[2]).toBeLessThan(64);expect(red[3]).toBe(255);
+  expect(green[1]).toBeGreaterThan(200);expect(green[0]).toBeLessThan(64);expect(green[2]).toBeLessThan(64);expect(green[3]).toBe(255);
+  expect(pixel(20,16)).toEqual([0,0,0,255]); // Other side must actually be clipped.
   expect(r.before.some((v:number,i:number)=>i%4!==3&&v>0)).toBe(true);expect(r.error).toBe(0);expect(errors).toEqual([]);
 });
