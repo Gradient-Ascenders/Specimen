@@ -9,37 +9,35 @@ Credits for the people, music, sounds and tools behind Specimen.
 - Tyron Van Tonder
 - Caleb Perumalsamy
 
-All 3D models were created independently for Specimen.
+## Models
+
+- All 3D models were created by the Gradient Ascent Team.
 
 ## Music
 
 | Resource | Creator | Source | Licence | Use |
 | --- | --- | --- | --- | --- |
-| Osmotic Memory | Tsorthan Grove | [OpenGameArt](https://opengameart.org/content/osmotic-memory) | CC0 | Title music · edited for looping and volume. |
-| Thought Loop | GloryToTheMachine | [OpenGameArt](https://opengameart.org/content/thought-loop-glorytothemachine-ambientdeepnostalgic-loop) | CC BY 4.0 | Containment music · edited for volume. |
-| Unsolved Investigation | isaiah658 | [OpenGameArt](https://opengameart.org/content/unsolved-investigation) | CC0 | Cultivation music. |
-| Searching | yd | [OpenGameArt](https://opengameart.org/content/searching) | CC0 | Blackout music · edited for looping and volume. |
-| Tension | Tsorthan Grove | [OpenGameArt](https://opengameart.org/content/tension-0) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Bob's Awakening music · converted to OGG for game use. |
-| High Tech Lab | remaxim | [OpenGameArt](https://opengameart.org/content/high-tech-lab) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Goop's Escape music · converted to OGG for game use · reduced playback gain (0.60×). |
-| Digital Slash | PetterTheSturgeon | [OpenGameArt](https://opengameart.org/content/digital-slash) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | Volt's Rescue and Escape music · edited for use in Specimen, including trimming and a repeated musical section · supplied cut begins at original 1:03 · plays from file 0:00 · final OGG copied unchanged. |
-| A Flawless Getaway | vitalezzz | [OpenGameArt](https://opengameart.org/content/a-flawless-getaway) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | Final boss combat music · attribution notice: Vitalezzz - A Flawless Getaway · prepared in-game version edited and converted to OGG from the original looping WAV · supplied OGG copied unchanged. |
-| Soundscape - Synthwave Horror J60 - Loop | Tri-Tachyon (Ellary) | [OpenGameArt](https://opengameart.org/content/soundscape-synthwave-horror-j60-loop) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | The Quiet Ascent elevator cutscene · original loop extended using crossfades · harsh static reduced · opening and ending fades · converted to game-ready OGG · Music by Tri-Tachyon - https://soundcloud.com/tri-tachyon/albums. |
-| Sci-Fi Textures | [Marcelo Fernandez](https://soundcloud.com/marcelofernandezmusic) | [OpenGameArt](https://opengameart.org/content/sci-fi-textures) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | The Specimen, Act I · laboratory discovery · trimmed to 66 seconds · minor volume adjustment and boundary fades. |
-| Article 160 Section 2 | [Zander Noriega](https://opengameart.org/users/zander-noriega) | [OpenGameArt](https://opengameart.org/content/article-160-section-2) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | The Specimen, Act II · laboratory containment failure · original opening trimmed to 57.5 seconds · boundary fades · soundtrack stops at blackout. |
-| Inevitable | vitalezzz | [OpenGameArt](https://opengameart.org/content/inevitable) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | The Specimen, Acts III and IV · drone pursuit, crossfire, fusion and awakening · extended/repeated buildup in Act III flows into the synchronized 35-second fusion passage in Act IV · volume adjustment and fades · attribution notice: Vitalezzz - Inevitable. |
-| Derelict Spaceship | vitalezzz | [OpenGameArt](https://opengameart.org/content/derelict-spaceship) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | The Specimen, Act V · arena reveal and Exterminator introduction · selected 47-second passage aligned to the first arena reveal · volume adjustment and fades · attribution notice: Vitalezzz - Derelict Spaceship. |
-| Claimed by the Void | vitalezzz | [OpenGameArt](https://opengameart.org/content/claimed-by-the-void) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | First Sunlight ending cinematic · final showdown, Exterminator destruction, Goop's sacrifice and laboratory collapse · selected 105-second passage with dialogue level shaping and ending fade · attribution notice: Vitalezzz - Claimed by the Void. |
-| Exploration Theme | [Cleyton Kauffman](https://soundcloud.com/cleytonkauffman) | [OpenGameArt](https://opengameart.org/content/exploration-theme) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | First Sunlight ending cinematic · sunlight reveal and rolling credits · original opening trimmed to 68 seconds, adjusted volume and boundary fades · attribution notice: Music by Cleyton Kauffman - https://soundcloud.com/cleytonkauffman. |
-
-The Specimen uses one synchronized 277-second OGG containing the four individually
-credited compositions above. Music is silent from 2:03.5–2:14; existing sound
-effects continue through the blackout.
+| Osmotic Memory | Tsorthan Grove | [OpenGameArt](https://opengameart.org/content/osmotic-memory) | CC0 | Title screen. |
+| Thought Loop | GloryToTheMachine | [OpenGameArt](https://opengameart.org/content/thought-loop-glorytothemachine-ambientdeepnostalgic-loop) | CC BY 4.0 | Containment · volume adjusted. |
+| Unsolved Investigation | isaiah658 | [OpenGameArt](https://opengameart.org/content/unsolved-investigation) | CC0 | Cultivation. |
+| Searching | yd | [OpenGameArt](https://opengameart.org/content/searching) | CC0 | Blackout. |
+| Tension | Tsorthan Grove | [OpenGameArt](https://opengameart.org/content/tension-0) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Bob's Awakening. |
+| High Tech Lab | remaxim | [OpenGameArt](https://opengameart.org/content/high-tech-lab) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Goop's Escape · volume adjusted. |
+| Digital Slash | PetterTheSturgeon | [OpenGameArt](https://opengameart.org/content/digital-slash) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | Volt's Rescue and Escape · trimmed and looped. |
+| A Flawless Getaway | vitalezzz | [OpenGameArt](https://opengameart.org/content/a-flawless-getaway) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | Final boss fight. |
+| Soundscape - Synthwave Horror J60 - Loop | [Tri-Tachyon (Ellary)](https://soundcloud.com/tri-tachyon/albums) | [OpenGameArt](https://opengameart.org/content/soundscape-synthwave-horror-j60-loop) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | The Quiet Ascent · edited and looped. |
+| Sci-Fi Textures | [Marcelo Fernandez](https://soundcloud.com/marcelofernandezmusic) | [OpenGameArt](https://opengameart.org/content/sci-fi-textures) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | The Specimen, Act I · trimmed and faded. |
+| Article 160 Section 2 | [Zander Noriega](https://opengameart.org/users/zander-noriega) | [OpenGameArt](https://opengameart.org/content/article-160-section-2) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | The Specimen, Act II · trimmed and faded. |
+| Inevitable | vitalezzz | [OpenGameArt](https://opengameart.org/content/inevitable) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | The Specimen, Acts III and IV. |
+| Derelict Spaceship | vitalezzz | [OpenGameArt](https://opengameart.org/content/derelict-spaceship) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | The Specimen, Act V. |
+| Claimed by the Void | vitalezzz | [OpenGameArt](https://opengameart.org/content/claimed-by-the-void) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | First Sunlight · final showdown. |
+| Exploration Theme | [Cleyton Kauffman](https://soundcloud.com/cleytonkauffman) | [OpenGameArt](https://opengameart.org/content/exploration-theme) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) | Sunlight reveal and credits. |
 
 ## Sound effects
 
 | Resource | Creator | Source | Licence | Use |
 | --- | --- | --- | --- | --- |
-| Sound effects | Made with ElevenLabs | Requester-supplied sound packs and turret recording; see resource notes below. | Licence details not supplied | Character, interaction, environment, boss combat and cutscene audio. |
+| Sound effects · elevenlabs.io | Made with ElevenLabs | [ElevenLabs](https://elevenlabs.io/) | [Non-commercial use](https://elevenlabs.io/terms-of-use) · [Usage guide](https://elevenlabs.io/docs/help-center/legal/can-i-publish-the-content-i-generate-on-the-platform) | Gameplay and cutscenes. |
 
 ## Tools
 
@@ -48,7 +46,7 @@ effects continue through the blackout.
 | Three.js | mrdoob | [npm package](https://www.npmjs.com/package/three/v/0.185.1) | MIT | 3D graphics. |
 | Motion | Motion contributors | [Motion](https://motion.dev) | MIT | On-screen animation. |
 | Lucide | Lucide contributors | [Lucide](https://lucide.dev) | ISC | Icons. |
-| meshoptimizer | Arseny Kapoulkine | [meshoptimizer](https://github.com/zeux/meshoptimizer) | MIT | Character detail levels. |
+| meshoptimizer | Arseny Kapoulkine | [meshoptimizer](https://github.com/zeux/meshoptimizer) | MIT | Model detail. |
 | Vite | Evan You | [npm package](https://www.npmjs.com/package/vite/v/8.2.1) | MIT | Game builds. |
 | TypeScript | Microsoft Corp. | [npm package](https://www.npmjs.com/package/typescript/v/7.0.2) | Apache-2.0 | Code tools. |
 | @types/three | DefinitelyTyped contributors | [npm package](https://www.npmjs.com/package/@types/three/v/0.185.4) | MIT | Three.js code tools. |
@@ -57,7 +55,7 @@ effects continue through the blackout.
 
 | Resource | Creator | Source | Licence | Use |
 | --- | --- | --- | --- | --- |
-| Michroma | Vernon Adams | [Fontsource](https://fontsource.org/fonts/michroma) | SIL OFL 1.1 | Headings and baked facility signs. |
+| Michroma | Vernon Adams | [Fontsource](https://fontsource.org/fonts/michroma) | SIL OFL 1.1 | Headings and signs. |
 | Space Grotesk | Florian Karsten | [Fontsource](https://fontsource.org/fonts/space-grotesk) | SIL OFL 1.1 | Text and controls. |
 
 ## Code
@@ -76,8 +74,8 @@ work. The adapted `hash13` lattice hash is credited above; dissolve interpolatio
 corrosion, shader integration and matching shadow passes were written for this
 project. Dependency versions are recorded in `package.json` and its lockfile.
 
-Sound effects were supplied by the requester from ElevenLabs. The generating
-account's plan/licence documentation was not supplied. Original packs live in
+Sound effects were supplied by the requester from ElevenLabs and are credited
+under its free-plan terms: non-commercial use with attribution. Original packs live in
 `assets/audio/`; exact archive/member hashes, edits and gains are retained in
 `assets/audio/manifests/`. The turret recording was supplied separately and
 transcoded to OGG. Importers are in `scripts/audio/`; see the
