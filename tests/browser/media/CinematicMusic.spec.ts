@@ -100,12 +100,15 @@ test('cinematic recordings decode at the nested URL and credits use the existing
   expect(decoded[5]!.blackoutPeak).toBeLessThan(1e-4);
   await expect(page.locator('[data-flow-panel="title"]')).toBeVisible({ timeout: 180_000 });
   await page.locator('[data-flow-panel="title"] [data-action="credits"]').click();
-  for (const [title, creator] of [['Tension', 'Tsorthan Grove'], ['High Tech Lab', 'remaxim']]) {
+  for (const [title, creator, use] of [
+    ['Tension', 'Tsorthan Grove', "Bob's Awakening."],
+    ['High Tech Lab', 'remaxim', "Goop's Escape · volume adjusted."],
+  ]) {
     const row = page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: new RegExp(`^${title}$`) }) });
     await expect(row).toHaveCount(1);
     await expect(row.locator('.credits-creator')).toHaveText(creator!);
     await expect(row.locator('.credits-licence a')).toHaveAttribute('href', 'https://creativecommons.org/licenses/by/4.0/');
-    await expect(row.locator('.credits-use')).toContainText('converted to OGG');
+    await expect(row.locator('.credits-use')).toHaveText(use!);
     await expect(row.locator('h3 a')).toHaveAttribute('href', /^https:\/\//);
   }
   const voltCredit = page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: /^Digital Slash$/ }) });
@@ -113,8 +116,7 @@ test('cinematic recordings decode at the nested URL and credits use the existing
   await expect(voltCredit.locator('.credits-creator')).toHaveText('PetterTheSturgeon');
   await expect(voltCredit.locator('h3 a')).toHaveAttribute('href', 'https://opengameart.org/content/digital-slash');
   await expect(voltCredit.locator('.credits-licence a')).toHaveAttribute('href', 'https://creativecommons.org/licenses/by/3.0/');
-  await expect(voltCredit.locator('.credits-use')).toContainText('plays from file 0:00');
-  await expect(voltCredit.locator('.credits-use')).toContainText('edited for use in Specimen, including trimming and a repeated musical section');
+  await expect(voltCredit.locator('.credits-use')).toHaveText("Volt's Rescue and Escape · trimmed and looped.");
   await expect(page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: /^The Way Out$/ }) })).toHaveCount(0);
   for (const [title, creator, slug, licence] of [
     ['Soundscape - Synthwave Horror J60 - Loop', 'Tri-Tachyon (Ellary)', 'soundscape-synthwave-horror-j60-loop', 'licenses/by/4.0/'],
@@ -131,9 +133,9 @@ test('cinematic recordings decode at the nested URL and credits use the existing
     await expect(row.locator('h3 a')).toHaveAttribute('href', `https://opengameart.org/content/${slug}`);
     await expect(row.locator('.credits-licence a')).toHaveAttribute('href', `https://creativecommons.org/${licence}`);
   }
-  await expect(page.locator('.credits-use').filter({ hasText: 'Music by Tri-Tachyon - https://soundcloud.com/tri-tachyon/albums' })).toHaveCount(1);
+  await expect(page.locator('.credits-creator a').filter({ hasText: 'Tri-Tachyon (Ellary)' })).toHaveAttribute('href', 'https://soundcloud.com/tri-tachyon/albums');
   await expect(page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: /^Perpetual Tension$/ }) })).toHaveCount(0);
-  await expect(page.locator('.credits-use').filter({ hasText: 'extended/repeated buildup in Act III' })).toHaveCount(1);
+  await expect(page.locator('.credits-use').filter({ hasText: 'The Specimen, Acts III and IV.' })).toHaveCount(1);
   await page.locator('.credits-entry').filter({ has: page.locator('h3', { hasText: /^High Tech Lab$/ }) }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: test.info().outputPath('cinematic-music-credits.png') });
   expect(errors).toEqual([]);
