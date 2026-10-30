@@ -2795,8 +2795,14 @@ function createRoomCompileSubset(
   roomId: DebugRoomId,
   chamberScope = false,
 ): THREE.Group {
+  const sources = createRoomPrewarmSources(resources,roomId,chamberScope);
+  if (roomId === 4) {
+    // The wide Room 4 primer also draws this plaque under the six-point,
+    // ten-spot layout. Submit it early without expanding the real draw primers.
+    sources.push(requiredNamedObject(resources.testScene.root, 'room-1-pod-specimen-label'));
+  }
   return createCompileSubset(`containment-room-${roomId}-shader-prewarm-subset`,
-    createRoomPrewarmSources(resources,roomId,chamberScope));
+    sources);
 }
 
 function createCompileSubset(name:string,sources:readonly THREE.Object3D[]):THREE.Group{
