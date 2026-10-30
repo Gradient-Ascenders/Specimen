@@ -8,6 +8,7 @@ import type { AudioPlayback } from '../audio/AudioManager.ts';
 import type { BlackoutMaintenanceMapData } from '../render/environment/blackout/BlackoutMaintenanceMapData.ts';
 import * as THREE from 'three';
 import { CinematicCompileCache } from '../render/CinematicCompileCache.ts';
+import { withRetainedCameraView } from '../render/RetainedCameraView.ts';
 import { HiddenMaterialCulling } from '../render/HiddenMaterialCulling.ts';
 import { BlackoutShutterOcclusion } from '../render/environment/blackout/BlackoutShutterOcclusion.ts';
 import { CameraOcclusion } from '../render/CameraOcclusion.ts';
@@ -567,25 +568,45 @@ export class BlackoutLevelRuntime {
           await withLights(() => layer.withShadowPreparation(shadows, () => cinematicPrograms.compile(renderer, layer.scene, camera)));
           if (!current()) return;
           const viewport = renderer.getViewport(new THREE.Vector4()), transmissionScale = renderer.transmissionResolutionScale;
-          withLights(() => withIsolatedPrewarmState(renderer, () => {
+          withRetainedCameraView(layer.cameraRig.camera, camera, retainedCamera => withLights(() => withIsolatedPrewarmState(renderer, () => {
             // Each shot can select previously unused lamps. Allocate their
             // depth samplers before the receiver draw freezes shadow updates.
-            if (shadows) prepareShadowSamplerMaps(renderer, layer.scene, camera);
-            // These temporary cinematic cameras only rehearse programs/uploads.
-            // The retained gameplay camera's full-size transmission target was
-            // already primed by BlackoutPresentationPreparation. Keep that
-            // storage and the full-size shadow maps; bound only the hidden
-            // rehearsal raster work, drawing every shot and fencing below.
+            if (shadows) prepareShadowSamplerMaps(renderer, layer.scene, retainedCamera);
+            // Three retains transmission targets by scene/camera ID. Borrow
+            // the rig camera for every shot instead of allocating targets for
+            // the temporary research/defeat cameras. Keep bounded raster work;
+            // restore the gameplay target's dimensions before the final fence.
             const ratio = renderer.getPixelRatio();
             const scale = Math.min(1, 16 / (viewport.z * ratio), 9 / (viewport.w * ratio));
             const minimumSpan = Math.ceil(1 / transmissionScale) / ratio;
             renderer.setViewport(0, 0, Math.max(minimumSpan, viewport.z * scale), Math.max(minimumSpan, viewport.w * scale));
             renderer.setScissorTest(false); renderer.transmissionResolutionScale = transmissionScale;
-            layer.withShadowPreparation(shadows, () => this.hiddenMaterialCulling!.render(() => renderer.render(layer.scene, camera)));
-          }));
+            layer.withShadowPreparation(shadows, () => this.hiddenMaterialCulling!.render(() => renderer.render(layer.scene, retainedCamera)));
+          })));
         };
           await resources.researchFinale?.primePresentationFrames(layer.scene, warmFrame, current);
           await resources.defeatFinale?.primePresentationFrames(warmFrame, current);
+          if (current()) {
+            // The tiny shots resized the reused target. Allocate its gameplay
+            // extent now, without a full-world draw or a first-control resize.
+            let transmissionMesh: THREE.Mesh | undefined;
+            layer.scene.traverse(object => {
+              if (!transmissionMesh && object instanceof THREE.Mesh &&
+                [object.material].flat().some(material => material.visible &&
+                  material instanceof THREE.MeshPhysicalMaterial && material.transmission > 0)) transmissionMesh = object;
+            });
+            if (transmissionMesh) {
+              const camera = layer.cameraRig.camera, viewport = layer.getGameplayPrewarmViewport(new THREE.Vector4());
+              const transmissionScale = renderer.transmissionResolutionScale;
+              const draw = () => withIsolatedPrewarmState(renderer, () => {
+                renderer.setViewport(viewport); renderer.transmissionResolutionScale = transmissionScale;
+                layer.withShadowPreparation(renderer.shadowMap.enabled, () => renderIsolatedPrewarmResources(
+                  renderer, layer.scene, camera, [transmissionMesh!], { includeHidden: true, includeDescendants: false }));
+              });
+              if (resources.lighting?.lightLayout) resources.lighting.lightLayout.withLayout(camera, camera.position, draw);
+              else draw();
+            }
+          }
           // Every rehearsal submits to the same context. One fence drains all
           // preceding shots, allowing their uploads and CPU preparation to
           // overlap instead of stopping the pipeline at each camera pose.
